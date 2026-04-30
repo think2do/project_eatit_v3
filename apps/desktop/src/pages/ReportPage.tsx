@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Printer } from "lucide-react";
 import type { InterviewReportResponse } from "@eatit/shared-types";
 import { generateReport, getSessionReport } from "@/api/sessions";
-import { PassProbabilityRing } from "@/pages/report/PassProbabilityRing";
+import { HeroScoreCard } from "@/pages/report/HeroScoreCard";
 import { ReasonRow } from "@/pages/report/ReasonRow";
 import { WaitingTips } from "@/components/WaitingTips";
 // Side-effect stylesheet: adds @media print rules that hide chrome
@@ -237,7 +237,10 @@ export function ReportPage(): JSX.Element {
           gap: 18,
         }}
       >
-        <PassProbabilityRing value={payload.pass_probability} />
+        <HeroScoreCard
+          overallScore={payload.overall_score ?? null}
+          passLikelihood={payload.pass_likelihood ?? null}
+        />
         <div
           style={{
             fontSize: 14,

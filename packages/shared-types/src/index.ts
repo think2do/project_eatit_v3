@@ -244,14 +244,23 @@ export type ReportReason = {
   quote: string;
 };
 
+export type PassLikelihood = "中上" | "中" | "中下";
+
 export type InterviewReportPayload = {
   overall_summary: string;
   round_reviews: RoundReview[];
   strengths: string[];
   improvements: string[];
   next_actions: string[];
+  // Deprecated 0–100 匹配度,L0 红线下不向用户展示;后端兼容字段
   pass_probability: number;
   reasons: ReportReason[];
+  // F-314 v3.2+ additions. `pass_likelihood` is the only thing that
+  // surfaces in the report hero. Backend coerces any LLM drift to
+  // these three tiers before the payload reaches the client.
+  pass_likelihood?: PassLikelihood | null;
+  overall_score?: number | null;
+  ai_verdict?: string | null;
 };
 
 export type TriggerReportRequest = {

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
+from typing import Literal
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -21,11 +23,66 @@ from app.models.session import DirectionFramework, InterviewSession
 from app.schemas.reports import (
     InterviewReportPayload,
     InterviewReportResponse,
+    PassLikelihood,
     ReportReason,
     ReportStatusResponse,
     TriggerReportRequest,
     TriggerReportResponse,
 )
+
+
+logger = logging.getLogger(__name__)
+
+
+# F-314 L0 ethical guardrail. The user-facing "通过可能性" indicator is
+# strictly one of three tiers — anything else (a number, "不建议", "不通过",
+# any English negative, etc.) must be force-coerced to a tier here at the
+# service boundary.
+VALID_PASS_LIKELIHOOD: frozenset[str] = frozenset({"中上", "中", "中下"})
+
+
+def derive_pass_likelihood(
+    overall_score: int | None,
+    match_score: int | None,
+) -> Literal["中上", "中", "中下"]:
+    """Compute pass_likelihood from overall_score + match_score.
+
+    Never returns "不建议" or any non-3-tier value (L0 ethical guardrail).
+    The thresholds intentionally bottom out at "中下" instead of dropping
+    into a lower tier — the design system has no fourth option.
+    """
+    o = overall_score or 0
+    m = match_score or 0
+    if o >= 80 and m >= 75:
+        return "中上"
+    if o >= 65 and m >= 60:
+        return "中"
+    return "中下"
+
+
+def coerce_pass_likelihood(
+    raw: str | None,
+    overall_score: int | None,
+    match_score: int | None,
+) -> Literal["中上", "中", "中下"]:
+    """Validate LLM output; force-override illegal values to derive result.
+
+    Logs a WARN on every override so production can monitor LLM drift
+    against the L0 guardrail. Always returns one of the three legal tiers.
+    """
+    if raw in VALID_PASS_LIKELIHOOD:
+        # mypy / Pyright can narrow to Literal once the membership check
+        # has run, but the cast keeps the annotation explicit for callers.
+        return raw  # type: ignore[return-value]
+    derived = derive_pass_likelihood(overall_score, match_score)
+    logger.warning(
+        "pass_likelihood illegal value %r overridden to %r (overall=%s match=%s)",
+        raw,
+        derived,
+        overall_score,
+        match_score,
+    )
+    return derived
 
 
 class ReportsService:
@@ -295,6 +352,21 @@ class ReportsService:
         ]
         strengths = [r.aspect for r in agent_output.reasons if r.verdict in ("strong", "solid")]
         improvements = [r.aspect for r in agent_output.reasons if r.verdict in ("mixed", "weak")]
+        # F-314: derive pass_likelihood at the service boundary so we never
+        # surface a raw number or a non-tiered string. match_score is not
+        # yet wired through the parse agent (M1.x), so until then we use
+        # overall_score (or pass_probability when overall_score is None)
+        # as a proxy for both axes. Both fall to "中下" when LLM output is
+        # blank, which is L0-compliant.
+        overall = (
+            agent_output.overall_score
+            if agent_output.overall_score is not None
+            else agent_output.pass_probability
+        )
+        match = overall
+        pass_likelihood: PassLikelihood = coerce_pass_likelihood(
+            agent_output.pass_likelihood, overall, match
+        )
         return InterviewReportPayload(
             overall_summary=agent_output.summary,
             round_reviews=[],
@@ -303,4 +375,7 @@ class ReportsService:
             next_actions=list(agent_output.next_actions),
             pass_probability=agent_output.pass_probability,
             reasons=reasons,
+            pass_likelihood=pass_likelihood,
+            overall_score=agent_output.overall_score,
+            ai_verdict=agent_output.ai_verdict,
         )
