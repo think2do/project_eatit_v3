@@ -1,19 +1,28 @@
-# Eatit v3.2+ P0 Fix Plan
+# Eatit v3.2+ P1/M2.1 Fix Plan
 
 Source of truth for what's left. Ralph picks the **first unchecked item** in "High Priority" each loop. Section specs live in:
 
-- **当前阶段**: [`.ralph/specs/v32-p0-constraints.md`](specs/v32-p0-constraints.md) + [`.ralph/specs/v32-p0-sections.md`](specs/v32-p0-sections.md)
-- 历史阶段: `.ralph/specs/phase3-sections.md`、`phase3.5-sections.md`、`phase4-sections.md`、`phase5-sections.md`(已归档,不再用)
+- **当前阶段(P1/M2.1)**: [`.ralph/specs/v32-p1-constraints.md`](specs/v32-p1-constraints.md) + [`.ralph/specs/v32-p1-sections.md`](specs/v32-p1-sections.md)
+- 上一阶段(P0,已完成 2026-04-30): [`.ralph/specs/v32-p0-constraints.md`](specs/v32-p0-constraints.md) + [`.ralph/specs/v32-p0-sections.md`](specs/v32-p0-sections.md)
+- 历史阶段(v3.1,已归档): `.ralph/specs/phase3-sections.md`、`phase3.5-sections.md`、`phase4-sections.md`、`phase5-sections.md`
 
-Match the section prefix(V32.M0.* / V32.M1.*)to 当前 spec 文件即可。
+Match the section prefix(V32.M2.*)to 当前 spec 文件即可。
 
 ## High Priority (work top-down)
 
-> P0 = M0(红线整改 + 设计地基)+ M1(v3.2 三件套对齐)。共 11 个节点,~4.5 周。
-> 依赖关系见 v32-p0-sections.md "Execution order" 表。Ralph 必须按下方顺序执行。
+> P1 / M2.1 = 实时面试增强(F-309 / F-310 / F-311 / F-306 + InterviewPage 顶部重构)。共 5 个节点。
+> 依赖关系见 v32-p1-sections.md "Execution order" 表。Ralph 必须按下方顺序执行。
 
+- [ ] V32.M2.1.2 F-310 实时统计纯前端 hook(useTurnStats + fillerWords L0 双端锁 + 引入 Vitest 框架)
+- [ ] V32.M2.1.3 F-311 键盘快捷键(useGlobalKeymap + EndConfirmDialog + KeyboardShortcutHelper)
+- [ ] V32.M2.1.4 F-306 Tips Carousel 替换 WaitingTips(tips.json 静态库 + selectTips 合并 + 完成态 ✓ 过渡)
+- [ ] V32.M2.1.5 InterviewPage 顶部重构(REC 脉冲 + Session meta strip + WaveBars + 近 3 轮摘要 + 全部接入 M2.1.1-4 产出)
 
-## Completed (P0 — v3.2+)
+## Completed (P1/M2.1 — v3.2+)
+
+- [x] V32.M2.1.1 F-309 实时观察侧栏(InterviewerAgentOutput.live_observation ≤30 字 + LiveObservationCard + 7 boundary tests + A13 Observer fallback) (2d15550, 2026-04-30)
+
+## Completed (P0 — v3.2+, 2026-04-30)
 
 - [x] V32.M0.1a 按钮共享类(7 个 .btn 变体落到 @layer components) (4cc40e5, 2026-04-30)
 - [x] V32.M0.1b 卡片共享类(.card / .card-pad / .card-pad-lg / .card-header 共 4 个) (29696a6, 2026-04-30)
