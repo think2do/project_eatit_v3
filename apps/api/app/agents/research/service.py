@@ -23,6 +23,7 @@ import logging
 from datetime import datetime, timezone
 
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.research.schemas import (
     CompanyProfile,
@@ -35,6 +36,7 @@ from app.infra.llm.gateway import LLMGateway
 from app.infra.llm.instructor_client import make_instructor, structured_completion
 from app.infra.llm.tools import ToolUseCapability, build_web_search_tool
 from app.prompts import render_prompt
+from app.repositories import research_cache as cache_repo
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +61,11 @@ def _compute_cache_key(input: ResearchAgentInput) -> str:
 
 class ResearchAgentService:
     async def run(
-        self, input: ResearchAgentInput, gateway: LLMGateway
+        self,
+        input: ResearchAgentInput,
+        gateway: LLMGateway,
+        *,
+        session: AsyncSession | None = None,
     ) -> ResearchAgentOutput:
         cache_key = _compute_cache_key(input)
         # L0 A11: audit log records the hash only. role_title is treated
@@ -70,11 +76,32 @@ class ResearchAgentService:
             extra={"cache_key": cache_key, "role_title_len": len(input.role_title)},
         )
 
+        # M2.3.X audit-fix (G4) — try the 30-day cache first when a
+        # session is available. The cache is keyed on the sha256 hash
+        # of (company|industry_hints), so a re-parse for the same JD
+        # short-circuits without touching the LLM.
+        if session is not None:
+            cached_payload = await cache_repo.get(session, cache_key)
+            if cached_payload is not None:
+                logger.info("research_cache_hit", extra={"cache_key": cache_key})
+                try:
+                    return ResearchAgentOutput.model_validate(cached_payload)
+                except ValueError:
+                    # Stale schema in the cache — fall through to a fresh
+                    # fetch. This shouldn't happen in practice but keeps
+                    # the read-path defensive against migrations.
+                    logger.info(
+                        "research_cache_stale_schema",
+                        extra={"cache_key": cache_key},
+                    )
+
         can_tool_use = await ToolUseCapability.probe(gateway)
         if not can_tool_use:
-            return await self._degraded_run(
+            result = await self._degraded_run(
                 input, gateway, cache_key, "tool_use_unsupported"
             )
+            await self._write_cache(session, cache_key, result)
+            return result
 
         try:
             llm_out = await self._tool_augmented_run(input, gateway)
@@ -83,15 +110,56 @@ class ResearchAgentService:
                 "research_tool_call_failed",
                 extra={"cache_key": cache_key, "reason": type(exc).__name__},
             )
-            return await self._degraded_run(input, gateway, cache_key, str(exc))
+            result = await self._degraded_run(
+                input, gateway, cache_key, str(exc)
+            )
+            await self._write_cache(session, cache_key, result)
+            return result
 
-        return ResearchAgentOutput(
+        result = ResearchAgentOutput(
             company=llm_out.company,
             industry=llm_out.industry,
             fetched_at=datetime.now(timezone.utc),
             cache_key=cache_key,
             degraded=False,
         )
+        await self._write_cache(session, cache_key, result)
+        return result
+
+    async def _write_cache(
+        self,
+        session: AsyncSession | None,
+        cache_key: str,
+        result: ResearchAgentOutput,
+    ) -> None:
+        """Best-effort cache write. Cache failure must NEVER fail a
+        successful research run for the user."""
+        if session is None:
+            return
+        try:
+            await cache_repo.set_(
+                session, cache_key, result.model_dump(mode="json")
+            )
+        except Exception as exc:  # noqa: BLE001 — defensive
+            logger.info(
+                "research_cache_write_failed",
+                extra={"cache_key": cache_key, "reason": type(exc).__name__},
+            )
+
+    @staticmethod
+    def _resolve_tools(can_tool_use: bool) -> list[dict] | None:
+        """Return the provider tool block when the BYOK key supports it.
+
+        M2.3.X audit-fix (G2) — pre-audit this was a comment-only stub
+        and the `tools=` kwarg below was commented out, so no Research
+        run ever sent a hosted web-search tool to the LLM. The probe
+        result is the only gate on the tool-augmented path; we forward
+        the provider schema through `structured_completion`'s
+        `**completion_kwargs` to `gateway.complete`.
+        """
+        if can_tool_use:
+            return [build_web_search_tool()]
+        return None
 
     async def _tool_augmented_run(
         self, input: ResearchAgentInput, gateway: LLMGateway
@@ -112,11 +180,11 @@ class ResearchAgentService:
                 {"role": "user", "content": user},
             ],
             response_model=_LLMResearchOutput,
-            # Pass the hosted web_search tool through to the underlying
-            # gateway. Instructor's adapter forwards unknown kwargs.
-            # Note: not all providers will accept the tool block; the
-            # probe above is what gates this path.
-            # tools=[build_web_search_tool()],  # see _resolve_tools below
+            # M2.3.X audit-fix (G2) — actually inject the hosted
+            # web_search tool. We only reach this path after
+            # ToolUseCapability.probe returned True, so the provider
+            # has confirmed it speaks tool use.
+            tools=[build_web_search_tool()],
         )
 
     async def _degraded_run(

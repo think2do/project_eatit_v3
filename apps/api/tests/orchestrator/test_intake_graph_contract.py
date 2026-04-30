@@ -1,20 +1,24 @@
-"""V32.M2.3.4 — intake_graph contract + parallel + degraded-path tests.
+"""V32.M2.3.4 + M2.3.X audit-fix — intake_graph contract & wiring tests.
 
-Five guarantees this file enforces:
+Six guarantees this file enforces (post-audit):
 
   1. **Node-name lock** — INTAKE_GRAPH_NODES must equal exactly
      {"parse_node", "research_node", "predict_questions_node"}.
      Mirrors the A7-style lock turn_graph already has.
   2. **turn_graph untouched** — run the existing turn_graph contract
      and confirm intake_graph's existence didn't drift it (defensive).
-  3. **Parallel parse + research** — both nodes start before either
-     finishes. We instrument scripted services with asyncio.Event to
-     catch a serial execution regression.
-  4. **Research opt-out is a no-op** — research_input=None leaves
-     parse_payload populated and research_payload=None without raising.
-  5. **Research timeout doesn't block parse** — a research_node that
-     sleeps past the timeout still lets parse_payload land and the
-     graph reaches predict_questions_node.
+  3. **Sequential parse → research** (was parallel pre-audit) — Parse
+     must commit `parse_payload` before research_node runs, because
+     research_node now derives its input from `parse_payload.jd_*`.
+  4. **opt_in path** — when `research_opt_in=True` AND parse_payload
+     carries jd_company_name + jd_role_title, research_node runs and
+     populates research_payload.
+  5. **opt-out / no-signal short-circuit** — false opt_in OR missing JD
+     signal yields `research_skipped=True` with `research_payload=None`
+     and never invokes research_service.
+  6. **Research timeout / LLMError soft-skip** — research_node never
+     propagates a slow or failed Research call; parse_payload still
+     lands and the graph reaches predict_questions_node.
 
 We do NOT exercise predict_questions_node's framework call here; the
 M2.3.3 framework tests already cover that surface, and the framework
@@ -59,8 +63,24 @@ class _StubGateway(LLMGateway):
         )
 
 
-def _make_parse_output() -> ParseAgentOutput:
-    return ParseAgentOutput(match_summary="候选人匹配度中上")
+def _make_parse_output(
+    *,
+    jd_company_name: str | None = "字节跳动",
+    jd_role_title: str | None = "高级产品经理",
+    jd_industry_hints: list[str] | None = None,
+) -> ParseAgentOutput:
+    """Default parse output now ships JD-derived signal so the new
+    opt-in research path (M2.3.X) can derive a ResearchAgentInput.
+    Tests that need to exercise the no-signal path pass jd_*=None.
+    """
+    return ParseAgentOutput(
+        match_summary="候选人匹配度中上",
+        jd_company_name=jd_company_name,
+        jd_role_title=jd_role_title,
+        jd_industry_hints=jd_industry_hints
+        if jd_industry_hints is not None
+        else ["短视频"],
+    )
 
 
 def _make_research_output() -> ResearchAgentOutput:
@@ -88,16 +108,18 @@ def _make_research_output() -> ResearchAgentOutput:
 
 class _ScriptedParseService:
     """Returns a fixed parse output. Optional latch lets tests assert
-    parallel start order."""
+    sequential ordering vs. research_node."""
 
     def __init__(
         self,
         *,
         started: asyncio.Event | None = None,
         proceed: asyncio.Event | None = None,
+        output: ParseAgentOutput | None = None,
     ) -> None:
         self._started = started
         self._proceed = proceed
+        self._output = output
         self.calls = 0
 
     async def run(
@@ -108,7 +130,7 @@ class _ScriptedParseService:
             self._started.set()
         if self._proceed:
             await self._proceed.wait()
-        return _make_parse_output()
+        return self._output if self._output is not None else _make_parse_output()
 
 
 class _ScriptedResearchService:
@@ -119,19 +141,34 @@ class _ScriptedResearchService:
         proceed: asyncio.Event | None = None,
         sleep_seconds: float | None = None,
         raise_exc: BaseException | None = None,
+        observe_after: asyncio.Event | None = None,
     ) -> None:
         self._started = started
         self._proceed = proceed
         self._sleep_seconds = sleep_seconds
         self._raise_exc = raise_exc
+        self._observe_after = observe_after
         self.calls = 0
+        self.last_input: ResearchAgentInput | None = None
 
     async def run(
-        self, input: ResearchAgentInput, gateway: LLMGateway
+        self,
+        input: ResearchAgentInput,
+        gateway: LLMGateway,
+        *,
+        session: Any = None,
     ) -> ResearchAgentOutput:
         self.calls += 1
+        self.last_input = input
         if self._started:
             self._started.set()
+        # M2.3.X — used by the sequential test to assert parse_payload
+        # was already committed by the time research_node fired.
+        if self._observe_after is not None:
+            assert self._observe_after.is_set(), (
+                "research_node ran before parse_payload was committed; "
+                "intake_graph regressed back to parallel scheduling"
+            )
         if self._raise_exc:
             raise self._raise_exc
         if self._sleep_seconds:
@@ -188,19 +225,22 @@ def test_intake_graph_node_count_is_three() -> None:
     assert len(user_nodes) == 3
 
 
-async def test_parse_and_research_run_in_parallel() -> None:
-    """Both nodes must start before either commits state."""
-    parse_started = asyncio.Event()
-    parse_proceed = asyncio.Event()
-    research_started = asyncio.Event()
-    research_proceed = asyncio.Event()
+async def test_parse_runs_before_research_sequential() -> None:
+    """M2.3.X — research_node MUST observe parse_payload, so parse runs first."""
+    parse_committed = asyncio.Event()
+    parse_service = _ScriptedParseService()
+    research_service = _ScriptedResearchService(observe_after=parse_committed)
 
-    parse_service = _ScriptedParseService(
-        started=parse_started, proceed=parse_proceed
-    )
-    research_service = _ScriptedResearchService(
-        started=research_started, proceed=research_proceed
-    )
+    # Wrap parse_service.run so we can flip the latch only after parse
+    # returns (proxy for "parse_payload committed to state").
+    real_parse_run = parse_service.run
+
+    async def _run(input: ParseAgentInput, gateway: LLMGateway) -> ParseAgentOutput:
+        out = await real_parse_run(input, gateway)
+        parse_committed.set()
+        return out
+
+    parse_service.run = _run  # type: ignore[method-assign]
 
     gateway = _StubGateway()
     graph = build_intake_graph(
@@ -213,33 +253,54 @@ async def test_parse_and_research_run_in_parallel() -> None:
     state = IntakeState(
         resume_text="r",
         jd_text="j",
-        research_input=ResearchAgentInput(
-            company_name="字节", role_title="PM", industry_hints=["短视频"]
-        ),
+        research_opt_in=True,
         framework_config=None,  # skip predict_questions_node
     )
 
-    # Drive the graph in the background; release the latches once we've
-    # observed both nodes have started.
-    invocation = asyncio.create_task(graph.ainvoke(state.model_dump()))
-
-    # Wait for BOTH to start (proves parallel scheduling).
-    await asyncio.wait_for(
-        asyncio.gather(parse_started.wait(), research_started.wait()),
-        timeout=2.0,
-    )
-    parse_proceed.set()
-    research_proceed.set()
-
-    result = await asyncio.wait_for(invocation, timeout=2.0)
+    result = await asyncio.wait_for(graph.ainvoke(state.model_dump()), timeout=2.0)
     assert parse_service.calls == 1
     assert research_service.calls == 1
     assert result["parse_payload"] is not None
     assert result["research_payload"] is not None
 
 
-async def test_research_opt_out_yields_skipped_state() -> None:
-    """research_input=None ⇒ research_node short-circuits without raising."""
+async def test_research_input_derived_from_parse_jd_fields() -> None:
+    """opt_in=True + parse jd_* ⇒ research_node builds its own input."""
+    parse_service = _ScriptedParseService(
+        output=ParseAgentOutput(
+            match_summary="ok",
+            jd_company_name="OpenAI",
+            jd_role_title="PM",
+            jd_industry_hints=["LLM", "API"],
+        )
+    )
+    research_service = _ScriptedResearchService()
+
+    gateway = _StubGateway()
+    graph = build_intake_graph(
+        gateway,
+        parse_service=parse_service,
+        research_service=research_service,
+        framework_service=_NoopFrameworkService(),
+    )
+
+    state = IntakeState(
+        resume_text="r",
+        jd_text="j",
+        research_opt_in=True,
+        framework_config=None,
+    )
+    result = await graph.ainvoke(state.model_dump())
+
+    assert result["research_payload"] is not None
+    assert research_service.last_input is not None
+    assert research_service.last_input.company_name == "OpenAI"
+    assert research_service.last_input.role_title == "PM"
+    assert research_service.last_input.industry_hints == ["LLM", "API"]
+
+
+async def test_research_opt_out_short_circuits() -> None:
+    """research_opt_in=False ⇒ research_node skips without raising."""
     parse_service = _ScriptedParseService()
     research_service = _ScriptedResearchService()  # never invoked
 
@@ -254,7 +315,7 @@ async def test_research_opt_out_yields_skipped_state() -> None:
     state = IntakeState(
         resume_text="r",
         jd_text="j",
-        research_input=None,  # user opted out
+        research_opt_in=False,
         framework_config=None,
     )
     result = await graph.ainvoke(state.model_dump())
@@ -263,6 +324,39 @@ async def test_research_opt_out_yields_skipped_state() -> None:
     assert result["research_payload"] is None
     assert result["research_skipped"] is True
     assert result["research_error"] is None
+    assert research_service.calls == 0
+
+
+async def test_research_skipped_when_jd_lacks_signal() -> None:
+    """opt_in=True but parse jd_company_name=None ⇒ skip without LLM call."""
+    parse_service = _ScriptedParseService(
+        output=ParseAgentOutput(
+            match_summary="anonymous JD",
+            jd_company_name=None,
+            jd_role_title=None,
+            jd_industry_hints=[],
+        )
+    )
+    research_service = _ScriptedResearchService()
+
+    gateway = _StubGateway()
+    graph = build_intake_graph(
+        gateway,
+        parse_service=parse_service,
+        research_service=research_service,
+        framework_service=_NoopFrameworkService(),
+    )
+
+    state = IntakeState(
+        resume_text="r",
+        jd_text="j",
+        research_opt_in=True,
+        framework_config=None,
+    )
+    result = await graph.ainvoke(state.model_dump())
+
+    assert result["research_payload"] is None
+    assert result["research_skipped"] is True
     assert research_service.calls == 0
 
 
@@ -284,9 +378,7 @@ async def test_research_timeout_does_not_block_parse() -> None:
     state = IntakeState(
         resume_text="r",
         jd_text="j",
-        research_input=ResearchAgentInput(
-            company_name="字节", role_title="PM", industry_hints=["短视频"]
-        ),
+        research_opt_in=True,
         framework_config=None,
     )
     result = await asyncio.wait_for(graph.ainvoke(state.model_dump()), timeout=3.0)
@@ -317,9 +409,7 @@ async def test_research_llm_error_is_caught_and_skipped() -> None:
     state = IntakeState(
         resume_text="r",
         jd_text="j",
-        research_input=ResearchAgentInput(
-            company_name="字节", role_title="PM", industry_hints=["短视频"]
-        ),
+        research_opt_in=True,
         framework_config=None,
     )
     result = await graph.ainvoke(state.model_dump())
@@ -346,7 +436,7 @@ async def test_predict_questions_node_skips_when_no_config() -> None:
     state = IntakeState(
         resume_text="r",
         jd_text="j",
-        research_input=None,
+        research_opt_in=False,
         framework_config=None,  # ← the skip signal
     )
     result = await graph.ainvoke(state.model_dump())

@@ -1,30 +1,44 @@
-"""Intake-phase LangGraph (V32.M2.3.4 / F-320 + F-321).
+"""Intake-phase LangGraph (V32.M2.3.4 / F-320 + F-321 + M2.3.X audit fix).
 
 Independent graph from `turn_graph.py`. The two never interleave — turn_graph
 runs per-turn during the live interview, this one runs once during intake
-to fan out Parse + Research in parallel and (optionally) hand the merged
-inputs to Framework Agent for predicted-question generation.
+to chain Parse → Research → Framework predict so that downstream UI can
+show the company / industry / predicted-question cards.
 
-  START ──► parse_node    ───┐
-       │                     ├──► predict_questions_node ──► END
-       └──► research_node ───┘
+  START ──► parse_node ──► research_node ──► predict_questions_node ──► END
 
-Parallelism rules:
-  * `parse_node` and `research_node` are siblings off START. LangGraph runs
-    them concurrently and the merge into `predict_questions_node` waits for
-    both to commit their state slice.
+Sequential rationale (M2.3.X audit-fix):
+  Research / Predict need company + role + industry-hint signals out of
+  the JD. Pre-audit we tried to extract these via a regex hand-rolled
+  inside the assets domain service, which silently always returned None
+  — so research_node never had a real input and the Research Agent was
+  never actually called in production. Parse Agent already reads the JD
+  end-to-end; we now ask it to emit `jd_company_name / jd_role_title /
+  jd_industry_hints` alongside the rest of its output. research_node
+  consumes `state.parse_payload.jd_*` to construct its own input, which
+  forces this to be sequential — research_node MUST run after parse_node
+  has committed parse_payload.
+
+  Trade-off: total parse-trigger latency rises ~30% (parse 8-15s +
+  research 5-10s = 13-25s vs. the old "parallel but broken" 8-15s). We
+  accept this because correctness > performance; the cache layer in
+  ResearchAgentService keeps repeat parses snappy.
+
+Soft-skip rules (unchanged):
   * `research_node` is "soft" — when the user has NOT opted in (or the
-    Research call errors / times out) it sets `research_payload=None` and
-    flips `research_skipped=True`. This NEVER blocks parse_node; it's a
-    no-op write into state.
-  * `predict_questions_node` requires a parse_payload to do anything
-    useful. When parse_payload is missing or framework_config is None we
+    Parse Agent could not extract a company/role/industry signal, or
+    the Research call errors / times out) it sets `research_payload=None`
+    and flips `research_skipped=True`. The error class lands in
+    `research_error` for log triage.
+  * `predict_questions_node` requires a parse_payload AND a
+    `framework_config` to do anything useful. When either is missing we
     skip the FrameworkAgent call and leave `direction_framework=None`.
 
 L0 A11 privacy is inherited from the agents' own schemas/prompts —
-intake_graph itself never sees resume_text after the parse_node populates
-parse_payload. The research_input is built by the caller (assets domain
-service) using ONLY company / role / industry hints from the JD.
+intake_graph itself never sees resume_text after parse_node populates
+parse_payload. The ResearchAgentInput we build inside research_node is
+strictly company/role/industry-hints sourced from the JD via Parse
+Agent; the agent's `extra="forbid"` schema rejects anything else.
 """
 from __future__ import annotations
 
@@ -34,6 +48,9 @@ from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from pydantic import ValidationError
 
 from app.agents.framework.schemas import FrameworkAgentInput, FrameworkAgentOutput, FrameworkConfigInput
 from app.agents.framework.service import FrameworkAgentService
@@ -64,9 +81,16 @@ class IntakeState(BaseModel):
     # ===== Inputs (set before graph.ainvoke) =====
     resume_text: str
     jd_text: str
-    # research_input None ⇒ user has NOT opted in (or the caller could
-    # not derive company/role/industry hints). research_node short-
-    # circuits to a no-op.
+    # M2.3.X audit-fix: opt-in is the new entry signal. When True,
+    # research_node tries to derive a ResearchAgentInput from the
+    # post-parse `parse_payload.jd_company_name / jd_role_title /
+    # jd_industry_hints`. When False, research_node short-circuits to a
+    # no-op regardless of what Parse Agent produced.
+    research_opt_in: bool = False
+    # Backward-compat hatch (used by a handful of contract tests that
+    # pre-build a ResearchAgentInput directly to focus on graph wiring).
+    # Production callers leave this None and rely on the opt-in path.
+    # When set, it overrides the parse-derived path.
     research_input: ResearchAgentInput | None = None
     # framework_config None ⇒ predict_questions_node is a no-op. The
     # session-creation flow supplies a config; the parse-trigger flow
@@ -84,6 +108,7 @@ class IntakeState(BaseModel):
 def build_intake_graph(
     gateway: LLMGateway,
     *,
+    session: AsyncSession | None = None,
     parse_service: ParseAgentService | None = None,
     research_service: ResearchAgentService | None = None,
     framework_service: FrameworkAgentService | None = None,
@@ -91,9 +116,13 @@ def build_intake_graph(
 ):
     """Compile the 3-node intake StateGraph.
 
+    `session` (M2.3.X audit-fix G4) is forwarded into research_node so
+    ResearchAgentService can read/write the 30-day research_cache table.
+    When None (most contract tests) the cache layer becomes a no-op.
+
     Service overrides are exposed for tests so they can inject scripted
     fakes (see test_intake_graph_contract.py). Production callers pass
-    just the gateway and rely on default singletons.
+    just the gateway + session and rely on default singletons.
     """
     parse_service = parse_service or ParseAgentService()
     research_service = research_service or ResearchAgentService()
@@ -111,9 +140,23 @@ def build_intake_graph(
         return {"parse_payload": payload}
 
     async def research_node(state: IntakeState) -> dict[str, Any]:
-        # Opt-out / no input ⇒ soft skip. NEVER block parse_node.
-        if state.research_input is None:
-            logger.info("research_node_skipped", extra={"reason": "no_input"})
+        # M2.3.X audit-fix: derive ResearchAgentInput at this node, AFTER
+        # parse_node has committed parse_payload. The legacy
+        # `research_input` slot still wins if a caller pre-built one (a
+        # few contract tests do this to isolate the graph wiring).
+        research_input = state.research_input
+        if research_input is None:
+            research_input = _derive_research_input_from_parse(state)
+
+        # Opt-out / no extractable signal ⇒ soft skip. NEVER block the
+        # downstream predict_questions_node.
+        if research_input is None:
+            reason = (
+                "opt_out"
+                if not state.research_opt_in
+                else "insufficient_jd_signal"
+            )
+            logger.info("research_node_skipped", extra={"reason": reason})
             return {
                 "research_payload": None,
                 "research_skipped": True,
@@ -121,7 +164,9 @@ def build_intake_graph(
             }
         try:
             research_output = await asyncio.wait_for(
-                research_service.run(state.research_input, gateway),
+                research_service.run(
+                    research_input, gateway, session=session
+                ),
                 timeout=research_timeout,
             )
         except asyncio.TimeoutError:
@@ -183,15 +228,50 @@ def build_intake_graph(
     graph.add_node("research_node", research_node)
     graph.add_node("predict_questions_node", predict_questions_node)
 
-    # Parallel fan-out from START.
+    # M2.3.X audit-fix — sequential chain. research_node now derives its
+    # input from parse_payload, so it MUST run after parse_node has
+    # committed. predict_questions_node still wants both.
     graph.add_edge(START, "parse_node")
-    graph.add_edge(START, "research_node")
-    # Both must commit before predict_questions_node fires.
-    graph.add_edge("parse_node", "predict_questions_node")
+    graph.add_edge("parse_node", "research_node")
     graph.add_edge("research_node", "predict_questions_node")
     graph.add_edge("predict_questions_node", END)
 
     return graph.compile()
+
+
+def _derive_research_input_from_parse(
+    state: "IntakeState",
+) -> ResearchAgentInput | None:
+    """Build a ResearchAgentInput from the parse_payload.jd_* fields.
+
+    Returns None if (a) the user did not opt in, (b) parse_payload is
+    missing (parse_node failed), or (c) the JD did not yield enough
+    company/role signal for Research Agent to be useful. Industry hints
+    fall back to the role title when the LLM didn't surface keywords —
+    Research's `industry_hints` requires min_length=1.
+    """
+    if not state.research_opt_in:
+        return None
+    payload = state.parse_payload
+    if payload is None:
+        return None
+    company = (payload.jd_company_name or "").strip()
+    role = (payload.jd_role_title or "").strip()
+    if not company or not role:
+        return None
+    hints = [h.strip() for h in (payload.jd_industry_hints or []) if h.strip()]
+    if not hints:
+        hints = [role]
+    try:
+        return ResearchAgentInput(
+            company_name=company[:80],
+            role_title=role[:80],
+            industry_hints=hints[:5],
+        )
+    except ValidationError:
+        # Schema rejected our trim; treat as "no signal" rather than
+        # blowing up the whole intake graph.
+        return None
 
 
 __all__ = [

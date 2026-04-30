@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
+from app.agents.framework.schemas import PredictedQuestionBank
+from app.agents.research.schemas import ResearchAgentOutput
 from app.schemas.common import SchemaModel, TimestampedResponse
 
 
@@ -116,11 +118,29 @@ class ParseResultPayload(SchemaModel):
         default_factory=list, min_length=0, max_length=2
     )
 
+    # ===== M2.3.X audit-fix (F-320) =====
+    # Parse Agent now mines the JD itself for company/role/industry hints
+    # so intake_graph's research_node can build a ResearchAgentInput
+    # without a brittle regex pre-pass. All three are optional — when the
+    # JD doesn't mention a company name (rare but possible) we leave
+    # them None and the research_node short-circuits.
+    jd_company_name: str | None = Field(default=None, max_length=80)
+    jd_role_title: str | None = Field(default=None, max_length=80)
+    jd_industry_hints: list[str] = Field(default_factory=list, max_length=5)
+
 
 class ParseRequestResponse(SchemaModel):
     asset_bundle_id: UUID
     status: str
     payload: ParseResultPayload
+    # ===== M2.3.X audit-fix (F-320 / F-321) =====
+    # intake_graph now produces these alongside the parse payload when the
+    # user has opted into the connected research feature AND Parse Agent
+    # extracted enough JD signal. Both default None so the response stays
+    # backward-compatible; UploadPage / ParsedPanel render the extra cards
+    # only when the values are non-null AND researchOptIn=true.
+    research_payload: ResearchAgentOutput | None = None
+    predicted_questions: PredictedQuestionBank | None = None
 
 
 class ParseResultResponse(TimestampedResponse):

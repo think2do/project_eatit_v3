@@ -242,3 +242,47 @@ def test_profile_summary_300_ok() -> None:
 def test_profile_summary_301_rejected() -> None:
     with pytest.raises(ValidationError, match="at most"):
         ParseResultPayload(profile_summary="x" * 301)
+
+
+# ---------------------------------------------------------------------------
+# M2.3.X audit-fix: jd_* fields (F-320)
+# ---------------------------------------------------------------------------
+
+
+def test_jd_fields_default_none_and_empty() -> None:
+    """All three jd_* fields are optional — Parse Agent may legit return them None."""
+    payload = ParseResultPayload()
+    assert payload.jd_company_name is None
+    assert payload.jd_role_title is None
+    assert payload.jd_industry_hints == []
+
+
+def test_jd_company_name_max_length() -> None:
+    with pytest.raises(ValidationError, match="at most"):
+        ParseResultPayload(jd_company_name="x" * 81)
+
+
+def test_jd_role_title_max_length() -> None:
+    with pytest.raises(ValidationError, match="at most"):
+        ParseResultPayload(jd_role_title="r" * 81)
+
+
+def test_jd_industry_hints_5_ok_6_rejected() -> None:
+    payload = ParseResultPayload(jd_industry_hints=["a", "b", "c", "d", "e"])
+    assert len(payload.jd_industry_hints) == 5
+    with pytest.raises(ValidationError, match="at most"):
+        ParseResultPayload(jd_industry_hints=["a"] * 6)
+
+
+def test_jd_fields_round_trip_through_parse_payload() -> None:
+    """jd_* fields survive ParseResultPayload round-trip via JSON."""
+    payload = ParseResultPayload(
+        jd_company_name="OpenAI",
+        jd_role_title="Senior PM",
+        jd_industry_hints=["LLM", "AI infra"],
+    )
+    encoded = payload.model_dump_json()
+    decoded = ParseResultPayload.model_validate_json(encoded)
+    assert decoded.jd_company_name == "OpenAI"
+    assert decoded.jd_role_title == "Senior PM"
+    assert decoded.jd_industry_hints == ["LLM", "AI infra"]

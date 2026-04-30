@@ -56,6 +56,7 @@ async def structured_completion(
     messages: list[dict[str, Any]],
     response_model: type[T],
     max_retries: int = 2,
+    **completion_kwargs: Any,
 ) -> T:
     """Thin wrapper that unwraps Instructor's retry exception.
 
@@ -63,6 +64,11 @@ async def structured_completion(
     `InstructorRetryException`. That hides our typed `LLMError` subclasses from
     callers. We peel the wrapper off so the agent-layer contract stays
     "typed LLM errors bubble up unchanged".
+
+    `**completion_kwargs` lets callers forward provider-specific options
+    (e.g. `tools=[build_web_search_tool()]`, `max_tokens=...`) all the way
+    through to `gateway.complete`. Instructor accepts unknown kwargs and
+    passes them along to the litellm-style completion callable.
     """
     try:
         return await client.chat.completions.create(
@@ -70,6 +76,7 @@ async def structured_completion(
             messages=messages,
             response_model=response_model,
             max_retries=max_retries,
+            **completion_kwargs,
         )
     except InstructorRetryException as exc:
         for arg in exc.args:

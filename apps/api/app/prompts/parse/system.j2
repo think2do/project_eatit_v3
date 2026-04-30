@@ -23,6 +23,12 @@
   - `priority ∈ {high, mid, low}`,`title ≤30 字`,`description ≤120 字`
 - `project_hooks_v32`:0~2 条主打项目,`{name ≤50 字, why ≤120 字}`(新视图侧用,不替代老 project_hooks)
 
+### v3.2 M2.3 新增字段(F-320,联网情报检索复用,只挖 JD 不挖简历)
+- `jd_company_name`:从 JD 中识别到的公司名(≤80 字),只看 JD 文本不要看简历;若 JD 没明确写公司名,**返回 null,绝对不要猜**
+- `jd_role_title`:从 JD 中识别到的目标岗位标题(≤80 字),用 JD 原文,不要意译
+- `jd_industry_hints`:从 JD 抽 2-5 个行业 / 业务关键词(短词,各 ≤30 字),例如 ["AI 应用","B 端 SaaS"];若信号不足返回 `[]`
+> ⚠️ 这 3 字段后续会用于联网检索,只能基于 JD,**不得引用简历内容**。
+
 ## Few-shot 简例
 
 高匹配 AI PM(资深):

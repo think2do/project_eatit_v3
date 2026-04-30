@@ -44,10 +44,16 @@ class ScriptedGateway(LLMGateway):
         self._script = list(script)
         self.calls = 0
         self.last_messages: list[dict[str, Any]] | None = None
+        # Captured per-call so tests can assert provider-specific kwargs
+        # (notably `tools=[...]` for the Research Agent tool-use path).
+        self.last_kwargs: dict[str, Any] = {}
+        self.kwargs_history: list[dict[str, Any]] = []
 
-    async def complete(self, messages: list[dict[str, Any]], **_kwargs: Any) -> Any:
+    async def complete(self, messages: list[dict[str, Any]], **kwargs: Any) -> Any:
         self.calls += 1
         self.last_messages = messages
+        self.last_kwargs = dict(kwargs)
+        self.kwargs_history.append(dict(kwargs))
         if not self._script:
             raise AssertionError("ScriptedGateway exhausted: no more canned responses")
         nxt = self._script.pop(0)

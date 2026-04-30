@@ -96,6 +96,12 @@ export function UploadPage(): JSX.Element {
       patchUpload({
         parseStatus: "succeeded",
         parsePayload: response.payload,
+        // V32.M2.3.X audit-fix — Research/Predict outputs now flow
+        // through ParseRequestResponse. Both are optional / nullable
+        // (research_payload is null when opt-in is off; predicted_questions
+        // is null when Framework didn't fire at parse-trigger time).
+        researchPayload: response.research_payload ?? null,
+        predictedQuestions: response.predicted_questions ?? null,
         parsedAtMs: Date.now(),
       });
     } catch (err) {

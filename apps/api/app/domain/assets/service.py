@@ -10,7 +10,8 @@ from pypdf.errors import PdfReadError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.research.schemas import ResearchAgentInput
+from app.agents.framework.schemas import FrameworkAgentOutput
+from app.agents.research.schemas import ResearchAgentOutput
 from app.api.dependencies.auth import AuthenticatedUser
 from app.domain.settings.service import get_setting
 from app.infra.llm import LLMGateway
@@ -101,20 +102,20 @@ class AssetsService:
         resume_text = await self._download_as_text(storage, asset.resume_file_ref)
         jd_text = await self._download_as_text(storage, asset.jd_file_ref)
 
-        # F-320 V32.M2.3.4 — route through intake_graph so Parse + (opt-in)
-        # Research run in parallel. The graph also has predict_questions_node,
-        # but at parse-trigger time we don't know the InterviewConfig yet —
-        # framework_config=None makes that node a no-op so SessionsService
-        # can still drive Framework at session creation.
-        research_input = await self._build_research_input(session, jd_text)
-
-        graph = build_intake_graph(gateway)
+        # F-320 V32.M2.3.X — route through intake_graph so Parse →
+        # Research → predict_questions_node run sequentially. Research is
+        # gated by the user's `research_opt_in` setting; predict_questions
+        # only fires at session creation when a real InterviewConfig
+        # exists, so we leave framework_config=None here and the
+        # node is a no-op (SessionsService runs Framework later).
+        opt_in = await get_setting(session, "research_opt_in")
+        graph = build_intake_graph(gateway, session=session)
         try:
             graph_result = await graph.ainvoke(
                 IntakeState(
                     resume_text=resume_text,
                     jd_text=jd_text,
-                    research_input=research_input,
+                    research_opt_in=bool(opt_in),
                     framework_config=None,
                 ).model_dump()
             )
@@ -136,6 +137,13 @@ class AssetsService:
             parse_payload_obj
             if isinstance(parse_payload_obj, dict)
             else parse_payload_obj.model_dump()
+        )
+
+        research_payload = _coerce_research_payload(
+            graph_result.get("research_payload")
+        )
+        predicted_questions = _coerce_predicted_questions(
+            graph_result.get("direction_framework")
         )
 
         result = await session.execute(
@@ -163,40 +171,9 @@ class AssetsService:
             asset_bundle_id=asset.id,
             status=parse_result.status,
             payload=payload,
+            research_payload=research_payload,
+            predicted_questions=predicted_questions,
         )
-
-    async def _build_research_input(
-        self, session: AsyncSession, jd_text: str
-    ) -> ResearchAgentInput | None:
-        """Return the ResearchAgentInput when (a) the user opted in AND
-        (b) we can extract a company name + role from the JD.
-
-        L0 A11: NEVER include resume content. The JD heuristics below
-        only mine the JD itself for company/role/industry hints. If
-        either is missing we return None and the graph's research_node
-        becomes a no-op.
-        """
-        opt_in = await get_setting(session, "research_opt_in")
-        if not bool(opt_in):
-            return None
-
-        company, role = _extract_company_and_role(jd_text)
-        if not company or not role:
-            return None
-
-        hints = _extract_industry_hints(jd_text) or [role]
-        # ResearchAgentInput.industry_hints requires min_length=1; cap to 5.
-        hints = hints[:5]
-        try:
-            return ResearchAgentInput(
-                company_name=company[:80],
-                role_title=role[:80],
-                industry_hints=hints,
-            )
-        except Exception:  # noqa: BLE001
-            # If JD parsing produces something the schema rejects, fall
-            # back to "no research" rather than blowing up the parse path.
-            return None
 
     @staticmethod
     async def _download_as_text(storage: StorageInterface, file_ref: str) -> str:
@@ -317,33 +294,74 @@ class AssetsService:
 
 
 # ---------------------------------------------------------------------------
-# Module-level helpers: JD-only extraction for ResearchAgentInput (F-320 / M2.3.4)
+# Module-level helpers: parse-driven extraction for ResearchAgentInput
+# (F-320 / V32.M2.3.X audit-fix)
 # ---------------------------------------------------------------------------
 #
-# Why module-level: these are pure functions that only touch JD text and
-# don't see resume content (L0 A11). Keeping them outside AssetsService
-# makes them trivially unit-testable and removes any temptation to reach
-# into instance state.
+# Pre-audit these were regex stubs over `jd_text` that always returned
+# `(None, None)`, so research_node never had a real input. The audit-fix
+# moves the JD mining work into Parse Agent itself (which already reads
+# the whole JD), exposing `jd_company_name / jd_role_title /
+# jd_industry_hints` on ParseResultPayload. These helpers now just
+# project those fields out for callers that already hold the payload —
+# they exist so consumer code can stay terse and so the grep guard in
+# the audit-fix Acceptance step has something to land on.
 #
-# Today's heuristic is intentionally conservative: company/role extraction
-# from arbitrary JD text without an LLM is unreliable, so we return
-# (None, None) when we're not confident. The caller treats that as
-# "no research" — the intake_graph then runs research_node as a no-op,
-# preserving the safe default. A future ticket can swap in a smarter
-# extractor (e.g. a small dedicated agent) without touching the wiring.
+# L0 A11: the helpers never see resume_text — they only read JD-derived
+# fields that Parse Agent has already filtered through its own prompt.
 
 
-def _extract_company_and_role(jd_text: str) -> tuple[str | None, str | None]:
-    """Best-effort first-line extraction. Returns (None, None) on uncertainty."""
-    if not jd_text or not jd_text.strip():
-        return (None, None)
-    # Without a JD parser, we cannot reliably split company vs role.
-    # The conservative default avoids false-positive sends to the LLM.
-    return (None, None)
+def _extract_company_and_role(
+    parse_payload: ParseResultPayload | None,
+) -> tuple[str | None, str | None, list[str]]:
+    """Project (company, role, industry_hints) out of parse_payload.
+
+    Returns the bare projections so the caller can decide what counts
+    as "enough signal" (Research Agent's schema enforces min lengths).
+    """
+    if parse_payload is None:
+        return (None, None, [])
+    return (
+        parse_payload.jd_company_name,
+        parse_payload.jd_role_title,
+        list(parse_payload.jd_industry_hints or []),
+    )
 
 
-def _extract_industry_hints(jd_text: str) -> list[str]:
-    """Best-effort industry-keyword extraction. Returns [] on uncertainty."""
-    if not jd_text or not jd_text.strip():
-        return []
-    return []
+def _coerce_research_payload(raw: object) -> ResearchAgentOutput | None:
+    """LangGraph returns either the model instance or its model_dump().
+    Normalise to ResearchAgentOutput | None for the response builder.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, ResearchAgentOutput):
+        return raw
+    if isinstance(raw, dict):
+        try:
+            return ResearchAgentOutput.model_validate(raw)
+        except ValueError:
+            return None
+    return None
+
+
+def _coerce_predicted_questions(raw: object):
+    """Pull predicted_questions out of FrameworkAgentOutput, if any.
+
+    `direction_framework` is None when predict_questions_node was a
+    no-op (parse-trigger path), and even when present its
+    `predicted_questions` field is itself optional (Framework declined
+    to predict). We surface None in either case.
+    """
+    if raw is None:
+        return None
+    framework_output: FrameworkAgentOutput | None = None
+    if isinstance(raw, FrameworkAgentOutput):
+        framework_output = raw
+    elif isinstance(raw, dict):
+        try:
+            framework_output = FrameworkAgentOutput.model_validate(raw)
+        except ValueError:
+            return None
+    if framework_output is None:
+        return None
+    return framework_output.predicted_questions

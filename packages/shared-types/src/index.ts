@@ -256,6 +256,13 @@ export type ParseResultPayload = {
   gaps: Gap[];
   interview_focus: InterviewFocus[];
   project_hooks_v32: ProjectHookV32[];
+  // V32.M2.3.X audit-fix (F-320) — Parse Agent now mines the JD itself
+  // for the company / role / industry signal that the intake_graph's
+  // research_node consumes to build a ResearchAgentInput. All three are
+  // optional because plenty of JDs anonymise the hiring company.
+  jd_company_name?: string | null;
+  jd_role_title?: string | null;
+  jd_industry_hints?: string[];
 };
 
 export type ParseResultPreview = {
@@ -369,6 +376,13 @@ export type ParseRequestResponse = {
   asset_bundle_id: string;
   status: ParseResultStatus | string;
   payload: ParseResultPayload;
+  // V32.M2.3.X audit-fix (F-320 / F-321) — intake_graph now plumbs the
+  // research output and the predicted-question bank through the
+  // ParseRequest response. Both default null when (a) the user has not
+  // opted into connected research or (b) Framework declined to predict
+  // (parse-trigger path leaves framework_config=None today).
+  research_payload?: ResearchResult | null;
+  predicted_questions?: PredictedQuestionBank | null;
 };
 
 export type ParseResultResponse = TimestampedEntity & {

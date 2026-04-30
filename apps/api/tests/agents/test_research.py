@@ -295,6 +295,82 @@ async def test_audit_log_no_resume_or_plaintext_company(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Service layer — tool-augmented happy path (M2.3.X audit-fix G7)
+# ---------------------------------------------------------------------------
+
+
+_LLM_HAPPY_REPLY = json.dumps(
+    {
+        "company": {
+            "name": "字节跳动",
+            "business_model": "短视频与社交平台,广告变现为主。",
+            "stage": "mature",
+            "recent_signals": [
+                {
+                    "type": "product",
+                    "summary": "TikTok Shop 在东南亚扩张",
+                    "occurred_at": None,
+                    "source_url": "https://example.com/tiktokshop",
+                }
+            ],
+            "evidence_links": ["https://example.com/bytedance"],
+            "confidence": "high",
+        },
+        "industry": {
+            "name": "短视频",
+            "landscape_summary": "中国短视频行业进入存量竞争。",
+            "key_metrics": ["DAU", "时长", "广告 ARPU"],
+            "typical_pain_points": ["内容审核成本", "创作者生态"],
+            "competitors_in_jd_ctx": ["快手"],
+        },
+    }
+)
+
+
+async def test_tool_augmented_run_passes_web_search_tool(
+    monkeypatch: pytest.MonkeyPatch, agent_input: ResearchAgentInput
+) -> None:
+    """Pre-audit `tools=[...]` was commented out — make sure it actually
+    reaches the gateway when probe=True. This locks G2 (the dead-lock fix
+    where the LLM never received the tool block) against regression."""
+
+    async def _force_tool_use(_gateway: Any) -> bool:
+        return True
+
+    monkeypatch.setattr(
+        "app.agents.research.service.ToolUseCapability.probe",
+        staticmethod(_force_tool_use),
+    )
+    gateway = ScriptedGateway([_LLM_HAPPY_REPLY])
+
+    result = await ResearchAgentService().run(agent_input, gateway)
+
+    assert isinstance(result, ResearchAgentOutput)
+    assert result.degraded is False
+    assert result.company.name == "字节跳动"
+    # The point of this test: tool block actually hit the gateway.
+    # ScriptedGateway captures kwargs per call; the structured_completion
+    # call is the only LLM contact and it must include `tools`.
+    completion_call = gateway.kwargs_history[0]
+    assert "tools" in completion_call, (
+        "tools=[build_web_search_tool()] regressed back to commented-out — "
+        f"completion kwargs were {completion_call!r}"
+    )
+    tools = completion_call["tools"]
+    assert isinstance(tools, list) and len(tools) >= 1
+    assert tools[0].get("name") == "web_search"
+    assert tools[0].get("type") == "web_search_20250320"
+
+
+def test_resolve_tools_static_helper() -> None:
+    """_resolve_tools(True) returns a single web_search block; (False) → None."""
+    enabled = ResearchAgentService._resolve_tools(True)
+    assert enabled is not None and len(enabled) == 1
+    assert enabled[0]["name"] == "web_search"
+    assert ResearchAgentService._resolve_tools(False) is None
+
+
 def test_research_output_round_trip() -> None:
     """A hand-built valid output deserialises into the same shape."""
     out = ResearchAgentOutput(

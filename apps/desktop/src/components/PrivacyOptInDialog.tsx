@@ -6,7 +6,12 @@
 // language: only company / role / industry hints leave the device,
 // never the resume body or PII. User must explicitly tap "我已了解,
 // 启用" to confirm; cancel keeps the toggle OFF.
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Props {
   open: boolean;
@@ -31,14 +36,14 @@ export function PrivacyOptInDialog({
         className="card-pad-lg"
         data-testid="privacy-opt-in-dialog"
       >
-        <h2 className="h2">启用「联网情报检索」前请确认</h2>
-        <p
+        <DialogTitle className="h2">启用「联网情报检索」前请确认</DialogTitle>
+        <DialogDescription
           className="body"
           style={{ marginTop: 8, lineHeight: 1.6, color: "var(--ink-900)" }}
         >
           启用后,Eatit 在解析阶段会把 <strong>仅以下信息</strong> 发送给你
           BYOK 的大模型用于公开网络检索:
-        </p>
+        </DialogDescription>
         <ul
           style={{
             paddingLeft: 22,
