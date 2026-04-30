@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { getAppSetting, putAppSetting } from "@/api/appSettings";
 import { fetchASRHealth } from "@/api/asr";
+import {
+  getResearchOptIn,
+  setResearchOptIn as putResearchOptIn,
+} from "@/api/settingsResearch";
+import { PrivacyOptInDialog } from "@/components/PrivacyOptInDialog";
 import { ProviderSelect } from "@/pages/settings/ProviderSelect";
 import { KeyInput } from "@/pages/settings/KeyInput";
 import { TestConnectionButton } from "@/pages/settings/TestConnectionButton";
 import { DataManagement } from "@/pages/settings/DataManagement";
 import { loadLLMConfig, type LLMConfig, type LLMProvider } from "@/lib/llm/config";
 import { getProvider, PROVIDERS } from "@/lib/llm/providers";
+import { useAppStore } from "@/stores/app-store";
 
 type InterviewInputMode = "voice" | "text";
 
@@ -195,6 +201,8 @@ export function SettingsPage(): JSX.Element {
       </section>
 
       <InterviewExperienceSection />
+
+      <ResearchOptInSection />
 
       <DataManagement />
     </div>
@@ -525,6 +533,139 @@ function InterviewExperienceSection(): JSX.Element {
           {observerError}
         </div>
       ) : null}
+    </section>
+  );
+}
+
+
+// V32.M2.3.5 (F-320) — Research opt-in toggle.
+//
+// Hydrates from `GET /api/v1/settings/research-opt-in` on mount and
+// mirrors into the Zustand store so ParsedPanel can react instantly
+// without re-fetching. The first time the user flips the toggle ON we
+// open PrivacyOptInDialog; only after they confirm does the PUT fire.
+// Flipping OFF is a one-step write (no confirmation) — disabling a
+// network feature is always safe to make easy.
+export function ResearchOptInSection(): JSX.Element {
+  const researchOptIn = useAppStore((s) => s.researchOptIn);
+  const setStoreOptIn = useAppStore((s) => s.setResearchOptIn);
+
+  const [hydrated, setHydrated] = useState(false);
+  const [pendingEnable, setPendingEnable] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    getResearchOptIn()
+      .then(({ enabled }) => {
+        if (!mounted) return;
+        setStoreOptIn(enabled);
+      })
+      .catch(() => {
+        /* backend unavailable — default-off */
+      })
+      .finally(() => {
+        if (mounted) setHydrated(true);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [setStoreOptIn]);
+
+  const persist = async (next: boolean) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await putResearchOptIn(next);
+      setStoreOptIn(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "保存失败");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleChange = (next: boolean) => {
+    if (next && !researchOptIn) {
+      // Flipping ON requires the privacy modal to surface the L0 A11
+      // contract and the user's explicit confirmation.
+      setPendingEnable(true);
+      return;
+    }
+    void persist(next);
+  };
+
+  return (
+    <section
+      className="card card-pad"
+      data-testid="research-opt-in-section"
+      style={{ display: "flex", flexDirection: "column", gap: 12 }}
+    >
+      <header>
+        <div className="eyebrow">联网情报检索</div>
+        <h2 className="h3" style={{ margin: "4px 0 0" }}>
+          公司 / 行业洞察(opt-in)
+        </h2>
+      </header>
+
+      <p
+        className="muted"
+        style={{ fontSize: 13, lineHeight: 1.55, margin: 0 }}
+      >
+        启用后,Eatit 会在解析阶段把 JD 中的公司名 / 岗位名 / 行业关键词
+        发送给你的大模型,触发联网搜索。结果会在解析页加 3 块卡(公司洞察 /
+        行业洞察 / 预测题库)。简历内容与 PII 永远不出本地。
+      </p>
+
+      <label
+        className="row"
+        style={{
+          gap: 12,
+          alignItems: "center",
+          marginTop: 4,
+          cursor: hydrated && !saving ? "pointer" : "wait",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={researchOptIn}
+          disabled={!hydrated || saving}
+          onChange={(e) => handleChange(e.target.checked)}
+          data-testid="research-opt-in-toggle"
+        />
+        <span style={{ fontSize: 13.5, color: "var(--ink-900)" }}>
+          {researchOptIn ? "已启用" : "未启用"}
+        </span>
+        {saving ? (
+          <span className="muted" style={{ fontSize: 12 }}>
+            保存中…
+          </span>
+        ) : null}
+      </label>
+
+      {error ? (
+        <div
+          style={{
+            fontSize: 12,
+            color: "var(--warn)",
+            background: "var(--warn-soft)",
+            padding: "8px 12px",
+            borderRadius: "var(--r-sm)",
+          }}
+        >
+          {error}
+        </div>
+      ) : null}
+
+      <PrivacyOptInDialog
+        open={pendingEnable}
+        onConfirm={() => {
+          setPendingEnable(false);
+          void persist(true);
+        }}
+        onCancel={() => setPendingEnable(false)}
+      />
     </section>
   );
 }

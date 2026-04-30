@@ -4,6 +4,8 @@ import type {
   InterviewDurationV32,
   InterviewStyleV32,
   ParseResultPayload,
+  PredictedQuestionBank,
+  ResearchResult,
 } from "@eatit/shared-types";
 
 type UploadStatus = "idle" | "uploading" | "uploaded" | "failed";
@@ -22,6 +24,16 @@ export type CurrentUpload = {
   jdStatus: UploadStatus;
   parseStatus: ParseStatus;
   parsePayload: ParseResultPayload | null;
+  // V32.M2.3.5 (F-320) — Research output from intake_graph's
+  // research_node. Null when user opted out, the JD heuristics could
+  // not derive company/role, or the upstream API has not yet exposed
+  // it. ParsedPanel renders CompanyCard / IndustryCard only when both
+  // researchOptIn=true AND this is non-null.
+  researchPayload: ResearchResult | null;
+  // V32.M2.3.5 (F-321) — PredictedQuestionBank from intake_graph's
+  // predict_questions_node. Null when Framework declined to predict
+  // (insufficient evidence) or when the bank API has not yet shipped.
+  predictedQuestions: PredictedQuestionBank | null;
   // V32.M2.2.4 — wallclock at the moment parseStatus flipped to
   // "succeeded". Drives ParsedMetaBar's "N 秒前生成" relative time.
   parsedAtMs: number | null;
@@ -71,6 +83,15 @@ type AppStore = {
   // hand edits stick.
   hasSyncedFocusToConfig: boolean;
   markFocusSyncedToConfig: () => void;
+
+  // V32.M2.3.5 (F-320) — desktop mirror of `research_opt_in` from the
+  // backend app_settings table. Components read this flag to decide
+  // whether to render CompanyCard / IndustryCard / PredictedQuestionList
+  // (Research output is only fetched when opt-in is true). The
+  // SettingsPage toggle calls setResearchOptIn() to persist; that
+  // helper writes through to the API and flips this slot.
+  researchOptIn: boolean;
+  setResearchOptIn: (enabled: boolean) => void;
 };
 
 const DEFAULT_UPLOAD: CurrentUpload = {
@@ -83,6 +104,8 @@ const DEFAULT_UPLOAD: CurrentUpload = {
   jdStatus: "idle",
   parseStatus: "idle",
   parsePayload: null,
+  researchPayload: null,
+  predictedQuestions: null,
   parsedAtMs: null,
   error: null,
 };
@@ -133,4 +156,7 @@ export const useAppStore = create<AppStore>((set) => ({
 
   hasSyncedFocusToConfig: false,
   markFocusSyncedToConfig: () => set({ hasSyncedFocusToConfig: true }),
+
+  researchOptIn: false,
+  setResearchOptIn: (enabled) => set({ researchOptIn: enabled }),
 }));

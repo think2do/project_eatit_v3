@@ -2,11 +2,25 @@
 // header meta strip (F-305) + MatchDial + AI 画像摘要 + StrengthGapList
 // 双栏 + 三张 FocusCard (F-302) + 底部 CTA. Replaces the v3.1
 // ParseResultCard.
-import type { InterviewDirectionV32, ParseResultPayload } from "@eatit/shared-types";
+//
+// V32.M2.3.5 (F-320 / F-321) — when researchOptIn=true AND the upstream
+// pipeline produced a ResearchResult, we render CompanyCard +
+// IndustryCard + PredictedQuestionList between profile_summary and the
+// strength/gap row. None of those are gated on each other; missing
+// data ⇒ that specific card hides while siblings stay.
+import type {
+  InterviewDirectionV32,
+  ParseResultPayload,
+  PredictedQuestionBank,
+  ResearchResult,
+} from "@eatit/shared-types";
 
+import { CompanyCard } from "@/pages/upload/CompanyCard";
 import { FocusCard } from "@/pages/upload/FocusCard";
+import { IndustryCard } from "@/pages/upload/IndustryCard";
 import { MatchDial } from "@/pages/upload/MatchDial";
 import { ParsedMetaBar } from "@/pages/upload/ParsedMetaBar";
+import { PredictedQuestionList } from "@/pages/upload/PredictedQuestionList";
 import { StrengthGapList } from "@/pages/upload/StrengthGapList";
 import { useAppStore } from "@/stores/app-store";
 
@@ -17,6 +31,15 @@ interface Props {
   onContinue: () => void;
   reparseDisabled?: boolean;
   continueDisabled?: boolean;
+  // V32.M2.3.5 (F-320) — Research output. When null / undefined, the
+  // 联网情报 cards do not render. Tests can pass these directly; the
+  // production caller (UploadPage) reads them from the store.
+  researchPayload?: ResearchResult | null;
+  predictedQuestions?: PredictedQuestionBank | null;
+  // V32.M2.3.5 (F-320) — opt-in gate. When false the cards stay hidden
+  // even if researchPayload happens to be present. Defaults to false
+  // so any existing call site keeps the v3.2 (no-research) layout.
+  researchOptIn?: boolean;
 }
 
 export function ParsedPanel({
@@ -26,9 +49,18 @@ export function ParsedPanel({
   onContinue,
   reparseDisabled = false,
   continueDisabled = false,
+  researchPayload = null,
+  predictedQuestions = null,
+  researchOptIn = false,
 }: Props): JSX.Element {
   const selectedFocusIds = useAppStore((s) => s.selectedFocusIds);
   const toggleSelectedFocusId = useAppStore((s) => s.toggleSelectedFocusId);
+
+  const showResearchCards = researchOptIn && researchPayload !== null;
+  const showCompanyCard = showResearchCards;
+  const showIndustryCard = showResearchCards;
+  const showPredictedQuestions =
+    researchOptIn && predictedQuestions !== null;
   return (
     <section className="card" data-testid="parsed-panel">
       <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--line)" }}>
@@ -116,6 +148,19 @@ export function ParsedPanel({
             />
             <StrengthGapList title="潜在差距" items={payload.gaps} tint="warn" />
           </div>
+
+          {showCompanyCard ? (
+            <CompanyCard
+              company={researchPayload!.company}
+              degraded={researchPayload!.degraded}
+            />
+          ) : null}
+          {showIndustryCard ? (
+            <IndustryCard industry={researchPayload!.industry} />
+          ) : null}
+          {showPredictedQuestions ? (
+            <PredictedQuestionList bank={predictedQuestions!} />
+          ) : null}
         </div>
       </div>
 

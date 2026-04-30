@@ -26,6 +26,7 @@ export function UploadPage(): JSX.Element {
   const navigate = useNavigate();
   const upload = useAppStore((s) => s.upload);
   const patchUpload = useAppStore((s) => s.patchUpload);
+  const researchOptIn = useAppStore((s) => s.researchOptIn);
 
   const [globalError, setGlobalError] = useState<string | null>(null);
 
@@ -228,6 +229,9 @@ export function UploadPage(): JSX.Element {
           onContinue={() => navigate("/config")}
           reparseDisabled={!canParse}
           continueDisabled={!canContinue}
+          researchPayload={upload.researchPayload}
+          predictedQuestions={upload.predictedQuestions}
+          researchOptIn={researchOptIn}
         />
       ) : null}
     </div>
