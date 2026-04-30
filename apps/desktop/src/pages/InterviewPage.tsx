@@ -20,18 +20,55 @@ import {
 import { speakInterviewerLine, stopInterviewerLine } from "@/lib/tts";
 import { useGlobalKeymap } from "@/lib/useGlobalKeymap";
 import { EndConfirmDialog } from "@/components/EndConfirmDialog";
+import { getSession } from "@/api/sessions";
 import { FollowupHintChips } from "@/pages/interview/FollowupHintChips";
 import { KeyboardShortcutHelper } from "@/pages/interview/KeyboardShortcutHelper";
 import { LiveCaption } from "@/pages/interview/LiveCaption";
 import { ObserverPanel } from "@/pages/interview/ObserverPanel";
+import { RecBadge } from "@/pages/interview/RecBadge";
+import {
+  RecentRounds,
+  type RecentRound,
+} from "@/pages/interview/RecentRounds";
 import { ReferencePanel } from "@/pages/interview/ReferencePanel";
+import { SessionMetaStrip } from "@/pages/interview/SessionMetaStrip";
 import { useTurnStats } from "@/pages/interview/useTurnStats";
 import { VoiceControl } from "@/pages/interview/VoiceControl";
+import { WaveBars } from "@/pages/interview/WaveBars";
 import { interviewMachine } from "@/statecharts/interview-machine";
 
 const OBSERVER_BREAKPOINT_PX = 1100;
 const MAX_RECONNECT_ATTEMPTS = 3;
 const RECONNECT_BACKOFF_MS = 1000;
+
+// F-308 personas — keep the desktop-side mapping local so we don't have
+// to fetch /personas just to label the topbar. A6 red line: these names
+// are locked on the backend (apps/api/app/agents/interviewer/personas.py).
+const PERSONA_NAME_BY_STYLE: Record<string, string> = {
+  structured: "Sarah",
+  pressure: "Marcus",
+  friendly: "Lin",
+  expert: "Daniel",
+};
+
+const STYLE_LABEL_ZH: Record<string, string> = {
+  structured: "结构化",
+  pressure: "高压追问",
+  friendly: "友好引导",
+  expert: "专家深聊",
+  // legacy v3.1 styles still tolerated by the backend validator
+  friendly_guided: "友好引导",
+  standard_professional: "结构化",
+  high_pressure_followup: "高压追问",
+};
+
+// Rough turns/duration heuristic — backend's FrameworkAgent doesn't
+// surface the planned turn count separately, so we approximate from the
+// duration. 3 minutes/turn matches the PRD §6.3.4 pacing guidance.
+function estimateTotalTurns(durationMinutes: number): number {
+  if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return 5;
+  return Math.max(3, Math.round(durationMinutes / 3));
+}
 
 type InputMode = "voice" | "text";
 
@@ -472,8 +509,118 @@ export function InterviewPage(): JSX.Element {
       question: question.question,
       answer,
     });
+    // Snapshot for RecentRounds (M2.1.5). Tone defaults to "normal" until
+    // server.turn.assessed comes back; an effect below upgrades it to
+    // good/risk based on the assessment summary.
+    setPastRounds((prev) => {
+      if (prev.find((r) => r.index === question.turn_index)) return prev;
+      const summary =
+        answer.length > 60 ? `${answer.slice(0, 60).trim()}…` : answer;
+      const next: RecentRound = {
+        index: question.turn_index,
+        question: question.question,
+        answerSummary: summary,
+        tone: "normal",
+        toneLabel: "已记录",
+      };
+      return [...prev, next];
+    });
     send({ type: "SUBMIT_ANSWER" });
   };
+
+  // M2.1.5 — lift the latest assessment back into pastRounds so the
+  // bottom strip shows tone tags as soon as scoring lands. Heuristic:
+  // strengths > weaknesses → good; otherwise → risk.
+  const lastAssessment = state.context.lastAssessment;
+  useEffect(() => {
+    if (!lastAssessment) return;
+    setPastRounds((prev) =>
+      prev.map((r) => {
+        if (r.index !== lastAssessment.turn_index) return r;
+        const tone: RecentRound["tone"] =
+          lastAssessment.strengths.length >
+          lastAssessment.weaknesses.length
+            ? "good"
+            : lastAssessment.weaknesses.length > 0
+              ? "risk"
+              : "normal";
+        const toneLabel =
+          tone === "good" ? "回答有亮点" : tone === "risk" ? "可改进" : "已记录";
+        return {
+          ...r,
+          tone,
+          toneLabel,
+          answerSummary: lastAssessment.summary || r.answerSummary,
+        };
+      }),
+    );
+  }, [lastAssessment]);
+
+  // M2.1.5 — session meta strip data. Fetched once on sessionId mount
+  // (config_snapshot is the source of truth for style + duration).
+  // Falling back to "—" placeholders keeps the strip visible during
+  // the request window without flashing layout.
+  const [sessionMeta, setSessionMeta] = useState<{
+    jobTitle: string;
+    style: string;
+    totalTurns: number;
+  }>({
+    jobTitle: "—",
+    style: "structured",
+    totalTurns: 5,
+  });
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+    getSession(sessionId)
+      .then((detail) => {
+        if (cancelled) return;
+        const config = (detail.config_snapshot ?? {}) as Record<string, unknown>;
+        const style =
+          typeof config.style === "string" ? config.style : "structured";
+        const duration =
+          typeof config.duration_minutes === "number"
+            ? config.duration_minutes
+            : 30;
+        // job title not yet on session payload — fall back to candidate
+        // asset id sliced (placeholder until backend exposes it).
+        const titleFallback = detail.candidate_asset_id
+          ? `候选人 · ${detail.candidate_asset_id.slice(0, 6)}`
+          : "AI 模拟面试";
+        setSessionMeta({
+          jobTitle: titleFallback,
+          style,
+          totalTurns: estimateTotalTurns(duration),
+        });
+      })
+      .catch(() => {
+        /* keep placeholder values; non-fatal */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
+
+  // M2.1.5 — page-level elapsed (REC badge clock). Starts ticking once
+  // the WS opens; resets to 0 if the user navigates away and returns.
+  const [pageStartMs, setPageStartMs] = useState<number | null>(null);
+  const [pageNow, setPageNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    if (state.matches("idle") || state.matches("connecting")) return;
+    if (pageStartMs === null) {
+      setPageStartMs(Date.now());
+    }
+    const t = window.setInterval(() => setPageNow(Date.now()), 500);
+    return () => window.clearInterval(t);
+  }, [state, pageStartMs]);
+  const pageElapsedSeconds =
+    pageStartMs === null ? 0 : Math.floor((pageNow - pageStartMs) / 1000);
+
+  // M2.1.5 — local history of past rounds for the bottom RecentRounds
+  // strip. Snapshotted on every SUBMIT_ANSWER so we keep the question +
+  // typed/transcribed answer text before the state machine resets the
+  // turn fields. The XState machine doesn't carry per-turn history.
+  const [pastRounds, setPastRounds] = useState<RecentRound[]>([]);
 
   // F-310: per-turn wall-clock start. Resets the moment the user enters
   // the answering state for a new turn (covers both voice and text
@@ -544,26 +691,45 @@ export function InterviewPage(): JSX.Element {
 
   const isUserAnswering = state.matches("user_answering");
   const showObserverPanel = observerPanelEnabled;
+  const personaName =
+    PERSONA_NAME_BY_STYLE[sessionMeta.style] ?? "Sarah";
+  const styleLabel = STYLE_LABEL_ZH[sessionMeta.style] ?? "结构化";
+  // Progress: completed turn count = currentTurnIndex (0-based →
+  // turn 0 means we're answering Q1, so display 1/N). Cap at totalTurns.
+  const progressTurn = Math.min(
+    state.context.currentTurnIndex + (state.context.currentQuestion ? 1 : 0),
+    sessionMeta.totalTurns,
+  );
+
   const mainColumn = (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <header style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <div className="eyebrow">04 · 实时面试</div>
-        <h1
-          className="h-serif"
-          style={{
-            margin: "10px 0 2px",
-            fontSize: 36,
-            lineHeight: 1.1,
-            fontWeight: 400,
-            color: "var(--ink-900)",
-          }}
-        >
-          AI 模拟面试官
-        </h1>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--ink-500)" }}>
-          会话 · <span className="mono">{sessionId}</span>
-        </p>
-      </header>
+      {/* M2.1.5 — REC topbar (replaces the verbose page header). REC badge
+          + clock on the left, 结束面试 button on the right routes through
+          EndConfirmDialog (M2.1.3) instead of ending directly. */}
+      <div className="row between" style={{ paddingTop: 4 }}>
+        <RecBadge
+          recording={state.context.isRecording}
+          elapsedSeconds={pageElapsedSeconds}
+        />
+        <div className="row" style={{ gap: 8 }}>
+          <button
+            type="button"
+            className="btn btn-danger-soft"
+            onClick={() => setEndConfirmOpen(true)}
+            disabled={state.matches("ended") || state.matches("idle")}
+          >
+            结束面试
+          </button>
+        </div>
+      </div>
+
+      <SessionMetaStrip
+        jobTitle={sessionMeta.jobTitle}
+        personaName={personaName}
+        styleLabel={styleLabel}
+        currentTurn={progressTurn}
+        totalTurns={sessionMeta.totalTurns}
+      />
 
       <StatusBar label={statusLabel} error={state.context.error} />
 
@@ -625,15 +791,18 @@ export function InterviewPage(): JSX.Element {
 
         {inputMode === "voice" ? (
           <>
-            <VoiceControl
-              isRecording={state.context.isRecording}
-              disabled={!isUserAnswering}
-              partialTranscript={state.context.partialTranscript}
-              onStart={() => {
-                void handleVoiceStart();
-              }}
-              onStop={handleVoiceStop}
-            />
+            <div className="row" style={{ gap: 14, alignItems: "center" }}>
+              <VoiceControl
+                isRecording={state.context.isRecording}
+                disabled={!isUserAnswering}
+                partialTranscript={state.context.partialTranscript}
+                onStart={() => {
+                  void handleVoiceStart();
+                }}
+                onStop={handleVoiceStop}
+              />
+              <WaveBars active={state.context.isRecording} />
+            </div>
             <LiveCaption
               finalTranscript={state.context.finalTranscript}
               partialTranscript={state.context.partialTranscript}
@@ -773,6 +942,8 @@ export function InterviewPage(): JSX.Element {
         the final report; the live UI just doesn't render it. See the
         post-interview ReportPage for the consolidated review.
       */}
+
+      <RecentRounds rounds={pastRounds} />
     </div>
   );
 

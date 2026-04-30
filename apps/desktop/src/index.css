@@ -505,3 +505,16 @@
 .pulse-dot {
   animation: eatit-pulse 1.1s ease-in-out infinite;
 }
+
+/* M2.1.5 — WaveBars 8 根条带波形动画。bottom origin keeps each bar
+   anchored visually so the row reads as a vertical equalizer. Pair
+   with 0.08s i*delay in the component for the staggered shimmer. */
+@keyframes eatit-wave {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
