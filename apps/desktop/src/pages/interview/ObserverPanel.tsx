@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ObserverEntry, ObserverTone } from "@/statecharts/interview-machine";
 import { LiveObservationCard } from "@/pages/interview/LiveObservationCard";
@@ -40,6 +41,7 @@ export function ObserverPanel({
   onToggle,
   liveObservation,
   showLiveObservationCard,
+  footerSlot,
 }: {
   observations: ObserverEntry[];
   collapsed: boolean;
@@ -52,6 +54,8 @@ export function ObserverPanel({
   // only once the page actually has a current question to observe; the
   // page passes false during connecting / pre-first-question.
   showLiveObservationCard?: boolean;
+  // F-311 — pinned to the aside's bottom (e.g. KeyboardShortcutHelper).
+  footerSlot?: React.ReactNode;
 }): JSX.Element {
   if (collapsed) {
     return (
@@ -177,6 +181,11 @@ export function ObserverPanel({
           ))
         )}
       </div>
+      {footerSlot ? (
+        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}>
+          {footerSlot}
+        </div>
+      ) : null}
     </aside>
   );
 }

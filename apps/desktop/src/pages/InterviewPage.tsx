@@ -18,7 +18,10 @@ import {
   type AudioRecorderHandle,
 } from "@/lib/mic";
 import { speakInterviewerLine, stopInterviewerLine } from "@/lib/tts";
+import { useGlobalKeymap } from "@/lib/useGlobalKeymap";
+import { EndConfirmDialog } from "@/components/EndConfirmDialog";
 import { FollowupHintChips } from "@/pages/interview/FollowupHintChips";
+import { KeyboardShortcutHelper } from "@/pages/interview/KeyboardShortcutHelper";
 import { LiveCaption } from "@/pages/interview/LiveCaption";
 import { ObserverPanel } from "@/pages/interview/ObserverPanel";
 import { ReferencePanel } from "@/pages/interview/ReferencePanel";
@@ -488,6 +491,38 @@ export function InterviewPage(): JSX.Element {
   }, [isUserAnsweringNow, currentTurnIndexForStats]);
   const turnStats = useTurnStats(state.context.draftAnswer, turnStartMs);
 
+  // F-311 — keymap state. `endConfirmOpen` gates EndConfirmDialog so Esc
+  // only ever opens the dialog (never ends directly); the dialog's
+  // 确认结束 button is what actually fires session.end.
+  const [endConfirmOpen, setEndConfirmOpen] = useState(false);
+
+  const handleReplay = useCallback(() => {
+    if (!ttsEnabled) return;
+    if (!currentQuestionText) return;
+    speakInterviewerLine(currentQuestionText);
+  }, [ttsEnabled, currentQuestionText]);
+
+  const handleEndSession = useCallback(() => {
+    setEndConfirmOpen(false);
+    sendClientFrame({ event: "client.session.end" });
+    send({ type: "END_SESSION" });
+  }, [sendClientFrame, send]);
+
+  // Suspend the keymap once the session has wrapped — pressing Esc on a
+  // navigated-away page would otherwise reopen the dialog.
+  const keymapEnabled =
+    !state.matches("idle") &&
+    !state.matches("ended") &&
+    state.context.currentQuestion !== null;
+  useGlobalKeymap(
+    {
+      onSubmit: handleSubmit,
+      onReplay: handleReplay,
+      onEnd: () => setEndConfirmOpen(true),
+    },
+    keymapEnabled,
+  );
+
   const statusLabel = useMemo(() => {
     if (state.matches("idle")) return "待启动";
     if (state.matches("connecting")) return "正在连接...";
@@ -706,10 +741,7 @@ export function InterviewPage(): JSX.Element {
           </button>
           <button
             type="button"
-            onClick={() => {
-              sendClientFrame({ event: "client.session.end" });
-              send({ type: "END_SESSION" });
-            }}
+            onClick={() => setEndConfirmOpen(true)}
             disabled={state.matches("ended") || state.matches("idle")}
             style={{
               padding: "10px 18px",
@@ -744,8 +776,21 @@ export function InterviewPage(): JSX.Element {
     </div>
   );
 
+  const endConfirm = (
+    <EndConfirmDialog
+      open={endConfirmOpen}
+      onCancel={() => setEndConfirmOpen(false)}
+      onConfirm={handleEndSession}
+    />
+  );
+
   if (!showObserverPanel) {
-    return mainColumn;
+    return (
+      <>
+        {mainColumn}
+        {endConfirm}
+      </>
+    );
   }
 
   return (
@@ -765,7 +810,9 @@ export function InterviewPage(): JSX.Element {
         onToggle={() => setObserverCollapsed((v) => !v)}
         liveObservation={state.context.currentQuestion?.live_observation ?? null}
         showLiveObservationCard={state.context.currentQuestion !== null}
+        footerSlot={!observerCollapsed ? <KeyboardShortcutHelper /> : null}
       />
+      {endConfirm}
     </div>
   );
 }
