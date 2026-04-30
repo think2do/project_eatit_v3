@@ -1,16 +1,28 @@
-# Eatit v3.2+ P1/M2.1 Fix Plan
+# Eatit v3.2+ P2/M3 Fix Plan
 
 Source of truth for what's left. Ralph picks the **first unchecked item** in "High Priority" each loop. Section specs live in:
 
-- **当前阶段(P1/M2.1)**: [`.ralph/specs/v32-p1-constraints.md`](specs/v32-p1-constraints.md) + [`.ralph/specs/v32-p1-sections.md`](specs/v32-p1-sections.md)
-- 上一阶段(P0,已完成 2026-04-30): [`.ralph/specs/v32-p0-constraints.md`](specs/v32-p0-constraints.md) + [`.ralph/specs/v32-p0-sections.md`](specs/v32-p0-sections.md)
+- **当前阶段(P2/M3)**: [`.ralph/specs/v32-p2-constraints.md`](specs/v32-p2-constraints.md) + [`.ralph/specs/v32-p2-sections.md`](specs/v32-p2-sections.md)
+- 上一阶段(P1,已完成 2026-04-30): [`.ralph/specs/v32-p1-constraints.md`](specs/v32-p1-constraints.md) + [`.ralph/specs/v32-p1-sections.md`](specs/v32-p1-sections.md)
+- P0 阶段(已完成): [`.ralph/specs/v32-p0-constraints.md`](specs/v32-p0-constraints.md) + [`.ralph/specs/v32-p0-sections.md`](specs/v32-p0-sections.md)
 - 历史阶段(v3.1,已归档): `.ralph/specs/phase3-sections.md`、`phase3.5-sections.md`、`phase4-sections.md`、`phase5-sections.md`
 
-Match the section prefix(V32.M2.*)to 当前 spec 文件即可。
+Match the section prefix(V32.M3.*)to 当前 spec 文件即可。
 
 ## High Priority (work top-down)
 
-> P1 / M2.3 audit-fix 已完成。下一阶段(M3 Coach + Reflection + Dashboard,~8 节点)需要新 spec 文件 `v32-p2-sections.md`。
+> P2 / M3 = Coach + Dashboard + Reflection 复盘报告(老板 F-322 最后的需求)。共 8 节点。
+> 依赖关系见 v32-p2-sections.md "Execution order" 表。Ralph 必须按下方顺序执行。
+> ⚠️ M3.1.4 Dashboard 整页是工程量最大节点(~8 文件 / ~300 行),若 timeout 拆 a/b。
+
+- [ ] V32.M3.1.1 Coach Agent + UserInsightCache schema + 教学语气护栏(L0 条款 12 fuzz 12 禁止词,AGENT_NAMES 增至 9)
+- [ ] V32.M3.1.2 post_report_graph + asyncio.create_task 异步触发(coach_node 单节点 graph + 场次<3 跳过 + 幂等检测 based_on_last_session_id)
+- [ ] V32.M3.1.3 user_insight_cache 表 alembic + GET /api/v1/users/me/insights API(repository + 5 tests)
+- [ ] V32.M3.1.4 Dashboard 整版重写 — StatCards×4 + AICoachCard linear-gradient + 4 FilterTabs + 6 列 SessionTable + 17 tests(若 timeout 拆 a/b)
+- [ ] V32.M3.1.5 复用上次配置 + HistoryFooterCTA(skipUpload + reuseLastConfig action)
+- [ ] V32.M3.2.1 Reflection Agent + ReflectionReport schema + 教学语气护栏(L0 条款 12 + 不重复 Report 评价 regex 扫,AGENT_NAMES 增至 10)
+- [ ] V32.M3.2.2 post_report_graph 加 reflection_node(与 coach_node 并行)+ reflection_reports 表 + GET /api/v1/sessions/{id}/reflection
+- [ ] V32.M3.2.3 ReportPage segment tab + ReflectionView 状态机(pending/ok/failed + PerQuestionCoachingCard + MockDialogue)
 
 
 ## Completed (P1/M2.3 — v3.2+)

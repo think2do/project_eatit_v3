@@ -4,11 +4,11 @@ You are Ralph, the autonomous agent driving the **v3.2+ P0** of the Eatit projec
 
 ## Every loop iteration, do exactly this:
 
-1. **Read the red lines.** Open `.ralph/specs/v32-p1-constraints.md`. Never violate sections A (架构红线) / B (工程纪律) / C (Secrets) / D (Design system) / E (Migration) / F (Test floor) / G (PRD/AGENTS sync). If you discover a prior commit already violates them, stop and report instead of silently proceeding.
+1. **Read the red lines.** Open `.ralph/specs/v32-p2-constraints.md`. Never violate sections A (架构红线) / B (工程纪律) / C (Secrets) / D (Design system) / E (Migration) / F (Test floor) / G (PRD/AGENTS sync). If you discover a prior commit already violates them, stop and report instead of silently proceeding.
 
 2. **Pick one task.** Open `.ralph/fix_plan.md`. Find the FIRST unchecked `- [ ]` line under "High Priority". That is the section you work on this loop. Do not skip ahead. Do not work on multiple sections in one loop. Do not pick from "Archived" (those are P3-P5 历史完成项,不再做).
 
-3. **Read the spec.** Open `.ralph/specs/v32-p1-sections.md` and jump to the anchor for the section you picked (e.g. `## V32.M1.3 — 五维度评分 + 单题评分(F-312/F-313)`). Follow its **Files**, **Key Interfaces**, and **Acceptance** criteria exactly.
+3. **Read the spec.** Open `.ralph/specs/v32-p2-sections.md` and jump to the anchor for the section you picked (e.g. `## V32.M1.3 — 五维度评分 + 单题评分(F-312/F-313)`). Follow its **Files**, **Key Interfaces**, and **Acceptance** criteria exactly.
 
 4. **Implement.** Write / modify only the files listed (or files the spec clearly implies, like an `__init__.py` for a new package). When adding Python deps use `uv add <pkg>` from `apps/api/`. When adding JS deps use `corepack pnpm add <pkg> --filter @eatit/desktop`. When adding Rust deps edit `apps/desktop/src-tauri/Cargo.toml` and run `cargo check`.
 
@@ -57,7 +57,7 @@ Run `.ralph/AGENT.md` 的 "Context refresh" 块来 re-orient。每个 section �
 - **One task per loop.** Resist scope creep.
 - Testing ≤ 20% of effort per loop. Don't chase coverage for its own sake; cover new behavior + the headline invariants(no key leaks, TaskGroup cleanup, 红线护栏)
 - Searching the codebase with Grep/Glob is free — use it before asking "does X exist yet"
-- 如果 spec 含糊,优先选与 `v32-p1-constraints.md` + 现有代码风格一致的解释。Add a note in the commit body 如果你做了 judgment call
+- 如果 spec 含糊,优先选与 `v32-p2-constraints.md` + 现有代码风格一致的解释。Add a note in the commit body 如果你做了 judgment call
 - **L0 优先**:任何选择都不得违反 L0 红线(伦理护栏 / 隐私护栏 / schema 不删字段)。即使会让节点完不成也要先停下报告
 
 ## Commit message 格式
