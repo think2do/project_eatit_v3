@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -82,9 +82,20 @@ export function ConfigPage(): JSX.Element {
   const upload = useAppStore((s) => s.upload);
   const config = useAppStore((s) => s.config);
   const patchConfig = useAppStore((s) => s.patchConfig);
+  const presetConfig = useAppStore((s) => s.presetConfig);
+  const setPresetConfig = useAppStore((s) => s.setPresetConfig);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // F-317: consume one-shot preset handoff from ReportPage's dark CTA
+  // and clear the slot. Runs once on mount; subsequent navigations
+  // back to ConfigPage with no preset don't reset the user's edits.
+  useEffect(() => {
+    if (!presetConfig) return;
+    patchConfig(presetConfig);
+    setPresetConfig(null);
+  }, [presetConfig, patchConfig, setPresetConfig]);
 
   const directionsValid =
     config.directions.length >= MIN_DIRECTIONS && config.directions.length <= MAX_DIRECTIONS;

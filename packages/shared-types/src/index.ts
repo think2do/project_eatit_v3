@@ -85,6 +85,16 @@ export type RoundReviewV2 = {
   ai_feedback: string;
 };
 
+// F-317 V32.M1.5 — preset-driven next-session CTA. The dark card on
+// the report page renders when `next_actions_v2` is present; clicking
+// the primary CTA hands `preset_config` to `app-store.presetConfig`
+// and navigates to ConfigPage which then pre-fills on mount.
+export type NextActions = {
+  headline: string;
+  preset_config: InterviewConfigRequest;
+  reason: string;
+};
+
 export type InterviewSessionStatus =
   | "created"
   | "session_started"
@@ -334,6 +344,9 @@ export type InterviewReportPayload = {
   // `round_reviews` field rather than replacing it (L0 retention).
   dimensions?: DimensionScore[];
   round_reviews_v2?: RoundReviewV2[];
+  // F-317 v3.2+ — server-derived preset CTA. Null when every dimension
+  // scored ≥ 80 or the report has no dimensions (v3.1 legacy).
+  next_actions_v2?: NextActions | null;
 };
 
 export type TriggerReportRequest = {

@@ -37,6 +37,12 @@ type AppStore = {
 
   config: CurrentConfig;
   patchConfig: (patch: Partial<CurrentConfig>) => void;
+
+  // F-317 V32.M1.5 — one-shot prefill bridge from ReportPage's dark
+  // CTA to ConfigPage. The dark card commits this slot, navigates to
+  // ConfigPage, and the page consumes (then clears) the slot on mount.
+  presetConfig: Partial<CurrentConfig> | null;
+  setPresetConfig: (preset: Partial<CurrentConfig> | null) => void;
 };
 
 const DEFAULT_UPLOAD: CurrentUpload = {
@@ -65,4 +71,7 @@ export const useAppStore = create<AppStore>((set) => ({
   config: { ...DEFAULT_CONFIG },
   patchConfig: (patch) =>
     set((state) => ({ config: { ...state.config, ...patch } })),
+
+  presetConfig: null,
+  setPresetConfig: (preset) => set({ presetConfig: preset }),
 }));

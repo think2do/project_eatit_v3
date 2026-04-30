@@ -25,12 +25,14 @@ from app.schemas.reports import (
     DimensionScore,
     InterviewReportPayload,
     InterviewReportResponse,
+    NextActions,
     PassLikelihood,
     ReportReason,
     ReportStatusResponse,
     TriggerReportRequest,
     TriggerReportResponse,
 )
+from app.schemas.sessions import InterviewConfigRequest
 
 
 logger = logging.getLogger(__name__)
@@ -131,6 +133,81 @@ def normalize_dimensions(raw: list[DimensionScore]) -> list[DimensionScore]:
             )
     assert len(out) == 5
     return out
+
+
+# F-317 V32.M1.5 — weakest-dimension → recommended direction map. Each
+# entry encodes the heuristic "if the candidate scored low on this
+# dimension, the next session should focus on the linked v3.2 direction
+# to drill that weakness". The mapping is deterministic and covered by
+# `tests/domain/test_preset_config.py`.
+DIMENSION_TO_DIRECTION_MAP: dict[str, str] = {
+    "专业深度": "ai-insight",      # 弱 → AI 场景洞察方向加强专业深度
+    "结构化表达": "data-driven",    # 弱 → 数据驱动训练结构化表达
+    "批判性思考": "strategy",       # 弱 → 产品战略训练批判
+    "业务直觉": "user-research",    # 弱 → 用户洞察补业务直觉
+    "沟通节奏": "cross-func",       # 弱 → 跨职能协作练沟通
+}
+
+# A score at or above this threshold counts as "already strong" and is
+# excluded from the weakest-dimension picker. If every dimension hits
+# the bar, `derive_preset_config` returns None and the dark CTA card is
+# hidden — there's nothing meaningful to drill.
+_PRESET_STRONG_FLOOR = 80
+_PRESET_DEFAULT_DURATION = 30
+_PRESET_DEFAULT_STYLE = "pressure"
+_PRESET_FALLBACK_DIRECTION = "cross-func"
+
+
+def derive_preset_config(
+    dimensions: list[DimensionScore],
+    last_session_job_title: str | None = None,
+) -> NextActions | None:
+    """Pick the 1-2 weakest dimensions, map to v3.2 directions, build a
+    preset `InterviewConfigRequest`.
+
+    Returns `None` when:
+      * `dimensions` is empty (v3.1 legacy report — the dark card
+        should be hidden, not show a degraded fake)
+      * every dimension scored ≥ 80 (no weak spot to drill)
+
+    `last_session_job_title` is reserved for a future loop where the
+    reason text will name the role; unused for now to keep the test
+    surface narrow.
+    """
+    del last_session_job_title  # not yet wired through the report path
+    if not dimensions:
+        return None
+
+    sorted_dims = sorted(dimensions, key=lambda d: d.score)
+    weak = [d for d in sorted_dims if d.score < _PRESET_STRONG_FLOOR][:2]
+    if not weak:
+        return None
+
+    # De-duplicate while preserving order (multiple weak dimensions can
+    # map to the same direction); fall back to cross-func when the
+    # mapping table doesn't recognise a name (defensive — A8 lock means
+    # this branch shouldn't fire in practice).
+    seen: set[str] = set()
+    directions: list[str] = []
+    for d in weak:
+        mapped = DIMENSION_TO_DIRECTION_MAP.get(d.name, _PRESET_FALLBACK_DIRECTION)
+        if mapped not in seen:
+            seen.add(mapped)
+            directions.append(mapped)
+    if not directions:
+        directions = [_PRESET_FALLBACK_DIRECTION]
+
+    preset = InterviewConfigRequest(
+        style=_PRESET_DEFAULT_STYLE,
+        directions=directions,  # type: ignore[arg-type]  # validated by Literal at construct time
+        duration_minutes=_PRESET_DEFAULT_DURATION,
+    )
+    weak_names = "、".join(d.name for d in weak)
+    return NextActions(
+        headline="针对薄弱点再来一场",
+        preset_config=preset,
+        reason=f"本场 {weak_names} 维度得分偏低,建议高压追问型加强训练",
+    )
 
 
 class ReportsService:
@@ -423,6 +500,13 @@ class ReportsService:
             if agent_output.dimensions
             else []
         )
+        # F-317: server-derived next-session preset. Trust the LLM's
+        # explicit suggestion when present; otherwise compute from the
+        # weakest dimensions. Returns None when nothing's weak — the
+        # UI then hides the dark CTA card.
+        next_actions_v2 = agent_output.next_actions_v2 or derive_preset_config(
+            dimensions
+        )
         return InterviewReportPayload(
             overall_summary=agent_output.summary,
             round_reviews=[],
@@ -436,4 +520,5 @@ class ReportsService:
             ai_verdict=agent_output.ai_verdict,
             dimensions=dimensions,
             round_reviews_v2=list(agent_output.round_reviews_v2),
+            next_actions_v2=next_actions_v2,
         )

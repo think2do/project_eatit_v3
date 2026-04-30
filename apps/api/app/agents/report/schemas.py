@@ -54,10 +54,21 @@ class ReportAgentOutput(BaseModel):
     # REST envelope can reuse them without circular imports.
     dimensions: list["DimensionScore"] = Field(default_factory=list)
     round_reviews_v2: list["RoundReviewV2"] = Field(default_factory=list)
+    # F-317 — opt-in preset-driven next-session CTA. Defaults to None;
+    # the report service usually derives this server-side via
+    # `derive_preset_config` rather than trusting LLM output, so the
+    # field is rarely populated by the agent itself. Keeping it here
+    # lets future LLM revisions emit an explicit suggestion without
+    # a schema change.
+    next_actions_v2: "NextActions | None" = None
 
 
 # Forward-ref imports — placed at module bottom to avoid circular
 # import (schemas.reports imports nothing from agents.report).
-from app.schemas.reports import DimensionScore, RoundReviewV2  # noqa: E402
+from app.schemas.reports import (  # noqa: E402
+    DimensionScore,
+    NextActions,
+    RoundReviewV2,
+)
 
 ReportAgentOutput.model_rebuild()

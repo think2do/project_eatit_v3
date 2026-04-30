@@ -2,13 +2,20 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Printer } from "lucide-react";
-import type { InterviewReportResponse } from "@eatit/shared-types";
+import type {
+  InterviewDirectionV32,
+  InterviewDurationV32,
+  InterviewReportResponse,
+  InterviewStyleV32,
+} from "@eatit/shared-types";
 import { generateReport, getSessionReport } from "@/api/sessions";
+import { DarkActionCard } from "@/pages/report/DarkActionCard";
 import { DimensionRow } from "@/pages/report/DimensionRow";
 import { HeroScoreCard } from "@/pages/report/HeroScoreCard";
 import { QuestionReview } from "@/pages/report/QuestionReview";
 import { ReasonRow } from "@/pages/report/ReasonRow";
 import { WaitingTips } from "@/components/WaitingTips";
+import { useAppStore } from "@/stores/app-store";
 // Side-effect stylesheet: adds @media print rules that hide chrome
 // and paginate ReasonRow entries cleanly. See print.css for details.
 import "@/pages/report/print.css";
@@ -32,6 +39,7 @@ function extractError(err: unknown): string {
 export function ReportPage(): JSX.Element {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const setPresetConfig = useAppStore((s) => s.setPresetConfig);
   const [state, setState] = useState<ReportState>({ kind: "loading" });
 
   useEffect(() => {
@@ -358,6 +366,43 @@ export function ReportPage(): JSX.Element {
           </ol>
         </section>
       ) : null}
+
+      {payload.next_actions_v2
+        ? (() => {
+            // F-317 V32.M1.5 — preset-driven 专项训练 dark CTA. Hidden
+            // when backend's derive_preset_config returned null (every
+            // dimension ≥ 80, or v3.1 legacy report with no dimensions).
+            const next = payload.next_actions_v2;
+            // Backend's `derive_preset_config` always emits v3.2-palette
+            // strings, but the shared `InterviewConfigRequest` type
+            // unions them with the legacy v3.1 enum values for L0
+            // back-compat. Cast through `unknown` so the prefill matches
+            // the desktop store's stricter v3.2-only shape.
+            const apply = () => {
+              setPresetConfig({
+                style: next.preset_config.style as InterviewStyleV32,
+                directions:
+                  next.preset_config.directions as InterviewDirectionV32[],
+                durationMinutes:
+                  next.preset_config.duration_minutes as InterviewDurationV32,
+              });
+            };
+            return (
+              <DarkActionCard
+                headline={next.headline}
+                reason={next.reason}
+                onPrimaryClick={() => {
+                  apply();
+                  navigate("/config");
+                }}
+                onSecondaryClick={() => {
+                  apply();
+                  navigate("/config");
+                }}
+              />
+            );
+          })()
+        : null}
     </div>
   );
 }

@@ -85,6 +85,25 @@ class RoundReviewV2(BaseModel):
     ai_feedback: str
 
 
+class NextActions(BaseModel):
+    """F-317 V32.M1.5 — preset-driven "next session" CTA payload.
+
+    Drives the dark CTA card on the report page right aside. The
+    `preset_config` is a real `InterviewConfigRequest` so the
+    front-end can hand it straight to `app-store.presetConfig` and
+    have ConfigPage pre-fill on mount. `headline` is bounded to 20
+    chars so the dark card title renders on a single line.
+    """
+
+    headline: str = Field(max_length=20)
+    # Forward-ref string: schemas.reports must not import schemas.sessions
+    # at load time (sessions.py imports SchemaModel from common which
+    # would be fine, but keeping the forward-ref keeps the dependency
+    # graph one-way). Resolved by `model_rebuild()` at module bottom.
+    preset_config: "InterviewConfigRequest"
+    reason: str
+
+
 class InterviewReportPayload(SchemaModel):
     overall_summary: str
     round_reviews: list[RoundReview] = Field(default_factory=list)
@@ -106,6 +125,11 @@ class InterviewReportPayload(SchemaModel):
     # 严格 5 项 (经过 normalize_dimensions 补齐) 或空(v3.1 老报告未填)。
     dimensions: list[DimensionScore] = Field(default_factory=list)
     round_reviews_v2: list[RoundReviewV2] = Field(default_factory=list)
+    # ===== v3.2+ 新增(F-317 专项训练 CTA)=====
+    # 由 service.derive_preset_config 从 dimensions 最低分 1-2 项映射
+    # 出来的预填入参;dimensions 全 ≥80 或 [] 时为 None,DarkActionCard
+    # 不渲染。
+    next_actions_v2: "NextActions | None" = None
 
 
 class TriggerReportResponse(SchemaModel):
@@ -130,3 +154,14 @@ class ReportStatusResponse(SchemaModel):
     session_id: UUID
     status: InterviewReportStatus
     has_payload: bool
+
+
+# F-317 V32.M1.5 — resolve `NextActions.preset_config` and
+# `InterviewReportPayload.next_actions_v2` forward references after
+# both `NextActions` and the sessions schema module exist. Keeping the
+# import at module bottom prevents an import-time cycle (the sessions
+# schema module imports nothing from reports).
+from app.schemas.sessions import InterviewConfigRequest  # noqa: E402
+
+NextActions.model_rebuild()
+InterviewReportPayload.model_rebuild()
