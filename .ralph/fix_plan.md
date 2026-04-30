@@ -15,11 +15,11 @@ Match the section prefix(V32.M3.*)to 当前 spec 文件即可。
 > 依赖关系见 v32-p2-sections.md "Execution order" 表。Ralph 必须按下方顺序执行。
 > ⚠️ M3.1.4 Dashboard 整页是工程量最大节点(~8 文件 / ~300 行),若 timeout 拆 a/b。
 
-- [ ] V32.M3.2.3 ReportPage segment tab + ReflectionView 状态机(pending/ok/failed + PerQuestionCoachingCard + MockDialogue)
 
 
 ## Completed (P2/M3 — v3.2+)
 
+- [x] V32.M3.2.3 F-322 ReportPage [评估] [详细复盘] tabs + ReflectionView 状态机(SegmentTabs 通用组件 + MockDialogue 双向气泡 + PerQuestionCoachingCard 折叠卡 + ReflectionView 6 状态 absent/loading/running/ok/failed/error + 2s/180s 轮询 + cached store 跳过首次 fetch + getReflection API client + reflection store slot + 14 tests;前端 142→156) (eab98cf, 2026-05-01)
 - [x] V32.M3.2.2 F-322 reflection_node parallel coach + reflection_reports 表 + API(20260501_0001 迁移 + ReflectionReportRow session_id UNIQUE + ix_rr_session + SqlAlchemyReflectionReportRepository 4 lifecycle + uuid7 PK + DBReflectionReportLoader joins reports×turns + ReflectionService + GET /sessions/{id}/reflection 204/200/404 跨 user 鉴权 + POST_REPORT_GRAPH_NODES 锁扩到 {coach_node, reflection_node} + _generate_report_task 单 graph spawn 覆盖两节点 + 14 tests;后端 460→469) (0e92324, 2026-05-01)
 - [x] V32.M3.2.1 F-322 Reflection Agent + ReflectionReport schema + 教学语气护栏(reflection 包 schemas/service/__init__ + system.j2/user.j2 + AGENT_NAMES 10 + extra=forbid 拒 PII + 12 禁止词 sanitize_tone + ACCUSATORY_PREFIXES "建议下次" 重写 + AI_VERDICT_CORE_TERMS 后置 regex 防重复评价 + ReflectionReport TS 类型 + 40 tests;后端 418→460) (4ca25d9, 2026-05-01)
 - [x] V32.M3.1.5 F-316 复用上次配置 + HistoryFooterCTA(extractConfigFromSnapshot 防御 v3.1 老 snapshot + pickLastReusableConfig 跳过 malformed 行 + skipUpload/reuseLastConfig/consumeSkipUpload store actions + UploadPage useEffect 消费并 redirect /config + HistoryPage 挂 HistoryFooterCTA + 14 tests;前端 128→142) (4b8f3ec, 2026-05-01)
