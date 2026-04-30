@@ -30,6 +30,8 @@ AGENT_NAMES: tuple[str, ...] = (
     "research",
     # F-318 V32.M3.1.1 — 9th agent, async post-report cross-session insight.
     "coach",
+    # F-322 V32.M3.2.1 — 10th agent, async post-report teaching reflection.
+    "reflection",
 )
 
 PromptRole = Literal["system", "user"]

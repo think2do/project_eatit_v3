@@ -1,0 +1,32 @@
+本场面试 Report payload(用于绑定 ai_verdict / dimensions / round_reviews_v2,
+请勿原样复述其中评价词):
+
+```json
+{{ report_payload_json }}
+```
+
+完整对话回合(JSON,顺序为发生顺序):
+
+```json
+{{ turns_json }}
+```
+
+{% if parse_payload_json %}
+ParseResult(候选人匹配画像,只在补充上下文时引用):
+
+```json
+{{ parse_payload_json }}
+```
+{% endif %}
+
+{% if research_payload_json %}
+ResearchResult(公司/行业情报,只在重写 mock_followup_dialogue 时酌情引用):
+
+```json
+{{ research_payload_json }}
+```
+{% endif %}
+
+请按 system prompt 的约束输出 `ReflectionReport` 的 4 个动态字段:
+`executive_summary / per_question_coaching / general_growth_advice /
+mock_followup_dialogue`。

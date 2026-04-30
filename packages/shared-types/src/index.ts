@@ -627,6 +627,39 @@ export type UserInsightCache = {
   status: UserInsightStatus;
 };
 
+// F-322 V32.M3.2.1 — Reflection Agent teaching-tone deep dive payload.
+// Mirrors the Pydantic schema at `apps/api/app/agents/reflection/schemas.py`
+// + persisted shape declared in v32-p2-constraints.md §A17. Rendered by
+// the ReportPage segment tab "[详细复盘]" introduced in M3.2.3.
+export type ReflectionStatus = "pending" | "running" | "ok" | "failed";
+
+export type PerQuestionCoaching = {
+  turn_index: number;
+  question: string;
+  your_answer_summary: string;
+  diagnosis: string;
+  model_answer_outline: string[];
+  key_phrases_to_use: string[];
+  mistakes_to_avoid: string[];
+  recommended_resources: string[];
+};
+
+export type DialogueTurn = {
+  role: "interviewer" | "candidate";
+  text: string;
+};
+
+export type ReflectionReport = {
+  report_id: string;
+  session_id: string;
+  executive_summary: string;
+  per_question_coaching: PerQuestionCoaching[];
+  general_growth_advice: string;
+  mock_followup_dialogue: DialogueTurn[];
+  generated_at: string;
+  status: ReflectionStatus;
+};
+
 export type ClientAudioStartEvent = {
   event: "client.audio.start";
   turn_index: number;

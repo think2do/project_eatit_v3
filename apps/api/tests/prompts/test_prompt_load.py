@@ -85,6 +85,14 @@ _USER_VARS: dict[str, dict] = {
         "recent_reports_json": "[]",
         "candidate_profile_json": None,
     },
+    # F-322 V32.M3.2.1 — Reflection Agent. report/turns are JSON dumps;
+    # parse/research dumps default to None (the optional intake context).
+    "reflection": {
+        "report_payload_json": "{}",
+        "turns_json": "[]",
+        "parse_payload_json": None,
+        "research_payload_json": None,
+    },
 }
 
 
