@@ -60,6 +60,9 @@ jobs:
       - name: eslint
         run: pnpm --filter @eatit/desktop lint
 
+      - name: design-tokens lint (forbid Tailwind default palette + hex)
+        run: pnpm --filter @eatit/desktop lint:design-tokens
+
   tauri:
     name: tauri (cargo check, macOS)
     runs-on: macos-latest

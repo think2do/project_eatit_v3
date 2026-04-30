@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint .",
+    "lint:design-tokens": "bash scripts/lint-design-tokens.sh",
     "tauri": "tauri",
     "build:dmg": "tauri build --target aarch64-apple-darwin --bundles dmg"
   },
