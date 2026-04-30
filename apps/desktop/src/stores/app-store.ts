@@ -43,6 +43,16 @@ type AppStore = {
   // ConfigPage, and the page consumes (then clears) the slot on mount.
   presetConfig: Partial<CurrentConfig> | null;
   setPresetConfig: (preset: Partial<CurrentConfig> | null) => void;
+
+  // F-302 V32.M2.2.3 — InterviewFocus cards on ParsedPanel toggle the
+  // user's preferred direction_ids; ConfigPage reads this on mount to
+  // pre-populate `directions` (capped at 3 per F-307). Subsequent edits
+  // in ConfigPage no longer flow back here — the store entry is sticky
+  // until the user re-parses (cleared by `resetSelectedFocusIds`).
+  selectedFocusIds: InterviewDirectionV32[];
+  setSelectedFocusIds: (ids: InterviewDirectionV32[]) => void;
+  toggleSelectedFocusId: (id: InterviewDirectionV32) => void;
+  resetSelectedFocusIds: () => void;
 };
 
 const DEFAULT_UPLOAD: CurrentUpload = {
@@ -74,4 +84,14 @@ export const useAppStore = create<AppStore>((set) => ({
 
   presetConfig: null,
   setPresetConfig: (preset) => set({ presetConfig: preset }),
+
+  selectedFocusIds: [],
+  setSelectedFocusIds: (ids) => set({ selectedFocusIds: ids }),
+  toggleSelectedFocusId: (id) =>
+    set((state) => ({
+      selectedFocusIds: state.selectedFocusIds.includes(id)
+        ? state.selectedFocusIds.filter((x) => x !== id)
+        : [...state.selectedFocusIds, id],
+    })),
+  resetSelectedFocusIds: () => set({ selectedFocusIds: [] }),
 }));

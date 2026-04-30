@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -86,6 +86,7 @@ export function ConfigPage(): JSX.Element {
   const patchConfig = useAppStore((s) => s.patchConfig);
   const presetConfig = useAppStore((s) => s.presetConfig);
   const setPresetConfig = useAppStore((s) => s.setPresetConfig);
+  const selectedFocusIds = useAppStore((s) => s.selectedFocusIds);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +101,20 @@ export function ConfigPage(): JSX.Element {
     patchConfig(presetConfig);
     setPresetConfig(null);
   }, [presetConfig, patchConfig, setPresetConfig]);
+
+  // F-302 V32.M2.2.3: when the user toggled focus cards on ParsedPanel
+  // (and there's no in-flight preset from F-317), seed `directions`
+  // from selectedFocusIds — capped at 3, deduped, ordered by user pick.
+  // Runs once on mount only (and only if the user hasn't already
+  // hand-tuned this session) so re-renders don't clobber edits.
+  const seededFromFocus = useRef(false);
+  useEffect(() => {
+    if (seededFromFocus.current) return;
+    if (presetConfig) return;
+    if (selectedFocusIds.length === 0) return;
+    seededFromFocus.current = true;
+    patchConfig({ directions: selectedFocusIds.slice(0, MAX_DIRECTIONS) });
+  }, [selectedFocusIds, presetConfig, patchConfig]);
 
   const directionsValid =
     config.directions.length >= MIN_DIRECTIONS && config.directions.length <= MAX_DIRECTIONS;
