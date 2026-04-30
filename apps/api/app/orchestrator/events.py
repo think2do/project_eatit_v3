@@ -39,6 +39,11 @@ class QuestionGeneratedEvent:
     # chars (already enforced by the upstream Pydantic field_validator
     # in `interviewer/schemas.py`).
     followup_hints: tuple[str, ...] = ()
+    # F-309 v3.2+ — lightweight observation about the previous turn.
+    # Always None for turn_index == 0; ≤ 30 chars otherwise (Pydantic
+    # max_length on InterviewerAgentOutput). When None, the desktop
+    # client falls back to the legacy server.coach.observation event.
+    live_observation: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

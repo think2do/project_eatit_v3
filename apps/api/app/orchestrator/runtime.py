@@ -117,6 +117,9 @@ class SessionRuntime:
                 followup_hint=output.followup_hint,
                 should_end=output.should_end,
                 followup_hints=tuple(output.followup_hints),
+                # F-309: A12 — turn 0 has no prior turn, force-None even
+                # if the LLM ignored the prompt and emitted text here.
+                live_observation=None,
             )
         )
         self._kick_reference(0, output.question)
@@ -411,6 +414,7 @@ class SessionRuntime:
                     followup_hint=nq.followup_hint,
                     should_end=nq.should_end,
                     followup_hints=tuple(nq.followup_hints),
+                    live_observation=nq.live_observation,
                 )
             )
             # Reference for the upcoming question fires here, not after the

@@ -379,6 +379,7 @@ def _serialize_event(event: object) -> dict[str, Any]:
                 "followup_hint": event.followup_hint,
                 "should_end": event.should_end,
                 "followup_hints": list(event.followup_hints),
+                "live_observation": event.live_observation,
             },
         }
     if isinstance(event, ReferenceAnswerReadyEvent):

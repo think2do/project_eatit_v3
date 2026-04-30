@@ -12,6 +12,11 @@ export type GeneratedQuestion = {
   // `field_validator` in `interviewer/schemas.py`). Optional in the
   // type so v3.1 WS payloads — which omit the key — still parse.
   followup_hints?: string[];
+  // F-309 v3.2+ — per-turn observation surfaced in LiveObservationCard
+  // (right aside). Null on turn 0 by contract; ≤30 chars otherwise.
+  // When null/missing, the page falls back to the latest entry from
+  // `observations[]` (server.coach.observation legacy track, A13).
+  live_observation?: string | null;
 };
 
 export type TurnAssessmentSummary = {

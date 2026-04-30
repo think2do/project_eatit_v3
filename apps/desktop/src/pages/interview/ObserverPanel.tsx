@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ObserverEntry, ObserverTone } from "@/statecharts/interview-machine";
+import { LiveObservationCard } from "@/pages/interview/LiveObservationCard";
 
 const TONE_META: Record<ObserverTone, { label: string; dot: string; ink: string; soft: string }> = {
   support: {
@@ -37,10 +38,20 @@ export function ObserverPanel({
   observations,
   collapsed,
   onToggle,
+  liveObservation,
+  showLiveObservationCard,
 }: {
   observations: ObserverEntry[];
   collapsed: boolean;
   onToggle: () => void;
+  // F-309 — text from InterviewerAgentOutput.live_observation, primary
+  // source for LiveObservationCard. When null/undefined the card falls
+  // back to the latest server.coach.observation entry (A13 dual-track).
+  liveObservation?: string | null;
+  // The card is the right aside's "third card" per PRD §6.3 — render it
+  // only once the page actually has a current question to observe; the
+  // page passes false during connecting / pre-first-question.
+  showLiveObservationCard?: boolean;
 }): JSX.Element {
   if (collapsed) {
     return (
@@ -135,6 +146,12 @@ export function ObserverPanel({
           <ChevronRight size={14} />
         </button>
       </header>
+      {showLiveObservationCard ? (
+        <LiveObservationCard
+          text={liveObservation ?? null}
+          fallback={observations[0]?.observation ?? null}
+        />
+      ) : null}
       <div
         style={{
           flex: 1,

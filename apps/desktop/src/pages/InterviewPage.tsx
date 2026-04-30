@@ -744,6 +744,8 @@ export function InterviewPage(): JSX.Element {
         observations={state.context.observations}
         collapsed={observerCollapsed}
         onToggle={() => setObserverCollapsed((v) => !v)}
+        liveObservation={state.context.currentQuestion?.live_observation ?? null}
+        showLiveObservationCard={state.context.currentQuestion !== null}
       />
     </div>
   );

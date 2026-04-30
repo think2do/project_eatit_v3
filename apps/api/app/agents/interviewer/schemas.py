@@ -43,6 +43,20 @@ class InterviewerAgentOutput(BaseModel):
     # v3.2+ chip list. `default_factory=list` allows degraded empty
     # output; non-empty must be 2 or 3 items, each ≤ 8 chars.
     followup_hints: list[str] = Field(default_factory=list, max_length=_HINT_MAX)
+    # F-309 V32.M2.1.1 — lightweight observation about the previous turn,
+    # surfaced in InterviewPage's right aside (LiveObservationCard). Hard
+    # cap at 30 chars (stricter than ObserverAgent's 60). Must stay None
+    # for `turn 0` (no prior turn to observe). The Interviewer prompt
+    # also enforces a non-judgmental tone — not enforceable in code, so
+    # the prompt template carries the do-/don't list.
+    live_observation: str | None = Field(
+        default=None,
+        max_length=30,
+        description=(
+            "≤30 字的轻量观察(对上一轮回答),教学语气非评判式;"
+            "turn 0 时为 None"
+        ),
+    )
 
     @field_validator("followup_hints")
     @classmethod

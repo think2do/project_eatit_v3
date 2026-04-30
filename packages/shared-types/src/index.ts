@@ -554,6 +554,13 @@ export type ServerQuestionGeneratedEvent = {
     expected_depth: "surface" | "tactical" | "strategic";
     followup_hint: string | null;
     should_end: boolean;
+    // F-319 v3.2+ chip list (added in M1.4). Optional so v3.1 mock
+    // payloads still parse; the runtime mirrors the empty default.
+    followup_hints?: string[];
+    // F-309 v3.2+ — Interviewer Agent's per-turn observation (≤30 chars,
+    // null on turn 0). When null, the desktop client falls back to the
+    // legacy server.coach.observation event (A13 dual-track).
+    live_observation?: string | null;
   };
 };
 
