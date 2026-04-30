@@ -15,13 +15,16 @@ Match the section prefix(V32.M4.*)to 当前 spec 文件即可。
 > P3 / M4 = 收口阶段 = F-315 配额 mock + 字体本地子集化 + Playwright 烟雾 E2E + locust 性能基线 + 文档收尾。
 > 4 主节点 + 1 收尾。任一节点 fail 不向后跑。完成后 v3.3 全收尾,EXIT_SIGNAL: true。
 
-- [ ] V32.M4.1 — F-315 SidebarQuotaCard + quotaMock localStorage + 7 vitest 单测(L0 A18 enforced)
 - [ ] V32.M4.2 — woff2 字体本地子集化(Inter / Instrument Serif / JetBrains Mono 共 5 个 woff2 + LICENSE)+ index.css 改 @font-face,删 googleapis @import
 - [ ] V32.M4.3 — Playwright 烟雾 E2E(2 spec:upload-to-config + report-renders + mock backend fixtures)
 - [ ] V32.M4.4 — locust 性能骨架(parse_baseline.py + baseline.md + README + pytest collect 排除)
 - [ ] V32.M4.X — M4 收尾文档同步(FEATURES F-315 ✅ + fix_plan 收尾 banner + EXIT_SIGNAL=true)
 
 
+
+## Completed (P3/M4 — v3.2+)
+
+- [x] V32.M4.1 F-315 SidebarQuotaCard + quotaMock localStorage(read/increment/reset/getRemaining + 跨月自动归零 + 默认 0/10 + "占位" 文案 + 5+4=9 vitest 单测;前端 160→169) (40cc5df, 2026-05-01)
 
 ## Completed (P2/M3 — v3.2+)
 

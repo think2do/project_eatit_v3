@@ -8,6 +8,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+import { SidebarQuotaCard } from "@/components/SidebarQuotaCard";
+
 const FLOW = [
   { to: "/upload", label: "上传与解析", Icon: FileText },
   { to: "/config", label: "面试配置", Icon: Sliders },
@@ -183,6 +185,7 @@ function SidebarFooter(): JSX.Element {
         <Settings size={16} />
         <span>设置</span>
       </NavLink>
+      <SidebarQuotaCard />
       <div
         style={{
           display: "inline-flex",
