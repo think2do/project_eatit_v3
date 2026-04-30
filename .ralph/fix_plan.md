@@ -15,7 +15,6 @@ Match the section prefix(V32.M3.*)to 当前 spec 文件即可。
 > 依赖关系见 v32-p2-sections.md "Execution order" 表。Ralph 必须按下方顺序执行。
 > ⚠️ M3.1.4 Dashboard 整页是工程量最大节点(~8 文件 / ~300 行),若 timeout 拆 a/b。
 
-- [ ] V32.M3.1.2 post_report_graph + asyncio.create_task 异步触发(coach_node 单节点 graph + 场次<3 跳过 + 幂等检测 based_on_last_session_id)
 - [ ] V32.M3.1.3 user_insight_cache 表 alembic + GET /api/v1/users/me/insights API(repository + 5 tests)
 - [ ] V32.M3.1.4 Dashboard 整版重写 — StatCards×4 + AICoachCard linear-gradient + 4 FilterTabs + 6 列 SessionTable + 17 tests(若 timeout 拆 a/b)
 - [ ] V32.M3.1.5 复用上次配置 + HistoryFooterCTA(skipUpload + reuseLastConfig action)
@@ -26,6 +25,7 @@ Match the section prefix(V32.M3.*)to 当前 spec 文件即可。
 
 ## Completed (P2/M3 — v3.2+)
 
+- [x] V32.M3.1.2 F-318 post_report_graph + asyncio.create_task 异步触发(POST_REPORT_GRAPH_NODES={coach_node} A7-style 锁 + CoachService Protocols + InMemoryUserInsightCacheRepository 默认 + DBRecentReportsReader + _generate_report_task 末尾 fire-and-forget + _POST_REPORT_TASKS 强引用集 + 场次<3 跳过 / 幂等 / 失败非致命 / reader 抛错静默 + 12 tests;后端 400→412) (f62ffd5, 2026-04-30)
 - [x] V32.M3.1.1 F-318 Coach Agent + UserInsightCache schema + 教学语气护栏(coach 包 schemas/service/__init__ + system.j2/user.j2 + AGENT_NAMES 9 + extra=forbid 拒 PII + 12 禁止词 sanitize + UserInsightCache TS 类型 + 21 tests;后端 377→400) (13a3da5, 2026-04-30)
 
 ## Completed (P1/M2.3 — v3.2+)
