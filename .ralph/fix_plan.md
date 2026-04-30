@@ -13,7 +13,6 @@ Match the section prefix(V32.M2.*)to 当前 spec 文件即可。
 > P1 / M2.1 = 实时面试增强(F-309 / F-310 / F-311 / F-306 + InterviewPage 顶部重构)。共 5 个节点。
 > 依赖关系见 v32-p1-sections.md "Execution order" 表。Ralph 必须按下方顺序执行。
 
-- [ ] V32.M2.1.2 F-310 实时统计纯前端 hook(useTurnStats + fillerWords L0 双端锁 + 引入 Vitest 框架)
 - [ ] V32.M2.1.3 F-311 键盘快捷键(useGlobalKeymap + EndConfirmDialog + KeyboardShortcutHelper)
 - [ ] V32.M2.1.4 F-306 Tips Carousel 替换 WaitingTips(tips.json 静态库 + selectTips 合并 + 完成态 ✓ 过渡)
 - [ ] V32.M2.1.5 InterviewPage 顶部重构(REC 脉冲 + Session meta strip + WaveBars + 近 3 轮摘要 + 全部接入 M2.1.1-4 产出)
@@ -21,6 +20,7 @@ Match the section prefix(V32.M2.*)to 当前 spec 文件即可。
 ## Completed (P1/M2.1 — v3.2+)
 
 - [x] V32.M2.1.1 F-309 实时观察侧栏(InterviewerAgentOutput.live_observation ≤30 字 + LiveObservationCard + 7 boundary tests + A13 Observer fallback) (2d15550, 2026-04-30)
+- [x] V32.M2.1.2 F-310 实时统计纯前端 hook(useTurnStats + 双端 L0 fillerWords 锁 + Vitest@^2 框架引入 + 12 tests + InterviewPage stat row) (c180456, 2026-04-30)
 
 ## Completed (P0 — v3.2+, 2026-04-30)
 
