@@ -16,6 +16,7 @@ from app.agents.report.schemas import ReportAgentInput, ReportAgentOutput
 from app.agents.report.service import ReportAgentService
 from app.api.dependencies.auth import AuthenticatedUser
 from app.domain.coach.service import build_default_coach_service
+from app.domain.reflection.service import build_default_reflection_service
 from app.infra.db import AsyncSessionFactory
 from app.infra.llm import LLMConfig, build_gateway
 from app.infra.tasks import TaskQueueInterface
@@ -56,14 +57,19 @@ def _spawn_post_report_coach_trigger(
 ) -> asyncio.Task[None] | None:
     """Spawn the post-report graph as a fire-and-forget task.
 
-    Returns the spawned task (mostly for tests). On any spawning error
-    (no running loop, etc.) returns ``None`` and logs — the caller's main
+    The graph holds ``coach_node`` AND (since M3.2.2) ``reflection_node``
+    in parallel — a single ``asyncio.create_task`` covers both. Returns
+    the spawned task (mostly for tests). On any spawning error (no
+    running loop, etc.) returns ``None`` and logs — the caller's main
     flow continues unaffected.
     """
     try:
         coach_service = build_default_coach_service(AsyncSessionFactory)
+        reflection_service = build_default_reflection_service(AsyncSessionFactory)
         gateway = build_gateway(llm_config)
-        graph = build_post_report_graph(coach_service, gateway)
+        graph = build_post_report_graph(
+            coach_service, reflection_service, gateway
+        )
         state = PostReportState(
             user_id=user_id, last_session_id=last_session_id
         )

@@ -12,6 +12,7 @@ from app.models.session import (
     InterviewTurn,
     TurnAssessment,
 )
+from app.models.reflection_report import ReflectionReportRow
 from app.models.user import User
 from app.models.user_insight_cache import UserInsightCacheRow
 
@@ -27,6 +28,7 @@ __all__ = [
     "InterviewTurn",
     "MetaReport",
     "ParseResult",
+    "ReflectionReportRow",
     "ResearchCache",
     "TurnAssessment",
     "User",
