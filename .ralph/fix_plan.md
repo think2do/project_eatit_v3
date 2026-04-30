@@ -10,13 +10,14 @@ Match the section prefix(V32.M2.*)to 当前 spec 文件即可。
 
 ## High Priority (work top-down)
 
-> P1 / M2.2 = 解析体验扩展(F-301 ~ F-305 整页 ParsedPanel 重构)。共 4 节点 ✅ 全部完成 2026-04-30。
-> 下一阶段(M2.3)需要新 spec 文件,Ralph 暂停等待人工指示。
+> P1 / M2.2 = 解析体验扩展(F-301 ~ F-305 整页 ParsedPanel 重构)。共 4 节点 + 1 个 audit-fix 节点。
+> 依赖关系见 v32-p1-sections.md M2.2 "Execution order" 表 + V32.M2.2.X 节。
 
-(无未完成项)
+(empty — M2.2 batch + audit-fix 全部完成)
 
 ## Completed (P1/M2.2 — v3.2+)
 
+- [x] V32.M2.2.X M2.2 audit-fix(F-303 chips + MatchScore cross-field validator + 3 service fallback tests + 4 ParsedPanel integration tests + 3 ConfigPage focusSync tests + ParsedMetaBar 60s 自刷新;后端 299→314 / 前端 74→81) (4126dd3, 2026-04-30)
 - [x] V32.M2.2.1 F-301 后端 ParseResult schema 扩展(MatchScore + profile_summary + advantages/gaps + interview_focus + project_hooks_v32 + 7 子 schema + 30 边界测试) (d14ea15, 2026-04-30)
 - [x] V32.M2.2.2 F-303 候选 profile chips + F-304 PageStepIndicator(3 页统一 eyebrow + ParseResultCard ProfileChips + 4 tests;meta 行 file size/pages 推迟到 M2.2.4) (699ad5b, 2026-04-30)
 - [x] V32.M2.2.3 F-302 FocusCard + F-305 ParsedMetaBar(relativeTime + selectedFocusIds store 联动 ConfigPage directions + 14 tests) (827f63e, 2026-04-30)
