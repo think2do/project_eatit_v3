@@ -15,7 +15,6 @@ Match the section prefix(V32.M3.*)to 当前 spec 文件即可。
 > 依赖关系见 v32-p2-sections.md "Execution order" 表。Ralph 必须按下方顺序执行。
 > ⚠️ M3.1.4 Dashboard 整页是工程量最大节点(~8 文件 / ~300 行),若 timeout 拆 a/b。
 
-- [ ] V32.M3.1.5 复用上次配置 + HistoryFooterCTA(skipUpload + reuseLastConfig action)
 - [ ] V32.M3.2.1 Reflection Agent + ReflectionReport schema + 教学语气护栏(L0 条款 12 + 不重复 Report 评价 regex 扫,AGENT_NAMES 增至 10)
 - [ ] V32.M3.2.2 post_report_graph 加 reflection_node(与 coach_node 并行)+ reflection_reports 表 + GET /api/v1/sessions/{id}/reflection
 - [ ] V32.M3.2.3 ReportPage segment tab + ReflectionView 状态机(pending/ok/failed + PerQuestionCoachingCard + MockDialogue)
@@ -23,6 +22,7 @@ Match the section prefix(V32.M3.*)to 当前 spec 文件即可。
 
 ## Completed (P2/M3 — v3.2+)
 
+- [x] V32.M3.1.5 F-316 复用上次配置 + HistoryFooterCTA(extractConfigFromSnapshot 防御 v3.1 老 snapshot + pickLastReusableConfig 跳过 malformed 行 + skipUpload/reuseLastConfig/consumeSkipUpload store actions + UploadPage useEffect 消费并 redirect /config + HistoryPage 挂 HistoryFooterCTA + 14 tests;前端 128→142) (4b8f3ec, 2026-05-01)
 - [x] V32.M3.1.4 F-316/F-318 Dashboard 整版重写(4 StatCard + AICoachCard linear-gradient brand-softer + 4 FilterTabs + 6 列 SessionTable + getUserInsights API client + insights store slot + HistoryPage 全量重写并保留 MetaReport modal + 20 tests;前端 108→128) (ea30874, 2026-05-01)
 - [x] V32.M3.1.3 F-318 user_insight_cache 表 alembic + GET /api/v1/users/me/insights API(20260430_0003 迁移 + UserInsightCacheRow + ix_uic_user_session + SqlAlchemyUserInsightCacheRepository 5 lifecycle 方法 SQLite ON CONFLICT + GET 路由 204/200 + build_default_coach_service 切到真 repo + 6 tests;后端 412→418) (8fff706, 2026-04-30)
 - [x] V32.M3.1.2 F-318 post_report_graph + asyncio.create_task 异步触发(POST_REPORT_GRAPH_NODES={coach_node} A7-style 锁 + CoachService Protocols + InMemoryUserInsightCacheRepository 默认 + DBRecentReportsReader + _generate_report_task 末尾 fire-and-forget + _POST_REPORT_TASKS 强引用集 + 场次<3 跳过 / 幂等 / 失败非致命 / reader 抛错静默 + 12 tests;后端 400→412) (f62ffd5, 2026-04-30)
