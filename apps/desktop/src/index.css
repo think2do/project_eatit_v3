@@ -361,6 +361,36 @@
     background: var(--warn);
   }
 
+  /* ===== Typography (M0.1e — h1 / h2 / h3 / body / muted) ===== */
+  .h1 {
+    font-family: var(--f-serif);
+    font-size: 42px;
+    line-height: 1.1;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    margin: 10px 0 6px;
+    color: var(--ink-900);
+  }
+  .h2 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .h3 {
+    font-size: 14.5px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .body {
+    font-size: 13.5px;
+    color: var(--ink-700);
+    line-height: 1.6;
+  }
+  .muted {
+    color: var(--ink-500);
+  }
+
   /* ===== Reusable pattern components ===== */
   .ds-card {
     background: var(--bg-elev);
