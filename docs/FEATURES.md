@@ -2,7 +2,7 @@
 
 > **本文件是 PRD 第零·二章 L1 冻结清单的镜像 + v3.2 / v3.3 新增 F-ID 的完成日志。**
 >
-> **最后更新**: 2026-04-30
+> **最后更新**: 2026-05-01(v3.3 全收尾)
 > **版本对齐**: PRD v3.2 + v3.3 addendum
 > **维护规则**:
 > - 每次新增 F-ID 时,在对应小节追加一行
@@ -72,11 +72,15 @@
 | F-316 | 面试记录 Dashboard(StatCards + AI 推荐卡 + 筛选 tabs + 表格) | ✅ done | `ea30874` | V32.M3.1.4 |
 | F-318 | Coach Agent(跨 session 异步分析 + UserInsightCache) | ✅ done | `13a3da5 + f62ffd5 + 8fff706` | V32.M3.1.1-3 |
 
-### P2 待做(M4)
+### P3 已完成(M4, 2026-05-01)
 
-| F-ID | 功能 | 状态 | 计划节点 |
-|---|---|---|---|
-| F-315 | 配额体系前端展示(Sidebar 配额卡,P0 仅 mock) | ⏳ pending | V32.M4.1 |
+| F-ID | 功能 | 状态 | commit | 实施节点 |
+|---|---|---|---|---|
+| F-315 | 配额体系前端展示(Sidebar 配额卡,纯前端 localStorage mock,L0 A18 enforced) | ✅ done | `bbfc3af` | V32.M4.1 |
+
+> **v3.3 全收尾**(2026-05-01):M4.1-M4.4 + M4.X 收口完成,F-315 落地 +
+> woff2 字体本地子集化(`ed1ce0d`)+ Playwright 烟雾 E2E(`8cd24d3`)+
+> locust 性能基线骨架(`01de0ae`)。所有 v3.2 / v3.3 F-ID 已交付。
 
 ---
 
@@ -116,3 +120,4 @@
 | 版本 | 日期 | 变更 |
 |---|---|---|
 | 初版 | 2026-04-30 | 创建本文件,镜像 PRD v3.2 + v3.3 addendum 的全部 F-ID;2026-04-30 P0 完成的 7 个 F-ID 全部记入 |
+| v3.3 全收尾 | 2026-05-01 | M4 收口 — F-315 SidebarQuotaCard 落地;woff2 字体本地子集化 / Playwright 烟雾 E2E / locust 性能骨架 三个间接成果一并入档 |
