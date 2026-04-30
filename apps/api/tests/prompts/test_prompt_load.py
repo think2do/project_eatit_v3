@@ -67,6 +67,11 @@ _USER_VARS: dict[str, dict] = {
         "remaining_minutes": 5,
         "long_term_summary": None,
     },
+    "research": {
+        "company_name": "字节跳动",
+        "role_title": "高级产品经理",
+        "industry_hints": ["短视频", "推荐"],
+    },
 }
 
 

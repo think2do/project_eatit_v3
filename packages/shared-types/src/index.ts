@@ -264,6 +264,56 @@ export type ParseResultPreview = {
   project_hook_count: number;
 };
 
+// ===== Research Agent (F-320, V32.M2.3.1) =====
+//
+// Eighth agent. Runs in parallel with parse during the intake phase.
+// Strict L0 A11 privacy: only company / role / industry crosses the
+// wire — never resume_text or PII. The Python schema enforces this with
+// `extra="forbid"`; this TS mirror is purely for the desktop UI.
+
+export type ResearchSignalType =
+  | "funding"
+  | "product"
+  | "personnel"
+  | "market"
+  | "regulation";
+
+export type ResearchSignal = {
+  type: ResearchSignalType;
+  summary: string;
+  occurred_at: string | null;
+  source_url: string | null;
+};
+
+export type CompanyStage = "seed" | "growth" | "mature" | "listed" | "unknown";
+export type ResearchConfidence = "high" | "mid" | "low";
+
+export type CompanyProfile = {
+  name: string;
+  business_model: string;
+  stage: CompanyStage;
+  recent_signals: ResearchSignal[];
+  evidence_links: string[];
+  confidence: ResearchConfidence;
+};
+
+export type IndustryProfile = {
+  name: string;
+  landscape_summary: string;
+  key_metrics: string[];
+  typical_pain_points: string[];
+  competitors_in_jd_ctx: string[];
+};
+
+export type ResearchResult = {
+  company: CompanyProfile;
+  industry: IndustryProfile;
+  fetched_at: string;
+  cache_key: string;
+  degraded: boolean;
+  degraded_reason: string | null;
+};
+
 export type TimestampedEntity = {
   id: string;
   created_at: string;
