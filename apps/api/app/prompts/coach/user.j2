@@ -1,0 +1,17 @@
+本次需要聚合的近 {{ based_on_session_count }} 场面试报告(JSON):
+
+```json
+{{ recent_reports_json }}
+```
+
+{% if candidate_profile_json %}
+候选人画像(JSON,只在补充上下文时参考,不要复述其中字段):
+
+```json
+{{ candidate_profile_json }}
+```
+{% endif %}
+
+请按 system prompt 的约束输出 `UserInsightCache` 的 5 个动态字段:
+`headline / headline_detail / recurring_weaknesses /
+improvement_signals / next_focus_areas`。

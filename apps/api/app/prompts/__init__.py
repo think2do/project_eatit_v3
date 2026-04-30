@@ -28,6 +28,8 @@ AGENT_NAMES: tuple[str, ...] = (
     "observer",
     # F-320 V32.M2.3.1 — 8th agent, runs parallel with parse during intake.
     "research",
+    # F-318 V32.M3.1.1 — 9th agent, async post-report cross-session insight.
+    "coach",
 )
 
 PromptRole = Literal["system", "user"]

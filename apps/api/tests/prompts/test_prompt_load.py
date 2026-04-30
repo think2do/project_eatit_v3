@@ -78,6 +78,13 @@ _USER_VARS: dict[str, dict] = {
         "role_title": "高级产品经理",
         "industry_hints": ["短视频", "推荐"],
     },
+    # F-318 V32.M3.1.1 — Coach Agent. recent_reports/candidate_profile are
+    # opaque JSON dumps the service forwards to the LLM after redaction.
+    "coach": {
+        "based_on_session_count": 3,
+        "recent_reports_json": "[]",
+        "candidate_profile_json": None,
+    },
 }
 
 

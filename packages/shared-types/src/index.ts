@@ -604,6 +604,29 @@ export type MetaReportListResponse = {
   total: number;
 };
 
+// F-318 V32.M3.1.1 — cross-session insight payload produced by the Coach
+// Agent and persisted in `user_insight_cache`. Mirrors the Pydantic schema
+// at `apps/api/app/agents/coach/schemas.py`.
+export type UserInsightStatus =
+  | "pending"
+  | "running"
+  | "ok"
+  | "failed"
+  | "skipped";
+
+export type UserInsightCache = {
+  user_id: string;
+  based_on_session_count: number;
+  based_on_last_session_id: string;
+  headline: string;
+  headline_detail: string;
+  recurring_weaknesses: string[];
+  improvement_signals: string[];
+  next_focus_areas: InterviewDirectionV32[];
+  generated_at: string;
+  status: UserInsightStatus;
+};
+
 export type ClientAudioStartEvent = {
   event: "client.audio.start";
   turn_index: number;
