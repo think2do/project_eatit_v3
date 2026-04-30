@@ -24,6 +24,9 @@ ALLOWED_KEYS: frozenset[str] = frozenset(
         "observer_panel_enabled",
         "interview_input_mode",
         "interviewer_tts_enabled",
+        # F-320 V32.M2.3.2 — opt-in flag for the connected Research Agent.
+        # Default-off; only flips on after the user accepts the privacy modal.
+        "research_opt_in",
     }
 )
 
