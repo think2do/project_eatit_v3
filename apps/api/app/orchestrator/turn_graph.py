@@ -1,5 +1,13 @@
 """Per-turn LangGraph.
 
+⚠️  DO NOT RENAME NODES — see AGENTS.md §6 +
+    tests/orchestrator/test_graph_contract.py +
+    .ralph/specs/v32-p0-constraints.md §A7.
+    Node-name set {"turn_assessment", "compression", "next_question"}
+    is an L0 red line. Any new agent (Coach / Reflection / etc.) must
+    live on its own graph (see post_report_graph for the pattern) so
+    this 3-node turn graph stays frozen.
+
   START ──► turn_assessment ──┐
        │                      ├──► next_question ──► END
        └──► compression ──────┘
