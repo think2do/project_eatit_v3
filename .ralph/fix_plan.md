@@ -23,7 +23,7 @@ _(High Priority 已清空。下一阶段需要新 spec 文件,例如 v32-p4-sect
 
 ## Completed (P3/M4 — v3.2+)
 
-- [x] V32.M4.X M4 收口文档同步(FEATURES.md F-315 ⏳→✅ + 把 P2 待做(M4)段改写成 P3 已完成(M4)+ v3.3 全收尾 banner;fix_plan High Priority 清空) (<COMMIT_HASH>, 2026-05-01)
+- [x] V32.M4.X M4 收口文档同步(FEATURES.md F-315 ⏳→✅ + 把 P2 待做(M4)段改写成 P3 已完成(M4)+ v3.3 全收尾 banner;fix_plan High Priority 清空) (7488597, 2026-05-01)
 - [x] V32.M4.1 F-315 SidebarQuotaCard + quotaMock localStorage(read/increment/reset/getRemaining + 跨月自动归零 + 默认 0/10 + "占位" 文案 + 5+4=9 vitest 单测;前端 160→169) (bbfc3af, 2026-05-01)
 - [x] V32.M4.2 woff2 字体本地子集化(Inter Regular/Medium/Semibold 18-19K + Instrument Serif Regular 20K + JetBrains Mono Regular 30K + 3 SIL OFL 1.1 LICENSE + index.css 5 @font-face 替换 googleapis @import;A19 enforced) (ed1ce0d, 2026-05-01)
 - [x] V32.M4.3 Playwright 烟雾 E2E(playwright.config + 2 spec + 3 fixtures + Tauri stub 解决 30s mount 阻塞 + LIFO route 顺序;upload-to-config + report-renders 2/2 passed in 2.7s;A20 enforced) (8cd24d3, 2026-05-01)
