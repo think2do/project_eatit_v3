@@ -344,3 +344,140 @@ corepack pnpm build
 3. 完成报告 → Hero "中上/中/中下"(F-314)+ 五维度评分 + 单题分 + 专项训练 CTA
 4. **切到[详细复盘] tab → 看 Reflection 教学版(F-322 新需求)**
 5. 累积 ≥3 场后 → **Dashboard 显示 StatCards + AI 推荐卡(F-316/F-318)**
+
+---
+
+## V32.M3.X — M3 audit-fix(补 G1/G2 双测试)
+
+**Goal.** 2026-05-01 凌晨 tester 复审 M3 评分 8.5/10,**4 条核心数据流全部真实接通,无 🔴 必修**。本节点只补 2 个 🟡 测试覆盖空洞,使 M3 push main 前测试质量达 9.5/10。
+
+> ⚠️ 与 M2.1.X / M2.2.X / M2.3.X audit-fix 不同:本次**只补测试,不动产品代码**(类似 M2.1.X 补测试空壳)。
+
+### 缺口清单(只修 2 个 🟡)
+
+- **G1**:`tests/api/test_reports_api.py` 缺"fire-and-forget 不阻塞 report READY"显式断言 — Coach trigger 抛异常时 report status 仍应 READY,但当前测试没显式验证这条隔离 contract
+- **G2**:`apps/desktop/src/__tests__/` 没有 HistoryPage 集成测试 — `getUserInsights` 调用路径、204→empty-state、ok/running/failed 三态分支 均无前端测试覆盖
+
+🟡 G4(overlap 扫描覆盖 summary)+ 🟢 G3/G5/G6/G7 + 🟡 G8(场次阈值竞态)留作 M4 一起处理或推到后续。
+
+### Files (new):
+
+- `apps/api/tests/api/test_reports_post_report_isolation.py` — G1:用 monkeypatch 替换 `_spawn_post_report_coach_trigger` 抛 RuntimeError,断言 report `_generate_report_task` 完成后 status 仍 READY,且 trigger 抛错被 logger.warning 捞住
+- `apps/desktop/src/__tests__/HistoryPage.test.tsx` — G2:覆盖 4 路径:
+  - `getUserInsights` 返回 null(204)→ AICoachCard 隐藏
+  - `getUserInsights` 返回 status=ok → AICoachCard 渲染 headline / headline_detail / recurring_weaknesses
+  - `getUserInsights` 返回 status=running → AICoachCard 显示"分析中"占位
+  - `getUserInsights` 返回 status=failed → AICoachCard 显示"分析失败,稍后重试"占位
+
+### Files (NOT modified — 严格不动产品代码):
+
+- 严禁修改任何 `apps/api/app/**/*.py`(后端业务代码)
+- 严禁修改任何 `apps/desktop/src/**` 下的非测试文件(组件 / hook / lib 实现)
+- 本节点**只补测试**,不改产品行为
+
+### Key Interfaces.
+
+```python
+# apps/api/tests/api/test_reports_post_report_isolation.py
+"""G1: fire-and-forget Coach/Reflection trigger does NOT block report READY status.
+
+Even when post-report triggers raise, _generate_report_task must:
+1. Return successfully
+2. Set report status to READY
+3. Log warning (no upstream propagation)
+"""
+import asyncio
+import pytest
+from unittest.mock import AsyncMock, patch
+
+@pytest.mark.asyncio
+async def test_report_ready_even_when_coach_trigger_raises(...):
+    """Coach trigger 抛 RuntimeError,report status 仍 READY."""
+    with patch("app.domain.reports.service._spawn_post_report_coach_trigger",
+               side_effect=RuntimeError("simulated coach failure")):
+        # ... setup session, run _generate_report_task
+        # ... assert report.status == "READY"
+        # ... assert coach exception was caught + logged WARNING
+        pass
+
+@pytest.mark.asyncio
+async def test_report_ready_even_when_reflection_trigger_raises(...):
+    """Reflection trigger 抛 ValueError,report status 仍 READY."""
+    # ... 同上,镜像 reflection trigger
+    pass
+```
+
+```typescript
+// apps/desktop/src/__tests__/HistoryPage.test.tsx
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
+import { HistoryPage } from '@/pages/HistoryPage'
+
+vi.mock('@/api/usersInsights', () => ({
+  getUserInsights: vi.fn(),
+}))
+
+describe('HistoryPage AICoachCard integration', () => {
+  it('hides AICoachCard when getUserInsights returns null (204)', async () => {
+    (getUserInsights as Mock).mockResolvedValue(null)
+    render(<HistoryPage />)
+    await waitFor(() => {
+      expect(screen.queryByTestId('ai-coach-card')).toBeNull()
+    })
+  })
+
+  it('renders AICoachCard with headline when status=ok', async () => {
+    (getUserInsights as Mock).mockResolvedValue({
+      status: 'ok',
+      headline: '建议继续深耕数据驱动方向',
+      headline_detail: '...',
+      recurring_weaknesses: ['x'],
+      next_focus_areas: ['data-driven'],
+      based_on_session_count: 5,
+    })
+    render(<HistoryPage />)
+    await waitFor(() => {
+      expect(screen.getByText(/建议继续深耕数据驱动方向/)).toBeTruthy()
+    })
+  })
+
+  it('shows analyzing placeholder when status=running', async () => { /* ... */ })
+  it('shows failed placeholder when status=failed', async () => { /* ... */ })
+})
+```
+
+### Acceptance:
+
+```bash
+cd apps/api
+unset VIRTUAL_ENV
+uv run python -m pytest tests/api/test_reports_post_report_isolation.py -v
+# ≥ 2 passed
+uv run python -m pytest -q
+# 全量 ≥ 471(469 + 2)
+
+cd ../desktop
+corepack pnpm test src/__tests__/HistoryPage.test.tsx -- --run
+# 4 passed
+corepack pnpm test -- --run
+# 全量 ≥ 160(156 + 4)
+corepack pnpm exec tsc --noEmit
+corepack pnpm lint
+corepack pnpm lint:design-tokens
+```
+
+### Commit:
+
+`test(audit): M3 audit-fix — fire-and-forget isolation + HistoryPage integration`
+
+提交 body 必须含:
+- G1 补 reports 隔离测试(2 case:Coach + Reflection trigger raise → report still READY)
+- G2 补 HistoryPage 集成测试(4 case:null / ok / running / failed)
+- 不动产品代码声明
+- 测试套总数变化(后端 469→471 / 前端 156→160)
+
+### 完工后
+
+M3 完整收尾(8 主节点 + 1 audit-fix)。下一阶段 M4(配额 + Playwright E2E + locust 性能 + shadcn 残余清理,~4 节点)需要新 spec `v32-p3-sections.md`。
+
+预期 M4 完工后 v3.2+ 全部 ~45 节点 100% 收官,达到对外发布门槛。

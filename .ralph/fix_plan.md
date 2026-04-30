@@ -11,9 +11,10 @@ Match the section prefix(V32.M3.*)to 当前 spec 文件即可。
 
 ## High Priority (work top-down)
 
-> P2 / M3 = Coach + Dashboard + Reflection 复盘报告(老板 F-322 最后的需求)。共 8 节点。
-> 依赖关系见 v32-p2-sections.md "Execution order" 表。Ralph 必须按下方顺序执行。
-> ⚠️ M3.1.4 Dashboard 整页是工程量最大节点(~8 文件 / ~300 行),若 timeout 拆 a/b。
+> P2 / M3 = Coach + Dashboard + Reflection 复盘报告。8 主节点 ✅ + 1 audit-fix
+> M3 tester 复审 8.5/10,**无 🔴 必修,只补 G1+G2 双测试**(只动测试,不动产品代码)。
+
+- [ ] V32.M3.X M3 audit-fix(G1 reports fire-and-forget 隔离测试 2 case + G2 HistoryPage 集成测试 4 case;只补测试,不动产品代码;预期后端 +2 / 前端 +4)
 
 
 
