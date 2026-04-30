@@ -91,7 +91,7 @@ function Brand(): JSX.Element {
           letterSpacing: "0.04em",
         }}
       >
-        v0.1
+        v3.2
       </div>
     </div>
   );
