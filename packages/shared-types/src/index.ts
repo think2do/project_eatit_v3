@@ -190,12 +190,72 @@ export type ProjectHook = {
   focus_points: string[];
 };
 
+export type MatchScoreLevel = "LOW" | "MID" | "HIGH";
+
+export type MatchScore = {
+  score: number;
+  level: MatchScoreLevel;
+  one_line: string;
+};
+
+export type MatchAdvantageTag = "强匹配" | "匹配";
+
+export type MatchAdvantage = {
+  label: string;
+  tag: MatchAdvantageTag;
+  evidence: string;
+};
+
+export type GapTag = "需补充" | "待评估";
+
+export type Gap = {
+  label: string;
+  tag: GapTag;
+  evidence: string;
+};
+
+export type InterviewDirectionId =
+  | "ai-insight"
+  | "data-driven"
+  | "cross-func"
+  | "zero-to-one"
+  | "user-research"
+  | "strategy";
+
+export type InterviewFocus = {
+  direction_id: InterviewDirectionId;
+  priority: "high" | "mid" | "low";
+  title: string;
+  description: string;
+};
+
+export type ProjectHookV32 = {
+  name: string;
+  why: string;
+};
+
+export type CandidateProfile = {
+  role: string;
+  years: number;
+  companies: string[];
+  domain_tags: string[];
+};
+
 export type ParseResultPayload = {
+  // legacy v3.1 fields (retained, L0 A10)
   job_requirements: JobRequirement[];
   candidate_highlights: CandidateHighlight[];
   candidate_risks: CandidateRisk[];
   project_hooks: ProjectHook[];
-  match_summary: string;
+  match_summary: string | null;
+  // v3.2 additions (F-301)
+  candidate_profile: CandidateProfile | null;
+  match_score: MatchScore | null;
+  profile_summary: string | null;
+  match_advantages: MatchAdvantage[];
+  gaps: Gap[];
+  interview_focus: InterviewFocus[];
+  project_hooks_v32: ProjectHookV32[];
 };
 
 export type ParseResultPreview = {
