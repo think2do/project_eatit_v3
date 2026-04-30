@@ -26,6 +26,20 @@ export type InterviewDirection =
   | "project_deep_dive"
   | "behavioral_comprehensive";
 
+// v3.2+ palette (F-307). The legacy types above are retained for
+// L0 back-compat (and still typed in legacy session payloads).
+export type InterviewStyleV32 = "structured" | "pressure" | "friendly" | "expert";
+
+export type InterviewDirectionV32 =
+  | "ai-insight"
+  | "data-driven"
+  | "cross-func"
+  | "zero-to-one"
+  | "user-research"
+  | "strategy";
+
+export type InterviewDurationV32 = 15 | 30 | 45;
+
 export type InterviewSessionStatus =
   | "created"
   | "session_started"
@@ -50,8 +64,8 @@ export type FrameworkStage = {
 };
 
 export type DirectionFramework = {
-  style: InterviewStyle;
-  direction: InterviewDirection;
+  style: InterviewStyleV32 | InterviewStyle;
+  direction: InterviewDirectionV32 | InterviewDirection;
   duration_minutes: number;
   stages: FrameworkStage[];
   focus_points: string[];
@@ -172,16 +186,24 @@ export type ParseResultResponse = TimestampedEntity & {
 };
 
 export type InterviewConfigRequest = {
-  style: InterviewStyle;
-  direction: InterviewDirection;
-  duration_minutes: number;
+  // v3.2+ palette (F-307). Backend `_upgrade_style` validator also
+  // accepts the legacy v3.1 strings via the InterviewStyle union, so
+  // existing v3.1 client code keeps working through the transition.
+  style: InterviewStyleV32 | InterviewStyle;
+  // v3.2+ multi-select. 1–3 items required at validation time;
+  // backend back-fills from `direction` (legacy single) when empty.
+  directions: InterviewDirectionV32[];
+  duration_minutes: InterviewDurationV32 | number;
+  // v3.1 legacy single-select; deprecated but accepted for L0 compat.
+  direction?: InterviewDirection;
 };
 
 export type InterviewConfigResponse = TimestampedEntity & {
   interview_session_id: string;
-  style: InterviewStyle;
-  direction: InterviewDirection;
-  duration_minutes: number;
+  style: InterviewStyleV32 | InterviewStyle;
+  directions: InterviewDirectionV32[];
+  duration_minutes: InterviewDurationV32 | number;
+  direction?: InterviewDirection | null;
 };
 
 export type CreateSessionRequest = {

@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import type {
-  InterviewDirection,
-  InterviewStyle,
+  InterviewDirectionV32,
+  InterviewDurationV32,
+  InterviewStyleV32,
   ParseResultPayload,
 } from "@eatit/shared-types";
 
@@ -20,9 +21,13 @@ export type CurrentUpload = {
 };
 
 export type CurrentConfig = {
-  style: InterviewStyle;
-  direction: InterviewDirection;
-  durationMinutes: number;
+  // v3.2+ shape (F-307). Old single `direction` field is folded into
+  // a 1–3-item `directions` list at the type level; backend still
+  // accepts a singular legacy `direction` via its before-validator,
+  // but the desktop client now writes the v3.2 shape directly.
+  style: InterviewStyleV32;
+  directions: InterviewDirectionV32[];
+  durationMinutes: InterviewDurationV32;
 };
 
 type AppStore = {
@@ -46,9 +51,9 @@ const DEFAULT_UPLOAD: CurrentUpload = {
 };
 
 const DEFAULT_CONFIG: CurrentConfig = {
-  style: "standard_professional",
-  direction: "project_deep_dive",
-  durationMinutes: 20,
+  style: "structured",
+  directions: ["zero-to-one"],
+  durationMinutes: 30,
 };
 
 export const useAppStore = create<AppStore>((set) => ({

@@ -1,26 +1,86 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, ValidationInfo, field_validator
 
-from app.models.enums import InterviewDirection, InterviewSessionStatus, InterviewStyle
+from app.models.enums import (
+    InterviewDirection,
+    InterviewDirectionV32,
+    InterviewDurationV32,
+    InterviewSessionStatus,
+    InterviewStyle,
+    InterviewStyleV32,
+)
+from app.models.legacy_mapping import (
+    upgrade_legacy_direction,
+    upgrade_legacy_duration,
+    upgrade_legacy_style,
+)
 from app.schemas.common import PaginatedResponse, SchemaModel, TimestampedResponse
 from app.schemas.frameworks import DirectionFramework
 
 
 class InterviewConfigRequest(SchemaModel):
-    style: InterviewStyle
-    direction: InterviewDirection
-    duration_minutes: int = Field(ge=1)
+    """v3.2+ InterviewConfig request shape (F-307).
+
+    Backward compat (L0): legacy v3.1 fields `direction` (singular) and
+    `style` values like `standard_professional` continue to validate.
+    Validators run in `mode='before'` to project the legacy palette
+    onto the v3.2 Literal palette before strict typing kicks in.
+    Any 1–3-direction list of v3.2 ids is accepted; a missing /
+    empty `directions` falls back to the legacy `direction` field.
+    """
+
+    style: InterviewStyleV32
+    # NB: `direction` is declared BEFORE `directions` so the
+    # before-validator on `directions` can read the legacy field via
+    # `info.data["direction"]` (Pydantic v2 only exposes already-
+    # validated fields in `info.data`).
+    direction: InterviewDirection | None = None
+    # v3.2+ multi-select. Default to `[]` so v3.1 clients that omit the
+    # field altogether (and only send `direction`) still hit the
+    # before-validator that promotes the legacy single-direction. The
+    # min_length=1 guard then fires AFTER the back-fill, so a payload
+    # with neither `directions` nor `direction` still gets rejected.
+    directions: list[InterviewDirectionV32] = Field(
+        default_factory=list, min_length=1, max_length=3
+    )
+    duration_minutes: InterviewDurationV32
+
+    @field_validator("style", mode="before")
+    @classmethod
+    def _upgrade_style(cls, v: Any) -> Any:
+        return upgrade_legacy_style(v)
+
+    @field_validator("duration_minutes", mode="before")
+    @classmethod
+    def _upgrade_duration(cls, v: Any) -> Any:
+        return upgrade_legacy_duration(v)
+
+    @field_validator("directions", mode="before")
+    @classmethod
+    def _fill_directions_from_legacy(
+        cls, v: Any, info: ValidationInfo
+    ) -> Any:
+        # Old front-ends that send only `direction` (singular) get
+        # auto-promoted to a one-element `directions` list.
+        if (not v) and info.data.get("direction"):
+            mapped = upgrade_legacy_direction(info.data["direction"])
+            if mapped is not None:
+                return [mapped]
+        return v
 
 
 class InterviewConfigResponse(TimestampedResponse):
     interview_session_id: UUID
-    style: InterviewStyle
-    direction: InterviewDirection
-    duration_minutes: int
+    style: InterviewStyleV32
+    directions: list[InterviewDirectionV32] = Field(default_factory=list)
+    duration_minutes: InterviewDurationV32
+    # Old single-direction echoed back for v3.1 clients (L0 retention).
+    direction: InterviewDirection | None = None
 
 
 class CreateSessionRequest(SchemaModel):

@@ -1,6 +1,23 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal
+
+
+# v3.2+ palette (F-307). These are Literal types rather than StrEnums
+# because Pydantic Literal validation gives the exact enumerated set
+# in error messages, which is what M1.1's boundary tests expect. The
+# legacy StrEnums below are kept verbatim — L0 forbids deletion.
+InterviewStyleV32 = Literal["structured", "pressure", "friendly", "expert"]
+InterviewDirectionV32 = Literal[
+    "ai-insight",
+    "data-driven",
+    "cross-func",
+    "zero-to-one",
+    "user-research",
+    "strategy",
+]
+InterviewDurationV32 = Literal[15, 30, 45]
 
 
 class CandidateAssetStatus(StrEnum):

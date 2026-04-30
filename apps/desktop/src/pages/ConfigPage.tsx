@@ -3,60 +3,72 @@ import axios from "axios";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type {
-  InterviewDirection,
-  InterviewStyle,
+  InterviewDirectionV32,
+  InterviewDurationV32,
+  InterviewStyleV32,
 } from "@eatit/shared-types";
 import { createSession } from "@/api/sessions";
 import { WaitingTips } from "@/components/WaitingTips";
 import { useAppStore } from "@/stores/app-store";
 
-type TileOption<T extends string> = {
-  value: T;
+type StyleOption = {
+  value: InterviewStyleV32;
+  label: string;
+  hint: string;
+  tag?: string;
+  tagClass?: string;
+};
+
+const STYLE_OPTIONS: StyleOption[] = [
+  {
+    value: "structured",
+    label: "结构化面试官",
+    hint: "按既定框架推进,节奏稳定,适合大部分日常练习",
+    tag: "推荐",
+    tagClass: "tag tag-green",
+  },
+  {
+    value: "pressure",
+    label: "高压追问型",
+    hint: "连续深挖细节、不断质疑你的判断依据",
+  },
+  {
+    value: "friendly",
+    label: "亲和启发型",
+    hint: "引导你自述,追问偏协助式",
+  },
+  {
+    value: "expert",
+    label: "资深行业专家",
+    hint: "以业务视角切入,追问行业理解",
+    tag: "Beta",
+    tagClass: "tag tag-line",
+  },
+];
+
+type DirectionOption = {
+  value: InterviewDirectionV32;
   label: string;
   hint: string;
 };
 
-const STYLE_OPTIONS: TileOption<InterviewStyle>[] = [
-  {
-    value: "friendly_guided",
-    label: "友好引导",
-    hint: "轻松破冰,给提示,适合第一次模拟",
-  },
-  {
-    value: "standard_professional",
-    label: "标准专业",
-    hint: "正式但克制,不给额外提示",
-  },
-  {
-    value: "high_pressure_followup",
-    label: "高强度追问",
-    hint: "连续追问,挑战表达与抗压",
-  },
+const DIRECTION_OPTIONS: DirectionOption[] = [
+  { value: "ai-insight", label: "AI 场景洞察", hint: "对新技术 / 新趋势的判断与边界感" },
+  { value: "data-driven", label: "数据驱动决策", hint: "指标体系、AB 实验、归因分析" },
+  { value: "cross-func", label: "跨职能协作", hint: "与不同角色的协作与推动" },
+  { value: "zero-to-one", label: "从 0 到 1", hint: "应对不确定性与新业务" },
+  { value: "user-research", label: "用户洞察", hint: "调研方法、客户分层" },
+  { value: "strategy", label: "产品战略", hint: "竞争分析、北极星指标" },
 ];
 
-const DIRECTION_OPTIONS: TileOption<InterviewDirection>[] = [
-  {
-    value: "role_match",
-    label: "岗位匹配",
-    hint: "聚焦候选人与岗位的契合度",
-  },
-  {
-    value: "project_deep_dive",
-    label: "项目深挖",
-    hint: "围绕 1~2 个重点项目纵向追问",
-  },
-  {
-    value: "behavioral_comprehensive",
-    label: "行为综合",
-    hint: "覆盖协作/复盘/抗压等维度",
-  },
+const DURATION_OPTIONS: { value: InterviewDurationV32; label: string; hint: string }[] = [
+  { value: 15, label: "15 分钟", hint: "短练,聚焦一个主题" },
+  { value: 30, label: "30 分钟", hint: "默认,覆盖 3-4 个轮次" },
+  { value: 45, label: "45 分钟", hint: "完整体验,含反问" },
 ];
 
-const DURATION_OPTIONS: TileOption<string>[] = [
-  { value: "15", label: "15 分钟", hint: "短练,聚焦一个主题" },
-  { value: "20", label: "20 分钟", hint: "默认,覆盖 3 个轮次" },
-  { value: "30", label: "30 分钟", hint: "完整体验,含反问" },
-];
+const MAX_DIRECTIONS = 3;
+const MIN_DIRECTIONS = 1;
 
 function extractError(err: unknown): string {
   if (axios.isAxiosError(err)) {
@@ -74,9 +86,16 @@ export function ConfigPage(): JSX.Element {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const directionsValid =
+    config.directions.length >= MIN_DIRECTIONS && config.directions.length <= MAX_DIRECTIONS;
+
   const handleStart = async () => {
     if (!upload.assetBundleId) {
       setError("请先在「上传与解析」里完成简历与 JD 的上传。");
+      return;
+    }
+    if (!directionsValid) {
+      setError("请至少选择 1 个面试方向(最多 3 个)。");
       return;
     }
     setError(null);
@@ -86,7 +105,7 @@ export function ConfigPage(): JSX.Element {
         asset_bundle_id: upload.assetBundleId,
         config: {
           style: config.style,
-          direction: config.direction,
+          directions: config.directions,
           duration_minutes: config.durationMinutes,
         },
       });
@@ -98,22 +117,28 @@ export function ConfigPage(): JSX.Element {
     }
   };
 
-  const ready = Boolean(upload.assetBundleId) && upload.parseStatus === "succeeded";
+  const ready =
+    Boolean(upload.assetBundleId) && upload.parseStatus === "succeeded" && directionsValid;
+
+  const toggleDirection = (value: InterviewDirectionV32) => {
+    const isSelected = config.directions.includes(value);
+    if (isSelected) {
+      patchConfig({ directions: config.directions.filter((d) => d !== value) });
+      return;
+    }
+    if (config.directions.length >= MAX_DIRECTIONS) {
+      // Already at the cap; tile is rendered with .selected:false + greyed
+      // hover, so this branch is mostly defensive.
+      return;
+    }
+    patchConfig({ directions: [...config.directions, value] });
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <div>
         <div className="eyebrow">03 · 面试配置</div>
-        <h1
-          className="h-serif"
-          style={{
-            fontSize: 42,
-            lineHeight: 1.1,
-            fontWeight: 400,
-            margin: "10px 0 6px",
-            color: "var(--ink-900)",
-          }}
-        >
+        <h1 className="h1" style={{ margin: "10px 0 6px" }}>
           选一套和今天状态匹配的面试方式
         </h1>
         <p style={{ fontSize: 14, color: "var(--ink-500)", maxWidth: 620, lineHeight: 1.6 }}>
@@ -121,7 +146,7 @@ export function ConfigPage(): JSX.Element {
         </p>
       </div>
 
-      {!ready ? (
+      {!upload.assetBundleId || upload.parseStatus !== "succeeded" ? (
         <div
           style={{
             padding: "10px 14px",
@@ -136,29 +161,112 @@ export function ConfigPage(): JSX.Element {
         </div>
       ) : null}
 
-      <TileGroup
-        title="面试风格"
+      <Section
+        eyebrow="01 · 面试风格"
+        title="选择 1 个面试官风格"
         description="影响 AI 面试官的语气与追问强度。"
-        options={STYLE_OPTIONS}
-        value={config.style}
-        onChange={(value) => patchConfig({ style: value })}
-      />
+      >
+        <div className="tile-group">
+          {STYLE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              className={`tile${config.style === opt.value ? " selected" : ""}`}
+              onClick={() => patchConfig({ style: opt.value })}
+            >
+              <div className="tile-radio" />
+              <div style={{ flex: 1 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <span className="tile-title">{opt.label}</span>
+                  {opt.tag ? <span className={opt.tagClass}>{opt.tag}</span> : null}
+                </div>
+                <div className="tile-desc">{opt.hint}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </Section>
 
-      <TileGroup
-        title="面试方向"
-        description="决定 AI 把重心放在哪里。"
-        options={DIRECTION_OPTIONS}
-        value={config.direction}
-        onChange={(value) => patchConfig({ direction: value })}
-      />
+      <Section
+        eyebrow="02 · 面试方向"
+        title="选择 1–3 个方向(可多选)"
+        description="决定 AI 把重心放在哪里。最多选 3 个。"
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2, 1fr)",
+            gap: 10,
+          }}
+        >
+          {DIRECTION_OPTIONS.map((opt) => {
+            const selected = config.directions.includes(opt.value);
+            const atCap = !selected && config.directions.length >= MAX_DIRECTIONS;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                className={`tile${selected ? " selected" : ""}`}
+                disabled={atCap}
+                onClick={() => toggleDirection(opt.value)}
+                style={atCap ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
+              >
+                <div className="tile-radio" />
+                <div style={{ flex: 1 }}>
+                  <div className="tile-title">{opt.label}</div>
+                  <div className="tile-desc">{opt.hint}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        {!directionsValid ? (
+          <div
+            style={{
+              marginTop: 8,
+              fontSize: 12.5,
+              color: "var(--warn)",
+            }}
+          >
+            请至少勾选 1 个方向。
+          </div>
+        ) : null}
+      </Section>
 
-      <TileGroup
-        title="期望时长"
-        description="会按比例切分各环节(暖场/深挖/反问)。"
-        options={DURATION_OPTIONS}
-        value={String(config.durationMinutes)}
-        onChange={(value) => patchConfig({ durationMinutes: Number(value) })}
-      />
+      <Section
+        eyebrow="03 · 期望时长"
+        title="选择面试时长"
+        description="会按比例切分各环节(暖场 / 深挖 / 反问)。"
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: 10,
+          }}
+        >
+          {DURATION_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              className={`tile${config.durationMinutes === opt.value ? " selected" : ""}`}
+              onClick={() => patchConfig({ durationMinutes: opt.value })}
+            >
+              <div className="tile-radio" />
+              <div style={{ flex: 1 }}>
+                <div className="tile-title">{opt.label}</div>
+                <div className="tile-desc">{opt.hint}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </Section>
 
       {error ? (
         <div
@@ -175,39 +283,16 @@ export function ConfigPage(): JSX.Element {
         </div>
       ) : null}
 
-      <div style={{ display: "flex", gap: 12 }}>
-        <button
-          type="button"
-          onClick={() => navigate("/upload")}
-          style={{
-            padding: "10px 18px",
-            borderRadius: "var(--r-md)",
-            border: "1px solid var(--line)",
-            background: "var(--bg-elev)",
-            color: "var(--ink-900)",
-            fontSize: 13.5,
-            cursor: "pointer",
-          }}
-        >
+      <div className="row">
+        <button type="button" className="btn" onClick={() => navigate("/upload")}>
           返回上传
         </button>
         <button
           type="button"
+          className={ready && !submitting ? "btn btn-brand btn-lg" : "btn btn-lg"}
           onClick={handleStart}
           disabled={!ready || submitting}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "11px 22px",
-            borderRadius: "var(--r-md)",
-            border: "none",
-            background: ready && !submitting ? "var(--brand)" : "var(--ink-200)",
-            color: "white",
-            fontSize: 14,
-            fontWeight: 500,
-            cursor: ready && !submitting ? "pointer" : "not-allowed",
-          }}
+          style={!ready || submitting ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
         >
           {submitting ? <Loader2 size={14} className="spin" /> : null}
           {submitting ? "生成面试框架..." : "开始面试"}
@@ -224,90 +309,24 @@ export function ConfigPage(): JSX.Element {
   );
 }
 
-interface TileGroupProps<T extends string> {
+interface SectionProps {
+  eyebrow: string;
   title: string;
   description: string;
-  options: TileOption<T>[];
-  value: T;
-  onChange: (next: T) => void;
+  children: React.ReactNode;
 }
 
-function TileGroup<T extends string>({
-  title,
-  description,
-  options,
-  value,
-  onChange,
-}: TileGroupProps<T>): JSX.Element {
+function Section({ eyebrow, title, description, children }: SectionProps): JSX.Element {
   return (
-    <section
-      className="ds-card"
-      style={{
-        padding: 20,
-        display: "flex",
-        flexDirection: "column",
-        gap: 14,
-      }}
-    >
-      <header style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <h2
-          style={{
-            margin: 0,
-            fontSize: 15,
-            fontWeight: 600,
-            color: "var(--ink-900)",
-          }}
-        >
-          {title}
-        </h2>
-        <p style={{ margin: 0, fontSize: 12.5, color: "var(--ink-500)" }}>
+    <section className="card card-pad">
+      <header style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 }}>
+        <div className="eyebrow">{eyebrow}</div>
+        <h2 className="h3">{title}</h2>
+        <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
           {description}
         </p>
       </header>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: 10,
-        }}
-      >
-        {options.map((option) => {
-          const selected = value === option.value;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => onChange(option.value)}
-              style={{
-                textAlign: "left",
-                padding: "14px 16px",
-                borderRadius: "var(--r-md)",
-                border: `1.5px solid ${selected ? "var(--brand)" : "var(--line)"}`,
-                background: selected ? "var(--brand-softer)" : "var(--bg-elev)",
-                color: "var(--ink-900)",
-                cursor: "pointer",
-                transition: "border-color 120ms ease, background 120ms ease",
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 13.5,
-                  fontWeight: 600,
-                  color: selected ? "var(--brand-ink)" : "var(--ink-900)",
-                }}
-              >
-                {option.label}
-              </span>
-              <span style={{ fontSize: 12, color: "var(--ink-500)", lineHeight: 1.5 }}>
-                {option.hint}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      {children}
     </section>
   );
 }
