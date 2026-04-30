@@ -52,6 +52,49 @@ describe("useTurnStats", () => {
     expect(result.current.rateLabel).toBe("slow");
   });
 
+  // G4 fix (2026-04-30 audit) — exact boundary cases at the rate
+  // thresholds. The rate label rules are:
+  //   wpm > 200          → 'fast'
+  //   wpm > 0 && wpm < 100 → 'slow'
+  //   else (incl. 0 / 100 / 200) → 'moderate'
+  // Without these tests, drift like ">=" instead of ">" or shifting
+  // the threshold to 90 would not fail any existing case.
+  it("rate label is moderate at exactly wpm=100 (lower boundary, not <100)", () => {
+    // 100 chars / 60s = 100 wpm — must NOT be 'slow' (rule is wpm < 100).
+    const text = "a".repeat(100);
+    const start = Date.now() - 60100; // small buffer so floor(elapsed)=60
+    const { result } = renderHook(() => useTurnStats(text, start));
+    expect(result.current.wpm).toBe(100);
+    expect(result.current.rateLabel).toBe("moderate");
+  });
+
+  it("rate label is slow just below wpm=100 (99 wpm)", () => {
+    // 99 chars / 60s = 99 wpm — strictly < 100 → 'slow'.
+    const text = "a".repeat(99);
+    const start = Date.now() - 60100;
+    const { result } = renderHook(() => useTurnStats(text, start));
+    expect(result.current.wpm).toBe(99);
+    expect(result.current.rateLabel).toBe("slow");
+  });
+
+  it("rate label is moderate at exactly wpm=200 (upper boundary, not >200)", () => {
+    // 200 chars / 60s = 200 wpm — must NOT be 'fast' (rule is wpm > 200).
+    const text = "a".repeat(200);
+    const start = Date.now() - 60100;
+    const { result } = renderHook(() => useTurnStats(text, start));
+    expect(result.current.wpm).toBe(200);
+    expect(result.current.rateLabel).toBe("moderate");
+  });
+
+  it("rate label is fast just above wpm=200 (201 wpm)", () => {
+    // 201 chars / 60s = 201 wpm — strictly > 200 → 'fast'.
+    const text = "a".repeat(201);
+    const start = Date.now() - 60100;
+    const { result } = renderHook(() => useTurnStats(text, start));
+    expect(result.current.wpm).toBe(201);
+    expect(result.current.rateLabel).toBe("fast");
+  });
+
   it("ticks elapsed seconds forward via setInterval (100ms cadence)", () => {
     vi.useFakeTimers();
     try {

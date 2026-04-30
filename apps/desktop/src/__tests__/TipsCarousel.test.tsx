@@ -107,4 +107,60 @@ describe("TipsCarousel", () => {
       vi.useRealTimers();
     }
   });
+
+  // G5 fix (2026-04-30 audit) — onCompleted lower bound. The original
+  // test only verified onCompleted *did* fire after 450ms (upper). If
+  // someone shrinks the transition window to 50ms (UX regression — the
+  // 已完成 ✓ plate would be near-invisible), the upper test still
+  // passes but the lower bound catches it.
+  it("does NOT call onCompleted before the ~400ms transition window", () => {
+    vi.useFakeTimers();
+    try {
+      const onCompleted = vi.fn();
+      const { rerender } = render(<TipsCarousel tips={mockTips} />);
+      rerender(
+        <TipsCarousel
+          tips={mockTips}
+          completing={true}
+          onCompleted={onCompleted}
+        />,
+      );
+      // 350ms < 400ms transition window — onCompleted must still be pending.
+      act(() => {
+        vi.advanceTimersByTime(350);
+      });
+      expect(onCompleted).not.toHaveBeenCalled();
+      // Walk past the window — now it should fire (cross-check this
+      // assertion is consistent with the upper-bound test above).
+      act(() => {
+        vi.advanceTimersByTime(100); // total 450ms
+      });
+      expect(onCompleted).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // G6 fix (2026-04-30 audit) — default intervalMs is the spec's "4-5s"
+  // requirement (PRD v3.2 §6.1.5). The other auto-advance tests use a
+  // small intervalMs to keep the test fast; this one uses the default
+  // so a regression to e.g. 1500ms or 8000ms fails CI.
+  it("uses default ~4500ms interval (spec '4-5s') when intervalMs not provided", () => {
+    vi.useFakeTimers();
+    try {
+      const { getByText } = render(<TipsCarousel tips={mockTips} />);
+      // At 3.5s, still on the first tip (default is > 3.5s).
+      act(() => {
+        vi.advanceTimersByTime(3500);
+      });
+      expect(getByText(/Tip 1 content/)).toBeTruthy();
+      // By 4.6s total, must have advanced (default ≤ 4.6s).
+      act(() => {
+        vi.advanceTimersByTime(1100); // total 4600ms
+      });
+      expect(getByText(/Tip 2 content/)).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

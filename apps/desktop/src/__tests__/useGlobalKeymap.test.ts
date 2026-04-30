@@ -40,6 +40,32 @@ describe("useGlobalKeymap", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  // G8 fix (2026-04-30 audit) — contenteditable focus is the third
+  // typing-target branch in `isTypingTarget`. Without this test, a
+  // refactor that drops the `isContentEditable` check would not fail
+  // CI even though rich-text editors (future review notes? feedback
+  // form?) would suddenly start submitting on Space.
+  //
+  // jsdom currently does not derive `isContentEditable` from the
+  // `contenteditable` attribute (only the property setter exists),
+  // so we stub the getter directly. This still exercises the hook's
+  // branch — the hook reads `target.isContentEditable`, which is what
+  // matters; how the DOM derives that boolean is jsdom's concern.
+  it("Space ignored when a contenteditable element is focused", () => {
+    const onSubmit = vi.fn();
+    renderHook(() => useGlobalKeymap({ onSubmit }));
+    const div = document.createElement("div");
+    Object.defineProperty(div, "isContentEditable", {
+      configurable: true,
+      get: () => true,
+    });
+    document.body.appendChild(div);
+    div.dispatchEvent(
+      new KeyboardEvent("keydown", { code: "Space", bubbles: true }),
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it("R triggers onReplay (lowercase + uppercase both)", () => {
     const onReplay = vi.fn();
     renderHook(() => useGlobalKeymap({ onReplay }));

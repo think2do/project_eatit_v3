@@ -7,15 +7,17 @@ turn (≥ 1) for the right-aside LiveObservationCard. Hard rules:
 - `turn 0` has no prior turn → field must stay None. The runtime
   force-resets it to None at the call site (see `runtime.py`), so
   the schema only needs to accept `None`.
-- The non-judgmental tone requirement is enforced by the prompt
-  template (do/don't list); these tests pin the template's contract
-  via a regex sweep instead of a runtime check (the LLM output is
-  not inspected for tone after generation).
+- The non-judgmental tone requirement is **prompt-only**: the LLM is
+  shown a do / don't list in the system prompt, but runtime does NOT
+  regex-scan the output. This is a deliberate trade-off — false
+  positives on legitimate tactical phrases ("可补判断维度") would do
+  more harm than rare LLM tone slips. These tests pin the prompt
+  template (the only enforcement surface) but make no claim about
+  what the runtime will do with a tone-violating LLM output.
 """
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
@@ -76,16 +78,33 @@ def test_prompt_template_carries_live_observation_contract() -> None:
     assert "live_observation" in template
     assert "≤ 30 字" in template
     assert "教学语气" in template
-    # Each violating sample is named in the prompt so the LLM has the
-    # negative examples in-context.
+
+
+def test_prompt_template_contains_donts() -> None:
+    """A12 教学语气护栏 (G2 fix, 2026-04-30 audit).
+
+    The original test in this slot regex-matched the don't-examples
+    against a judgmental regex — but the regex was constructed *from*
+    those exact strings, so it was a self-fulfilling tautology and
+    proved nothing. Replaced with a literal-text check that the
+    prompt actually carries both do- and don't-examples for the LLM
+    to learn from in-context.
+
+    Important: runtime does NOT scan LLM outputs for these patterns.
+    Tone enforcement is prompt-only; an LLM tone slip will pass the
+    Pydantic schema (it only caps length). This is a documented
+    trade-off (see module docstring)."""
+    template = (
+        Path(__file__).resolve().parents[2]
+        / "app"
+        / "prompts"
+        / "interviewer"
+        / "system.j2"
+    ).read_text(encoding="utf-8")
+    # don't examples: the prompt must explicitly show the LLM the
+    # judgmental phrasing it should avoid.
     for bad in ("你回答得很差", "完全没有抓住要点", "缺乏深度"):
-        assert bad in template, f"missing violating sample {bad!r} in prompt"
-
-
-def test_prompt_template_violating_samples_match_judgmental_regex() -> None:
-    """Cross-check: the violating examples in the prompt actually match
-    the judgmental-tone regex documented in the spec, so the prompt's
-    pedagogy stays consistent (do/don't pairs are genuinely opposite)."""
-    judgmental = re.compile(r"(你.*差|完全没有|缺乏)")
-    for sample in ("你回答得很差", "完全没有抓住要点", "缺乏深度"):
-        assert judgmental.search(sample), sample
+        assert bad in template, f"prompt missing don't sample {bad!r}"
+    # do examples: pedagogical samples the LLM can mimic.
+    assert "结构清晰" in template, "prompt missing 'do' sample (结构清晰…)"
+    assert "举例具体" in template, "prompt missing 'do' sample (举例具体…)"

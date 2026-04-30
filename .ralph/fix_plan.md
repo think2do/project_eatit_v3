@@ -10,12 +10,14 @@ Match the section prefix(V32.M2.*)to 当前 spec 文件即可。
 
 ## High Priority (work top-down)
 
-> P1 / M2.1 = 实时面试增强(F-309 / F-310 / F-311 / F-306 + InterviewPage 顶部重构)。共 5 个节点。
+> P1 / M2.1 = 实时面试增强(F-309 / F-310 / F-311 / F-306 + InterviewPage 顶部重构)。共 5 个节点 + 1 个测试 audit-fix 节点。
 > 依赖关系见 v32-p1-sections.md "Execution order" 表。Ralph 必须按下方顺序执行。
 
+(M2.1 batch all done — 5 主节点 + 1 audit 节点 完工)
 
 ## Completed (P1/M2.1 — v3.2+)
 
+- [x] V32.M2.1.X 测试缺口修补(audit fix:G1 bootstrap force-None / G2 删自证循环 + 改 prompt 文本守护 / G3 后端 fillerWords 锁 + 双端 diff / G4 wpm=100/200 边界 / G5/G6 TipsCarousel lower-bound + spec 4-5s 间隔 / G7 LiveObservationCard fallback / G8 contentEditable / G9 A10 legacy schema 6 项 / G10 InterviewPage 4 组件 smoke;后端 +12 / 前端 +20) (PENDING_HASH, 2026-04-30)
 - [x] V32.M2.1.1 F-309 实时观察侧栏(InterviewerAgentOutput.live_observation ≤30 字 + LiveObservationCard + 7 boundary tests + A13 Observer fallback) (2d15550, 2026-04-30)
 - [x] V32.M2.1.2 F-310 实时统计纯前端 hook(useTurnStats + 双端 L0 fillerWords 锁 + Vitest@^2 框架引入 + 12 tests + InterviewPage stat row) (c180456, 2026-04-30)
 - [x] V32.M2.1.3 F-311 键盘快捷键(useGlobalKeymap + EndConfirmDialog + KeyboardShortcutHelper + 7 tests + 提前结束 按钮统一走确认弹窗) (6071069, 2026-04-30)
