@@ -1636,3 +1636,379 @@ grep "hasSyncedFocusToConfig" src/stores/app-store.ts src/pages/ConfigPage.tsx
 PRD: PRD §6.1.4 ParsedPanel + §3.2 InterviewConfig 联动 + §0.1 L0 数据契约一致性
 AGENTS.md: §6 红线 A10 数据契约只增不改 — MatchScore validator 是契约自洽,不破坏 schema
 
+---
+
+# P1/M2.3 — 老板新需求:公司/行业情报 + 题目预测(F-320 / F-321,5 节点)
+
+> 2026-04-30 老板新增需求,见 [`docs/PRD/Eatit_PRD_v3_3_addendum.md`](../../../docs/PRD/Eatit_PRD_v3_3_addendum.md) §2 / §3。
+
+**背景**:把 Parse 之上加一层"信息深加工" — Research Agent 联网检索公司+行业情报(opt-in)+ Framework Agent 扩展输出预测题库,在 ParsedPanel 一次性渲染。
+
+**关键约束(继承 v32-p1-constraints.md + 新增)**:
+- **L0 A11 联网情报隐私护栏**(见 PRD v3.3 addendum §6 条款 11):
+  - 必须 user opt-in,严禁默认开启
+  - payload 严格只含公司名 + 岗位名 + 行业关键词,**严禁发送简历正文 / PII**
+  - cache_key 必须 hash 化,日志埋点不留明文
+  - 用户拒绝授权时,Research 跳过,前端 ParsedPanel 不显示新增 3 块卡
+- **L0 A7** LangGraph turn_graph 节点名锁不动,新增 `intake_graph.py`(独立 graph,与 turn_graph 不冲突)
+- **降级路径多**:BYOK 不支持 tool use → 半离线;联网超时 → 缓存兜底;API 配额耗尽 → 半离线 + Sentry 告警
+
+## Execution order
+
+| # | Section | Deps | Commit prefix |
+|---|---|---|---|
+| 1 | **V32.M2.3.1 Research Agent + LLM web_search tool 适配** | — | `feat(F-320): Research Agent with LLM web_search tool + privacy guardrail` |
+| 2 | **V32.M2.3.2 research_cache 表 + Settings opt-in 后端** | M2.3.1 | `feat(F-320): research_cache table + opt-in API + alembic migration` |
+| 3 | **V32.M2.3.3 Framework Agent 扩展 PredictedQuestionBank** | M2.3.1 | `feat(F-321): Framework Agent outputs PredictedQuestionBank from Parse + Research` |
+| 4 | **V32.M2.3.4 intake_graph LangGraph + 触发改造** | M2.3.1 / 2 / 3 | `feat(F-320,F-321): intake_graph parallel parse_node || research_node → predict_questions_node` |
+| 5 | **V32.M2.3.5 ParsedPanel 加 3 块卡 + Settings opt-in 模态** | M2.3.1-4 + M2.2 done | `feat(F-320,F-321): CompanyCard + IndustryCard + PredictedQuestionList + PrivacyOptInDialog` |
+
+**M2.3 总工程量估算**:5 节点,~30-60 分钟(M2.3.1 + M2.3.4 较重 ~10-15 min/节,M2.3.5 ~10 min,M2.3.2/3 ~5-7 min)。
+
+---
+
+## V32.M2.3.1 — Research Agent + LLM web_search tool 适配
+
+**Goal.** 新增 Research Agent(第 8 个 Agent,与 Parse 在解析阶段并行)。它接收**严格只含公司名 + 岗位名 + 行业关键词**的输入(L0 A11),通过 LLM 自带的 `web_search` tool 联网检索 → 输出 `ResearchResult`(CompanyProfile + IndustryProfile)。
+
+**Files (new):**
+- `apps/api/app/agents/research/__init__.py`
+- `apps/api/app/agents/research/schemas.py` — `ResearchAgentInput / ResearchAgentOutput / CompanyProfile / IndustryProfile / Signal`
+- `apps/api/app/agents/research/service.py` — Service 层,LLM tool use 调用 + 隐私 audit log
+- `apps/api/app/prompts/research/system.j2` — Prompt 模板(明确告诉 LLM 必须用 web_search,只搜公司+行业,严禁推测简历内容)
+- `apps/api/app/infra/llm/tools.py` — LLM web_search tool 适配层(检测 BYOK key 是否支持 tool use,不支持时返回半离线模式标志)
+- `apps/api/tests/agents/test_research.py` — 测试:happy path / 隐私护栏(payload 严禁 resume_text 字段)/ 降级(tool use 不支持)/ 边界(company_name 空)
+
+**Files (modify):**
+- `packages/shared-types/src/index.ts` — 同步 ResearchResult / CompanyProfile / IndustryProfile 类型
+
+**Key Interfaces.**
+
+```python
+# apps/api/app/agents/research/schemas.py
+from datetime import datetime
+from typing import Literal
+from pydantic import BaseModel, Field
+
+class Signal(BaseModel):
+    type: Literal["funding", "product", "personnel", "market", "regulation"]
+    summary: str = Field(max_length=200)
+    occurred_at: datetime | None = None
+    source_url: str | None = None  # 来自 LLM web_search 的 source
+
+class CompanyProfile(BaseModel):
+    name: str = Field(max_length=80)
+    business_model: str = Field(max_length=200)
+    stage: Literal["seed", "growth", "mature", "listed", "unknown"]
+    recent_signals: list[Signal] = Field(default_factory=list, max_length=8)
+    evidence_links: list[str] = Field(default_factory=list, max_length=10)
+    confidence: Literal["high", "mid", "low"]
+
+class IndustryProfile(BaseModel):
+    name: str = Field(max_length=60)
+    landscape_summary: str = Field(max_length=200)
+    key_metrics: list[str] = Field(default_factory=list, min_length=3, max_length=6)
+    typical_pain_points: list[str] = Field(default_factory=list, min_length=2, max_length=5)
+    competitors_in_jd_ctx: list[str] = Field(default_factory=list, max_length=8)
+
+class ResearchAgentInput(BaseModel):
+    """L0 A11 严禁字段:resume_text, candidate_email, candidate_phone 等 PII."""
+    company_name: str = Field(min_length=1, max_length=80)
+    role_title: str = Field(min_length=1, max_length=80)
+    industry_hints: list[str] = Field(min_length=1, max_length=5)
+
+    # 校验器拒绝任何 resume / pii 字段(如果 caller 误传)
+    model_config = {"extra": "forbid"}
+
+class ResearchAgentOutput(BaseModel):
+    company: CompanyProfile
+    industry: IndustryProfile
+    fetched_at: datetime
+    cache_key: str  # hash(company_name + industry) 用于缓存 lookup
+    degraded: bool = False  # 是否走了降级模式(tool use 不支持 / 超时)
+    degraded_reason: str | None = None
+```
+
+```python
+# apps/api/app/infra/llm/tools.py(关键片段)
+from typing import Any
+
+class ToolUseCapability:
+    """检测 BYOK LLM 是否支持 web_search tool."""
+    @staticmethod
+    async def probe(llm_config) -> bool:
+        """启动时一次性 probe(结果缓存到 session)."""
+        # 调用 LLM with web_search tool 试一下,看返回 tool_use 还是 fallback
+        # 实现略,关键是返回 bool
+
+def build_web_search_tool() -> dict[str, Any]:
+    """返回 Anthropic / OpenAI 标准格式的 web_search tool 定义."""
+    return {
+        "type": "web_search_20250320",  # Anthropic 标准
+        "name": "web_search",
+        "max_uses": 5,
+    }
+```
+
+```python
+# apps/api/app/agents/research/service.py(关键片段)
+import hashlib
+import logging
+
+logger = logging.getLogger(__name__)
+
+class ResearchAgentService:
+    async def run(self, input: ResearchAgentInput, gateway) -> ResearchAgentOutput:
+        # L0 A11:严禁 resume_text 入参(模型已通过 extra="forbid" 拦截,这里再 audit)
+        cache_key = hashlib.sha256(
+            f"{input.company_name}|{','.join(input.industry_hints)}".encode()
+        ).hexdigest()[:16]
+        logger.info("research_request", extra={"cache_key": cache_key})  # 不 log 明文
+
+        # 检测 tool use 能力
+        can_tool_use = await ToolUseCapability.probe(gateway.llm_config)
+        if not can_tool_use:
+            return self._degraded_output(input, cache_key, "tool_use_unsupported")
+
+        # 调 LLM with web_search tool
+        try:
+            result = await gateway.run_with_tools(...)
+        except (TimeoutError, ApiError) as e:
+            return self._degraded_output(input, cache_key, str(e))
+
+        return ResearchAgentOutput(
+            company=result.company,
+            industry=result.industry,
+            fetched_at=datetime.now(timezone.utc),
+            cache_key=cache_key,
+            degraded=False,
+        )
+
+    def _degraded_output(self, input, cache_key, reason: str) -> ResearchAgentOutput:
+        """降级:仅靠 LLM 内置知识 + 提示用户结果可能陈旧."""
+        # ... 调 LLM 不带 tool,返回 degraded=True
+```
+
+**测试设计**:
+
+```python
+# apps/api/tests/agents/test_research.py
+import pytest
+from pydantic import ValidationError
+from app.agents.research.schemas import ResearchAgentInput
+
+def test_input_rejects_resume_text():
+    """L0 A11:严禁字段."""
+    with pytest.raises(ValidationError, match="extra"):
+        ResearchAgentInput(
+            company_name="x", role_title="y", industry_hints=["z"],
+            resume_text="extra forbidden field",  # 应拒绝
+        )
+
+def test_input_rejects_pii():
+    with pytest.raises(ValidationError, match="extra"):
+        ResearchAgentInput(
+            company_name="x", role_title="y", industry_hints=["z"],
+            candidate_email="user@example.com",
+        )
+
+def test_industry_hints_min_1_max_5():
+    # 0 fail
+    with pytest.raises(ValidationError, match="min_length"):
+        ResearchAgentInput(company_name="x", role_title="y", industry_hints=[])
+    # 6 fail
+    with pytest.raises(ValidationError, match="max_length"):
+        ResearchAgentInput(company_name="x", role_title="y", industry_hints=["a"]*6)
+
+def test_cache_key_is_hash():
+    """cache_key 不留明文公司名."""
+    # 用 ScriptedGateway mock,断言 logger.info 调用的 extra dict 中 cache_key 是 hash 而非明文
+    ...
+
+def test_degraded_when_tool_use_unsupported():
+    """BYOK 不支持 tool use 时降级."""
+    # mock ToolUseCapability.probe 返回 False
+    # 断言输出 degraded=True, degraded_reason="tool_use_unsupported"
+    ...
+
+def test_audit_log_no_resume_text():
+    """grep 测试:audit log 中不出现 resume_text 关键词."""
+    # 跑一次 service.run,捕获 logger 输出,断言无简历相关字段
+    ...
+```
+
+**Acceptance** (从 `apps/api/` 跑):
+
+```bash
+unset VIRTUAL_ENV
+uv run python -m pytest tests/agents/test_research.py -v
+# 应 ≥ 8 passed
+
+uv run python -m pytest -q
+# 全量回归 ≥ 322 passed
+
+cd ../desktop
+corepack pnpm exec tsc --noEmit  # shared-types 同步类型 clean
+```
+
+**Commit.** `feat(F-320): Research Agent with LLM web_search tool + privacy guardrail`
+
+提交 body 必须含:
+- L0 A11 隐私护栏实施细节(extra="forbid" + cache_key hash + audit log 脱敏)
+- BYOK tool use 探测降级路径
+- 测试输出末尾 N passed
+- 不动现有 7 个 Agent / turn_graph 声明
+
+---
+
+## V32.M2.3.2 — research_cache 表 + Settings opt-in 后端
+
+**Goal.** 新增数据库表 `research_cache`(30 天 TTL)+ `app_settings.research_opt_in: bool` 字段;新增 API 路由 GET/PUT `/api/v1/settings/research-opt-in`。
+
+**Files (new):**
+- `apps/api/alembic/versions/mainline/<YYYYMMDD>_<NNNN>_research_cache_and_opt_in.py` — Alembic migration
+- `apps/api/app/models/research_cache.py` — SQLAlchemy model
+- `apps/api/app/api/routes/settings_research.py` — opt-in API endpoints
+- `apps/api/tests/api/test_research_opt_in.py` — API 层测试
+
+**Files (modify):**
+- `apps/api/app/models/app_settings.py`(若存在)— 加 `research_opt_in: bool = False` 字段
+- `apps/api/app/api/main.py`(或 router 注册处)— 注册新路由
+
+**Key Interfaces:**
+
+```python
+# Alembic migration
+def upgrade():
+    op.create_table(
+        "research_cache",
+        sa.Column("cache_key", sa.String(64), primary_key=True),
+        sa.Column("payload", sa.JSON, nullable=False),
+        sa.Column("fetched_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False, index=True),
+    )
+    op.add_column("app_settings", sa.Column("research_opt_in", sa.Boolean, server_default="false", nullable=False))
+
+# API
+@router.get("/api/v1/settings/research-opt-in")
+async def get_opt_in() -> dict: ...
+
+@router.put("/api/v1/settings/research-opt-in")
+async def set_opt_in(payload: OptInRequest) -> dict: ...
+```
+
+**Acceptance:** alembic upgrade head 成功;5+ API 测试 passed;全量回归 ≥ 327 passed。
+
+**Commit.** `feat(F-320): research_cache table + opt-in API + alembic migration`
+
+---
+
+## V32.M2.3.3 — Framework Agent 扩展 PredictedQuestionBank
+
+**Goal.** Framework Agent 在原有 DirectionFramework 输出基础上加 `PredictedQuestionBank`(8-15 道,4 个 category 分组),输入接 Parse + Research 输出。Interviewer Agent 出题时**优先**采用预测题。
+
+**Files (modify):**
+- `apps/api/app/agents/framework/schemas.py` — 加 `PredictedQuestion / PredictedQuestionBank`;`FrameworkAgentOutput.predicted_questions: PredictedQuestionBank | None`
+- `apps/api/app/prompts/framework/system.j2` — Prompt 改"接 ResearchResult,产出 8-15 道分类题"
+- `apps/api/app/agents/interviewer/service.py` — 出题时检查 `direction_framework.predicted_questions`,优先匹配当前 direction 的预测题
+- `apps/api/tests/agents/test_predicted_questions.py` — 测试预测题长度 / category 分布 / why_likely 字段
+- `packages/shared-types/src/index.ts` — 同步类型
+
+**Key Interfaces:**
+
+```python
+class PredictedQuestion(BaseModel):
+    category: Literal["company-business", "industry-judgment", "project-deepdive", "general-pm"]
+    question: str = Field(max_length=200)
+    why_likely: str = Field(max_length=80)
+    related_evidence: str = Field(max_length=120)
+
+class PredictedQuestionBank(BaseModel):
+    questions: list[PredictedQuestion] = Field(min_length=8, max_length=15)
+    generated_at: datetime
+    sources: list[Literal["jd", "resume", "research"]] = Field(min_length=1)
+```
+
+**Acceptance:** 6+ 测试 passed;全量 ≥ 333 passed。
+
+**Commit.** `feat(F-321): Framework Agent outputs PredictedQuestionBank from Parse + Research`
+
+---
+
+## V32.M2.3.4 — intake_graph LangGraph + 触发改造
+
+**Goal.** 新建 `intake_graph.py`(独立 graph,与 turn_graph 不冲突):`parse_node || research_node → predict_questions_node`。Parse Agent + Research Agent 并行,完成后 Framework Agent 一次产出 DirectionFramework + PredictedQuestionBank。
+
+**Files (new):**
+- `apps/api/app/orchestrator/intake_graph.py` — 新 graph
+- `apps/api/tests/orchestrator/test_intake_graph_contract.py` — 节点名锁 + 并行度验证
+
+**Files (modify):**
+- `apps/api/app/orchestrator/runtime.py`(或 domain/sessions/service.py)— Parse 触发改用 intake_graph.ainvoke
+- `apps/api/tests/orchestrator/test_graph_contract.py` — 不动 turn_graph 节点名锁(L0 A7)
+
+**Key Interfaces:**
+
+```python
+# intake_graph.py
+from langgraph.graph import StateGraph, END
+
+def build_intake_graph(parse_service, research_service, framework_service):
+    g = StateGraph(IntakeState)
+    g.add_node("parse_node", parse_service.run)
+    g.add_node("research_node", research_service.run)
+    g.add_node("predict_questions_node", framework_service.run_with_predict)
+
+    # 并行入口
+    g.add_edge(START, "parse_node")
+    g.add_edge(START, "research_node")  # 并行
+    # 汇合
+    g.add_edge("parse_node", "predict_questions_node")
+    g.add_edge("research_node", "predict_questions_node")
+    g.add_edge("predict_questions_node", END)
+    return g.compile()
+
+INTAKE_GRAPH_NODES = {"parse_node", "research_node", "predict_questions_node"}
+```
+
+**降级**:
+- 用户未 opt-in / Research 失败 → research_node 输出 None,predict_questions_node 仅基于 ParseResult 出题(category 仅 project-deepdive + general-pm)
+- Research 超时 15s → 仍不阻塞 parse 完成,intake_graph 提前到 predict_questions_node
+
+**Acceptance:** 5+ 集成测试 passed(并行 + 失败降级);全量 ≥ 338 passed;turn_graph 锁断言依然过。
+
+**Commit.** `feat(F-320,F-321): intake_graph parallel parse_node || research_node → predict_questions_node`
+
+---
+
+## V32.M2.3.5 — ParsedPanel 加 3 块卡 + Settings opt-in 模态
+
+**Goal.** ParsedPanel 在画像摘要后加 3 块卡:**公司洞察 + 行业洞察 + 预测面试题库**。Settings 加"联网情报检索"开关 + 首次启用模态(opt-in)。
+
+**Files (new):**
+- `apps/desktop/src/pages/upload/CompanyCard.tsx` — 公司洞察卡(business_model + stage + recent_signals + evidence_links)
+- `apps/desktop/src/pages/upload/IndustryCard.tsx` — 行业洞察卡(landscape_summary + key_metrics + pain_points + competitors)
+- `apps/desktop/src/pages/upload/PredictedQuestionList.tsx` — 预测题库(分类折叠,每条带"为什么会问"展开)
+- `apps/desktop/src/components/PrivacyOptInDialog.tsx` — opt-in 模态(基于 EatitDialog,首次启用确认)
+- `apps/desktop/src/__tests__/CompanyCard.test.tsx` / `IndustryCard.test.tsx` / `PredictedQuestionList.test.tsx` / `PrivacyOptInDialog.test.tsx` — 各 3-5 个测试
+
+**Files (modify):**
+- `apps/desktop/src/pages/upload/ParsedPanel.tsx` — 在双栏匹配优势/差距之前(或之后,看 spec)加 3 块卡,只在 ResearchResult 非 null 时渲染
+- `apps/desktop/src/pages/SettingsPage.tsx` — 加"联网情报检索"开关,首次 ON 触发 PrivacyOptInDialog;PUT /settings/research-opt-in 持久化
+- `apps/desktop/src/api/client.ts`(或类似)— 加 settings/research-opt-in API client
+- `apps/desktop/src/stores/app-store.ts` — 加 `researchOptIn: boolean` 状态
+
+**降级 UI**:
+- `researchOptIn === false` 或 ResearchResult 为 null → ParsedPanel 不渲染 3 块卡
+- ResearchResult.degraded === true → 显示一条"半离线模式 · 信息可能陈旧"的灰色 banner
+
+**Acceptance:** 12+ 前端测试 passed;全量前端 ≥ 93 passed;tsc/lint/lint:design-tokens clean;build 成功。
+
+**Commit.** `feat(F-320,F-321): CompanyCard + IndustryCard + PredictedQuestionList + PrivacyOptInDialog`
+
+---
+
+## P1/M2.3 完工后
+
+完成 5 节点后,P1 总进度:M2.1(5主+1audit)+ M2.2(4主+1audit)+ M2.3(5)= 16 节点。下一阶段 M3(Coach + Reflection + Dashboard,~8 节点)需要新 spec 文件 `v32-p2-sections.md`。
+

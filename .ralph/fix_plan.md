@@ -10,10 +10,15 @@ Match the section prefix(V32.M2.*)to 当前 spec 文件即可。
 
 ## High Priority (work top-down)
 
-> P1 / M2.2 = 解析体验扩展(F-301 ~ F-305 整页 ParsedPanel 重构)。共 4 节点 + 1 个 audit-fix 节点。
-> 依赖关系见 v32-p1-sections.md M2.2 "Execution order" 表 + V32.M2.2.X 节。
+> P1 / M2.3 = **老板新需求**:F-320 公司/行业情报(联网 opt-in)+ F-321 题目预测 + intake_graph 新建。共 5 节点。
+> 依赖关系见 v32-p1-sections.md "P1/M2.3 — 老板新需求" 节 + Execution order 表。
+> ⚠️ M2.3.1 涉及联网,L0 A11 隐私护栏:严禁发送简历正文 / PII。
 
-(empty — M2.2 batch + audit-fix 全部完成)
+- [ ] V32.M2.3.1 Research Agent + LLM web_search tool 适配(隐私护栏 extra=forbid + cache_key hash + audit log 脱敏 + BYOK tool use 探测降级)
+- [ ] V32.M2.3.2 research_cache 表 + Settings opt-in 后端(Alembic migration 30 天 TTL + GET/PUT /settings/research-opt-in API)
+- [ ] V32.M2.3.3 Framework Agent 扩展 PredictedQuestionBank(F-321,8-15 道分类题,Interviewer 优先采用预测题)
+- [ ] V32.M2.3.4 intake_graph LangGraph 新建(parse_node || research_node → predict_questions_node 并行 + 降级路径不阻塞 parse)
+- [ ] V32.M2.3.5 ParsedPanel 加 3 块卡 + PrivacyOptInDialog(CompanyCard + IndustryCard + PredictedQuestionList + Settings opt-in 开关)
 
 ## Completed (P1/M2.2 — v3.2+)
 
