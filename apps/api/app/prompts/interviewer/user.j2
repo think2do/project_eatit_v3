@@ -3,6 +3,21 @@
 === 面试方向框架(JSON) ===
 {{ framework_json }}
 
+{% if predicted_questions and predicted_questions|length > 0 %}
+=== 预测题库(F-321,优先采用其中与当前方向匹配的题)===
+本场已有 FrameworkAgent 产出的预测题。**当且仅当**满足以下条件,优先从中挑选:
+
+- 候选人前一轮回答没有打开新的深挖路径
+- 当前剩余时间充裕
+- 题目与当前 direction / focus_competencies 一致
+
+否则按已有的对话节奏自然出题,不要为了用预测题而打断深挖。
+
+{% for q in predicted_questions %}
+- [{{ q.category }}] {{ q.question }} (why: {{ q.why_likely }})
+{% endfor %}
+{% endif %}
+
 === 已经进行的轮次(最近 {{ recent_turns|length }} 轮,倒序)===
 {% for turn in recent_turns %}
 Q: {{ turn.question }}

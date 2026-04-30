@@ -18,6 +18,9 @@ _USER_VARS: dict[str, dict] = {
             (),
             {"level": "senior", "style": "deep_dive", "duration_minutes": 30},
         )(),
+        # F-321 V32.M2.3.3 — optional Research payload threaded through.
+        # None branch in user.j2 must render without StrictUndefined errors.
+        "research_payload_json": None,
     },
     "interviewer": {
         "framework_json": "{}",
@@ -30,6 +33,9 @@ _USER_VARS: dict[str, dict] = {
         ],
         "long_term_summary": None,
         "remaining_minutes": 18,
+        # F-321 V32.M2.3.3 — service-extracted predicted questions list.
+        # Empty list satisfies the {% if %} guard without rendering a block.
+        "predicted_questions": [],
     },
     "reference": {
         "question": "如何给 LLM 产品设计指标?",

@@ -1,4 +1,4 @@
-请基于以下输入生成 FrameworkAgent 的面试方向框架。
+请基于以下输入生成 FrameworkAgent 的面试方向框架,以及(若证据充足)预测题库。
 
 === Parse 结果(JSON) ===
 {{ parse_payload_json }}
@@ -7,3 +7,11 @@
 - 岗位级别:{{ config.level }}
 - 面试风格:{{ config.style }}
 - 期望时长:{{ config.duration_minutes }} 分钟
+
+{% if research_payload_json %}
+=== Research 结果(JSON,F-321 输入)===
+{{ research_payload_json }}
+{% else %}
+=== Research 结果 ===
+(本次未联网或用户未启用 Research opt-in。`predicted_questions` 仅基于 Parse,sources 不得包含 "research"。)
+{% endif %}

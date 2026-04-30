@@ -314,6 +314,33 @@ export type ResearchResult = {
   degraded_reason: string | null;
 };
 
+// ===== Predicted Question Bank (F-321, V32.M2.3.3) =====
+//
+// Framework Agent emits this when Parse + (optional) Research carry
+// enough evidence. The desktop UI renders it on ParsedPanel as the
+// PredictedQuestionList card. M2.3.5 wires the card.
+
+export type PredictedQuestionCategory =
+  | "company-business"
+  | "industry-judgment"
+  | "project-deepdive"
+  | "general-pm";
+
+export type PredictedQuestionSource = "jd" | "resume" | "research";
+
+export type PredictedQuestion = {
+  category: PredictedQuestionCategory;
+  question: string;
+  why_likely: string;
+  related_evidence: string;
+};
+
+export type PredictedQuestionBank = {
+  questions: PredictedQuestion[];
+  generated_at: string;
+  sources: PredictedQuestionSource[];
+};
+
 export type TimestampedEntity = {
   id: string;
   created_at: string;
