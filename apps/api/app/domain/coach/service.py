@@ -250,10 +250,17 @@ class CoachService:
 def build_default_coach_service(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> CoachService:
-    """Production default. M3.1.3 swaps the cache repo for the SQLAlchemy
-    one; until then the in-memory repo keeps the wiring exercised."""
+    """Production default — M3.1.3 wires the real SQLAlchemy repo.
+
+    Imported lazily to avoid a circular import (the repo module pulls in
+    Pydantic schemas that pull domain.coach back in).
+    """
+    from app.repositories.user_insight_cache import (
+        SqlAlchemyUserInsightCacheRepository,
+    )
+
     return CoachService(
-        cache_repo=_InMemoryUserInsightCacheRepository(),
+        cache_repo=SqlAlchemyUserInsightCacheRepository(session_factory),
         reports_reader=DBRecentReportsReader(session_factory),
     )
 

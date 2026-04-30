@@ -13,6 +13,7 @@ from app.models.session import (
     TurnAssessment,
 )
 from app.models.user import User
+from app.models.user_insight_cache import UserInsightCacheRow
 
 __all__ = [
     "AppSetting",
@@ -29,4 +30,5 @@ __all__ = [
     "ResearchCache",
     "TurnAssessment",
     "User",
+    "UserInsightCacheRow",
 ]
