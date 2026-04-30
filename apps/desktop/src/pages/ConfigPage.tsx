@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -87,6 +87,7 @@ export function ConfigPage(): JSX.Element {
   const presetConfig = useAppStore((s) => s.presetConfig);
   const setPresetConfig = useAppStore((s) => s.setPresetConfig);
   const selectedFocusIds = useAppStore((s) => s.selectedFocusIds);
+  const hasSyncedFocusToConfig = useAppStore((s) => s.hasSyncedFocusToConfig);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,19 +103,21 @@ export function ConfigPage(): JSX.Element {
     setPresetConfig(null);
   }, [presetConfig, patchConfig, setPresetConfig]);
 
-  // F-302 V32.M2.2.3: when the user toggled focus cards on ParsedPanel
-  // (and there's no in-flight preset from F-317), seed `directions`
-  // from selectedFocusIds — capped at 3, deduped, ordered by user pick.
-  // Runs once on mount only (and only if the user hasn't already
-  // hand-tuned this session) so re-renders don't clobber edits.
-  const seededFromFocus = useRef(false);
+  // F-302 V32.M2.2.3 (+ V32.M2.2.X audit fix): when the user toggled
+  // focus cards on ParsedPanel (and there's no in-flight preset from
+  // F-317), seed `directions` from selectedFocusIds — capped at 3,
+  // deduped, ordered by user pick. The lock now lives on the store
+  // (`hasSyncedFocusToConfig`) so navigating Config→Upload→Config does
+  // not clobber the user's hand edits on remount; only a new parse
+  // (`patchUpload({ parsePayload })`) clears the lock.
   useEffect(() => {
-    if (seededFromFocus.current) return;
+    if (hasSyncedFocusToConfig) return;
     if (presetConfig) return;
     if (selectedFocusIds.length === 0) return;
-    seededFromFocus.current = true;
+    // patchConfig flips hasSyncedFocusToConfig to true in the store, so
+    // subsequent remounts find the lock set and skip re-seeding.
     patchConfig({ directions: selectedFocusIds.slice(0, MAX_DIRECTIONS) });
-  }, [selectedFocusIds, presetConfig, patchConfig]);
+  }, [selectedFocusIds, presetConfig, patchConfig, hasSyncedFocusToConfig]);
 
   const directionsValid =
     config.directions.length >= MIN_DIRECTIONS && config.directions.length <= MAX_DIRECTIONS;

@@ -52,6 +52,32 @@ def test_match_score_one_line_max_length() -> None:
         MatchScore(score=70, level="MID", one_line="x" * 81)
 
 
+@pytest.mark.parametrize(
+    "score,level",
+    [
+        # score in LOW band but mislabelled
+        (10, "HIGH"),
+        (10, "MID"),
+        (59, "MID"),
+        (59, "HIGH"),
+        # score in MID band but mislabelled
+        (60, "LOW"),
+        (60, "HIGH"),
+        (75, "LOW"),
+        (75, "HIGH"),
+        # score in HIGH band but mislabelled
+        (76, "LOW"),
+        (76, "MID"),
+        (90, "LOW"),
+        (100, "MID"),
+    ],
+)
+def test_match_score_alien_level_rejected(score: int, level: str) -> None:
+    """Cross-field validator rejects score/level mismatches that the UI would render as garbage."""
+    with pytest.raises(ValidationError, match="must be"):
+        MatchScore(score=score, level=level, one_line="一句解读")
+
+
 # ---------------------------------------------------------------------------
 # interview_focus / direction_id
 # ---------------------------------------------------------------------------

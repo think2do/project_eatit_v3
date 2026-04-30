@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from app.schemas.common import SchemaModel, TimestampedResponse
 
@@ -36,6 +36,25 @@ class MatchScore(SchemaModel):
     score: int = Field(ge=0, le=100)
     level: Literal["LOW", "MID", "HIGH"]
     one_line: str = Field(max_length=80)
+
+    @model_validator(mode="after")
+    def _validate_score_level_alignment(self) -> "MatchScore":
+        # Cross-field guard: prevents the UI from rendering a number and
+        # a band label that contradict each other (e.g. score=10 / level=HIGH).
+        # Bands match the existing MatchDial thresholds: <60 LOW, 60-75 MID, >=76 HIGH.
+        if self.score < 60 and self.level != "LOW":
+            raise ValueError(
+                f"score {self.score} < 60 must be LOW, got {self.level}"
+            )
+        if 60 <= self.score < 76 and self.level != "MID":
+            raise ValueError(
+                f"score {self.score} in [60,76) must be MID, got {self.level}"
+            )
+        if self.score >= 76 and self.level != "HIGH":
+            raise ValueError(
+                f"score {self.score} >= 76 must be HIGH, got {self.level}"
+            )
+        return self
 
 
 class MatchAdvantage(SchemaModel):

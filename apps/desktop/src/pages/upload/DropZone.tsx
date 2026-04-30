@@ -10,6 +10,15 @@ interface Props {
   status: Status;
   accept?: string;
   onFile: (file: File) => void;
+  // V32.M2.2.X audit fix (F-303) — small chips shown after a successful
+  // parse. Resume side passes `{role}·{years}年`, companies join, and
+  // domain_tags; JD side passes job-title chips when JdProfile lands
+  // (currently empty since the schema is not in P1/M2.2 yet). Empty
+  // array → no chip row is rendered.
+  chips?: string[];
+  // V32.M2.2.X audit fix (F-303) — file metadata strip "· 124 KB ·
+  // 3 页" rendered in mono under the filename. Skipped when null.
+  meta?: string | null;
 }
 
 const ACCEPT_DEFAULT = ".pdf,.doc,.docx,.txt";
@@ -21,6 +30,8 @@ export function DropZone({
   status,
   accept = ACCEPT_DEFAULT,
   onFile,
+  chips = [],
+  meta = null,
 }: Props): JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
   const [hovering, setHovering] = useState(false);
@@ -105,12 +116,40 @@ export function DropZone({
             maxWidth: 260,
             textAlign: "center",
           }}
+          data-testid="dropzone-filename"
         >
           {fileName}
+          {meta ? (
+            <span
+              data-testid="dropzone-meta"
+              style={{ color: "var(--ink-400)", marginLeft: 4 }}
+            >
+              {meta}
+            </span>
+          ) : null}
         </div>
       ) : (
         <div style={{ fontSize: 12.5, color: "var(--ink-500)" }}>{hint}</div>
       )}
+
+      {chips.length > 0 ? (
+        <div
+          data-testid="dropzone-chips"
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: 6,
+            maxWidth: 280,
+          }}
+        >
+          {chips.map((chip) => (
+            <span key={chip} className="tag tag-line" style={{ fontSize: 10.5 }}>
+              {chip}
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       <div style={{ fontSize: 11, color: "var(--ink-400)" }}>
         支持 pdf / doc / docx / txt

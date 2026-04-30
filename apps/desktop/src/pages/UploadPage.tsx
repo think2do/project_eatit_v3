@@ -5,6 +5,11 @@ import { useNavigate } from "react-router-dom";
 import { getParseResult, triggerParse, uploadJd, uploadResume } from "@/api/assets";
 import { DropZone } from "@/pages/upload/DropZone";
 import { ParsedPanel } from "@/pages/upload/ParsedPanel";
+import {
+  buildJdChips,
+  buildResumeChips,
+  formatFileSizeMeta,
+} from "@/pages/upload/profileChips";
 import { PageStepIndicator } from "@/components/PageStepIndicator";
 import { TipsCarousel } from "@/components/TipsCarousel";
 import { selectTips } from "@/lib/tips";
@@ -30,6 +35,7 @@ export function UploadPage(): JSX.Element {
     setGlobalError(null);
     patchUpload({
       resumeFileName: file.name,
+      resumeFileSize: file.size,
       resumeStatus: "uploading",
       parseStatus: "idle",
       parsePayload: null,
@@ -54,6 +60,7 @@ export function UploadPage(): JSX.Element {
     setGlobalError(null);
     patchUpload({
       jdFileName: file.name,
+      jdFileSize: file.size,
       jdStatus: "uploading",
       parseStatus: "idle",
       parsePayload: null,
@@ -73,6 +80,11 @@ export function UploadPage(): JSX.Element {
       setGlobalError(extractError(err));
     }
   };
+
+  const resumeChips = buildResumeChips(upload.parsePayload);
+  const jdChips = buildJdChips(upload.parsePayload);
+  const resumeMeta = formatFileSizeMeta(upload.resumeFileSize);
+  const jdMeta = formatFileSizeMeta(upload.jdFileSize);
 
   const handleParse = async () => {
     if (!upload.assetBundleId) return;
@@ -145,6 +157,8 @@ export function UploadPage(): JSX.Element {
           fileName={upload.resumeFileName}
           status={upload.resumeStatus}
           onFile={handleResume}
+          chips={upload.parseStatus === "succeeded" ? resumeChips : []}
+          meta={resumeMeta}
         />
         <DropZone
           label="岗位 JD"
@@ -152,6 +166,8 @@ export function UploadPage(): JSX.Element {
           fileName={upload.jdFileName}
           status={upload.jdStatus}
           onFile={handleJd}
+          chips={upload.parseStatus === "succeeded" ? jdChips : []}
+          meta={jdMeta}
         />
       </div>
 

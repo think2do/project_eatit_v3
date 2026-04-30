@@ -13,6 +13,11 @@ export type CurrentUpload = {
   assetBundleId: string | null;
   resumeFileName: string | null;
   jdFileName: string | null;
+  // V32.M2.2.X audit fix (F-303) — file size in bytes, captured client-
+  // side when the user picks the file. Drives the "· N KB" tail of the
+  // DropZone metadata strip in done state.
+  resumeFileSize: number | null;
+  jdFileSize: number | null;
   resumeStatus: UploadStatus;
   jdStatus: UploadStatus;
   parseStatus: ParseStatus;
@@ -56,12 +61,24 @@ type AppStore = {
   setSelectedFocusIds: (ids: InterviewDirectionV32[]) => void;
   toggleSelectedFocusId: (id: InterviewDirectionV32) => void;
   resetSelectedFocusIds: () => void;
+
+  // V32.M2.2.X audit fix — was a `useRef(false)` inside ConfigPage, but
+  // a ref is reset on unmount, so navigating Config→Upload→Config kept
+  // re-seeding `directions` from selectedFocusIds and clobbered the
+  // user's hand edits. Promoting it to the store keeps the lock across
+  // remounts. patchUpload (new parse) flips it back to false so the
+  // next ConfigPage mount can re-seed; patchConfig flips it true so
+  // hand edits stick.
+  hasSyncedFocusToConfig: boolean;
+  markFocusSyncedToConfig: () => void;
 };
 
 const DEFAULT_UPLOAD: CurrentUpload = {
   assetBundleId: null,
   resumeFileName: null,
   jdFileName: null,
+  resumeFileSize: null,
+  jdFileSize: null,
   resumeStatus: "idle",
   jdStatus: "idle",
   parseStatus: "idle",
@@ -79,12 +96,27 @@ const DEFAULT_CONFIG: CurrentConfig = {
 export const useAppStore = create<AppStore>((set) => ({
   upload: { ...DEFAULT_UPLOAD },
   patchUpload: (patch) =>
-    set((state) => ({ upload: { ...state.upload, ...patch } })),
-  resetUpload: () => set({ upload: { ...DEFAULT_UPLOAD } }),
+    set((state) => ({
+      upload: { ...state.upload, ...patch },
+      // A patch that touches `parsePayload` indicates the parse
+      // lifecycle just moved (new upload clears it to null; successful
+      // parse sets the new payload). Either way, drop the seed-lock so
+      // the next ConfigPage mount re-seeds `directions` from the
+      // freshly chosen focus cards.
+      hasSyncedFocusToConfig: "parsePayload" in patch
+        ? false
+        : state.hasSyncedFocusToConfig,
+    })),
+  resetUpload: () => set({ upload: { ...DEFAULT_UPLOAD }, hasSyncedFocusToConfig: false }),
 
   config: { ...DEFAULT_CONFIG },
   patchConfig: (patch) =>
-    set((state) => ({ config: { ...state.config, ...patch } })),
+    set((state) => ({
+      config: { ...state.config, ...patch },
+      // Any user-driven config tweak locks the seed so navigation away
+      // and back doesn't re-seed `directions` from selectedFocusIds.
+      hasSyncedFocusToConfig: true,
+    })),
 
   presetConfig: null,
   setPresetConfig: (preset) => set({ presetConfig: preset }),
@@ -98,4 +130,7 @@ export const useAppStore = create<AppStore>((set) => ({
         : [...state.selectedFocusIds, id],
     })),
   resetSelectedFocusIds: () => set({ selectedFocusIds: [] }),
+
+  hasSyncedFocusToConfig: false,
+  markFocusSyncedToConfig: () => set({ hasSyncedFocusToConfig: true }),
 }));
