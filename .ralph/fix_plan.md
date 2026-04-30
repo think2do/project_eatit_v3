@@ -10,14 +10,12 @@ Match the section prefix(V32.M2.*)to 当前 spec 文件即可。
 
 ## High Priority (work top-down)
 
-> P1 / M2.3 = **老板新需求**:F-320 + F-321 + intake_graph。5 节点 ship,但 tester 复审 4/10 发现 3 连环功能死锁(实际 F-320 不工作)。
-> ⚠️ V32.M2.3.X audit-fix 是真功能修补(~150-200 行产品代码),不只是补测试。
-
-- [ ] V32.M2.3.X M2.3 audit-fix(真功能死锁修补:G1 _extract_company_and_role 真实现 via Parse Agent 输出 jd_* 字段 + G2 _resolve_tools 实现 + 去 line 119 注释 + G3 ParseRequestResponse 加 research_payload 透传 + G4 ResearchCache 真读写 + G5/G6/G7 补测试 + G8 narrow except + G9 DialogTitle;预期后端 +8-10 / 前端 +6-8;intake_graph 并行改 sequential trade-off)
+> P1 / M2.3 audit-fix 已完成。下一阶段(M3 Coach + Reflection + Dashboard,~8 节点)需要新 spec 文件 `v32-p2-sections.md`。
 
 
 ## Completed (P1/M2.3 — v3.2+)
 
+- [x] V32.M2.3.X M2.3 audit-fix(G1 _extract_company_and_role 改 Parse-driven jd_* + G2 _resolve_tools + 去 service.py:119 注释 + G3 ParseRequestResponse + UploadPage / store / ParsedPanel 透传 research_payload/predicted_questions + G4 research_cache repo 真读写 30天 TTL + G5/G6 ParsedPanel.research + ResearchOptInSection 集成测试 + G7 probe=True happy path + G8 except 已收窄至 PdfReadError/ValueError + G9 DialogTitle;intake_graph 并行→sequential trade-off;后端 365→377 / 前端 102→108) (557fc7d, 2026-04-30)
 - [x] V32.M2.3.5 F-320/F-321 ParsedPanel 3 块卡 + PrivacyOptInDialog(CompanyCard + IndustryCard + PredictedQuestionList + Settings opt-in toggle + L0 A11 模态确认 + 21 tests;前端 81→102) (3bc6544, 2026-04-30)
 - [x] V32.M2.3.4 F-320/F-321 intake_graph LangGraph(parse_node || research_node → predict_questions_node + 15s research timeout + opt-out short-circuit + trigger_parse 改用 intake_graph + 8 contract tests + turn_graph A7 锁未动;后端 354→362) (821172e, 2026-04-30)
 - [x] V32.M2.3.3 F-321 Framework Agent PredictedQuestionBank(8-15 道 + 4 category + 3 source 枚举 + Framework 接 Research 输入 + Interviewer 软优先 + 20 tests;后端 334→354) (18d9b7b, 2026-04-30)
@@ -105,3 +103,4 @@ Match the section prefix(V32.M2.*)to 当前 spec 文件即可。
 - Do not merge multiple nodes into one commit even if they feel related.
 - Move items from "High Priority" to "Completed" in the same commit that implements them, with the commit hash + date appended.
 - 当 11 个 V32.M0/M1 节点全部 [x] 后,EXIT_SIGNAL: true 收口;后续 M2(F-309/310/311/319/306 + F-320/321)需要新 spec 文件 v32-p1-sections.md。
+- M2.3.X audit-fix 完成后,P1/M2 全批(M2.1 + M2.2 + M2.3 + 3 audit-fix = 17 节点)收口。下一批 M3 需要 v32-p2-sections.md。
