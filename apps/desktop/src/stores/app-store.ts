@@ -17,6 +17,9 @@ export type CurrentUpload = {
   jdStatus: UploadStatus;
   parseStatus: ParseStatus;
   parsePayload: ParseResultPayload | null;
+  // V32.M2.2.4 — wallclock at the moment parseStatus flipped to
+  // "succeeded". Drives ParsedMetaBar's "N 秒前生成" relative time.
+  parsedAtMs: number | null;
   error: string | null;
 };
 
@@ -63,6 +66,7 @@ const DEFAULT_UPLOAD: CurrentUpload = {
   jdStatus: "idle",
   parseStatus: "idle",
   parsePayload: null,
+  parsedAtMs: null,
   error: null,
 };
 

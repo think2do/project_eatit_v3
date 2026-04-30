@@ -4,7 +4,7 @@ import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getParseResult, triggerParse, uploadJd, uploadResume } from "@/api/assets";
 import { DropZone } from "@/pages/upload/DropZone";
-import { ParseResultCard } from "@/pages/upload/ParseResultCard";
+import { ParsedPanel } from "@/pages/upload/ParsedPanel";
 import { PageStepIndicator } from "@/components/PageStepIndicator";
 import { TipsCarousel } from "@/components/TipsCarousel";
 import { selectTips } from "@/lib/tips";
@@ -33,6 +33,7 @@ export function UploadPage(): JSX.Element {
       resumeStatus: "uploading",
       parseStatus: "idle",
       parsePayload: null,
+      parsedAtMs: null,
       error: null,
     });
     try {
@@ -56,6 +57,7 @@ export function UploadPage(): JSX.Element {
       jdStatus: "uploading",
       parseStatus: "idle",
       parsePayload: null,
+      parsedAtMs: null,
       error: null,
     });
     try {
@@ -78,13 +80,21 @@ export function UploadPage(): JSX.Element {
     patchUpload({ parseStatus: "running" });
     try {
       const response = await triggerParse(upload.assetBundleId);
-      patchUpload({ parseStatus: "succeeded", parsePayload: response.payload });
+      patchUpload({
+        parseStatus: "succeeded",
+        parsePayload: response.payload,
+        parsedAtMs: Date.now(),
+      });
     } catch (err) {
       // Fall back to the GET endpoint — if parse succeeded but the POST
       // socket dropped, the stored payload is still the source of truth.
       try {
         const existing = await getParseResult(upload.assetBundleId);
-        patchUpload({ parseStatus: "succeeded", parsePayload: existing.payload });
+        patchUpload({
+          parseStatus: "succeeded",
+          parsePayload: existing.payload,
+          parsedAtMs: Date.now(),
+        });
         return;
       } catch {
         /* ignore, fall through to error path */
@@ -160,50 +170,23 @@ export function UploadPage(): JSX.Element {
         </div>
       ) : null}
 
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <button
-          type="button"
-          onClick={handleParse}
-          disabled={!canParse}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "10px 20px",
-            borderRadius: "var(--r-md)",
-            border: "none",
-            background: canParse ? "var(--brand)" : "var(--ink-200)",
-            color: "white",
-            fontSize: 13.5,
-            fontWeight: 500,
-            cursor: canParse ? "pointer" : "not-allowed",
-          }}
-        >
-          {upload.parseStatus === "running" ? <Loader2 size={14} className="spin" /> : null}
-          {upload.parseStatus === "running" ? "解析中..." : "开始 AI 解析"}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigate("/config")}
-          disabled={!canContinue}
-          style={{
-            padding: "10px 18px",
-            borderRadius: "var(--r-md)",
-            border: "1px solid var(--line)",
-            background: canContinue ? "var(--bg-elev)" : "transparent",
-            color: canContinue ? "var(--ink-900)" : "var(--ink-400)",
-            fontSize: 13.5,
-            cursor: canContinue ? "pointer" : "not-allowed",
-          }}
-        >
-          下一步 · 面试配置
-        </button>
-      </div>
+      {upload.parseStatus !== "succeeded" ? (
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={handleParse}
+            disabled={!canParse}
+            className="btn btn-brand btn-lg"
+          >
+            {upload.parseStatus === "running" ? <Loader2 size={14} className="spin" /> : null}
+            {upload.parseStatus === "running" ? "解析中..." : "开始 AI 解析"}
+          </button>
+        </div>
+      ) : null}
 
       {upload.parseStatus === "running" ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+          <div style={{ textAlign: "center" }}>
             <div
               style={{
                 fontSize: 14,
@@ -221,7 +204,16 @@ export function UploadPage(): JSX.Element {
         </div>
       ) : null}
 
-      {upload.parsePayload ? <ParseResultCard payload={upload.parsePayload} /> : null}
+      {upload.parsePayload && upload.parsedAtMs !== null ? (
+        <ParsedPanel
+          payload={upload.parsePayload}
+          parsedAt={upload.parsedAtMs}
+          onReparse={handleParse}
+          onContinue={() => navigate("/config")}
+          reparseDisabled={!canParse}
+          continueDisabled={!canContinue}
+        />
+      ) : null}
     </div>
   );
 }
