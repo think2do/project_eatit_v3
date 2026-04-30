@@ -116,6 +116,7 @@ class SessionRuntime:
                 expected_depth=output.expected_depth,
                 followup_hint=output.followup_hint,
                 should_end=output.should_end,
+                followup_hints=tuple(output.followup_hints),
             )
         )
         self._kick_reference(0, output.question)
@@ -409,6 +410,7 @@ class SessionRuntime:
                     expected_depth=nq.expected_depth,
                     followup_hint=nq.followup_hint,
                     should_end=nq.should_end,
+                    followup_hints=tuple(nq.followup_hints),
                 )
             )
             # Reference for the upcoming question fires here, not after the

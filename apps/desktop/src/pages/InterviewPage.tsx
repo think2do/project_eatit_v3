@@ -18,6 +18,7 @@ import {
   type AudioRecorderHandle,
 } from "@/lib/mic";
 import { speakInterviewerLine, stopInterviewerLine } from "@/lib/tts";
+import { FollowupHintChips } from "@/pages/interview/FollowupHintChips";
 import { LiveCaption } from "@/pages/interview/LiveCaption";
 import { ObserverPanel } from "@/pages/interview/ObserverPanel";
 import { ReferencePanel } from "@/pages/interview/ReferencePanel";
@@ -541,6 +542,9 @@ export function InterviewPage(): JSX.Element {
             >
               {state.context.currentQuestion.question}
             </div>
+            <FollowupHintChips
+              hints={state.context.currentQuestion.followup_hints}
+            />
           </>
         ) : (
           <div style={{ color: "var(--ink-500)", fontSize: 14 }}>

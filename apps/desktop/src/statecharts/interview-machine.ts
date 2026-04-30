@@ -7,6 +7,11 @@ export type GeneratedQuestion = {
   expected_depth: "surface" | "tactical" | "strategic";
   followup_hint: string | null;
   should_end: boolean;
+  // F-319 v3.2+ chip list. Either empty (degraded; render no row) or
+  // 2-3 ≤8-char strings (validated upstream by the Pydantic
+  // `field_validator` in `interviewer/schemas.py`). Optional in the
+  // type so v3.1 WS payloads — which omit the key — still parse.
+  followup_hints?: string[];
 };
 
 export type TurnAssessmentSummary = {

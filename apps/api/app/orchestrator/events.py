@@ -34,6 +34,11 @@ class QuestionGeneratedEvent:
     expected_depth: str
     followup_hint: str | None
     should_end: bool
+    # F-319 v3.2+ chip list. Empty tuple is valid (graceful degradation
+    # when the LLM fails to comply); otherwise 2 or 3 items each ≤ 8
+    # chars (already enforced by the upstream Pydantic field_validator
+    # in `interviewer/schemas.py`).
+    followup_hints: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
