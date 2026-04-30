@@ -6,6 +6,7 @@ import type {
   ParseResultPayload,
   PredictedQuestionBank,
   ResearchResult,
+  UserInsightCache,
 } from "@eatit/shared-types";
 
 type UploadStatus = "idle" | "uploading" | "uploaded" | "failed";
@@ -92,6 +93,14 @@ type AppStore = {
   // helper writes through to the API and flips this slot.
   researchOptIn: boolean;
   setResearchOptIn: (enabled: boolean) => void;
+
+  // F-318 V32.M3.1.4 — cross-session Coach insight payload backing the
+  // Dashboard AICoachCard. ``null`` covers two cases: (a) HistoryPage
+  // hasn't fetched yet, (b) the API returned 204 because the trigger
+  // hasn't run for this user. The card branches on ``insights`` +
+  // ``insights.status``; clients should not render coach copy when null.
+  insights: UserInsightCache | null;
+  setInsights: (insights: UserInsightCache | null) => void;
 };
 
 const DEFAULT_UPLOAD: CurrentUpload = {
@@ -159,4 +168,7 @@ export const useAppStore = create<AppStore>((set) => ({
 
   researchOptIn: false,
   setResearchOptIn: (enabled) => set({ researchOptIn: enabled }),
+
+  insights: null,
+  setInsights: (insights) => set({ insights }),
 }));
