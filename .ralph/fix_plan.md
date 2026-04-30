@@ -15,7 +15,6 @@ Match the section prefix(V32.M4.*)to 当前 spec 文件即可。
 > P3 / M4 = 收口阶段 = F-315 配额 mock + 字体本地子集化 + Playwright 烟雾 E2E + locust 性能基线 + 文档收尾。
 > 4 主节点 + 1 收尾。任一节点 fail 不向后跑。完成后 v3.3 全收尾,EXIT_SIGNAL: true。
 
-- [ ] V32.M4.4 — locust 性能骨架(parse_baseline.py + baseline.md + README + pytest collect 排除)
 - [ ] V32.M4.X — M4 收尾文档同步(FEATURES F-315 ✅ + fix_plan 收尾 banner + EXIT_SIGNAL=true)
 
 
@@ -25,6 +24,7 @@ Match the section prefix(V32.M4.*)to 当前 spec 文件即可。
 - [x] V32.M4.1 F-315 SidebarQuotaCard + quotaMock localStorage(read/increment/reset/getRemaining + 跨月自动归零 + 默认 0/10 + "占位" 文案 + 5+4=9 vitest 单测;前端 160→169) (bbfc3af, 2026-05-01)
 - [x] V32.M4.2 woff2 字体本地子集化(Inter Regular/Medium/Semibold 18-19K + Instrument Serif Regular 20K + JetBrains Mono Regular 30K + 3 SIL OFL 1.1 LICENSE + index.css 5 @font-face 替换 googleapis @import;A19 enforced) (ed1ce0d, 2026-05-01)
 - [x] V32.M4.3 Playwright 烟雾 E2E(playwright.config + 2 spec + 3 fixtures + Tauri stub 解决 30s mount 阻塞 + LIFO route 顺序;upload-to-config + report-renders 2/2 passed in 2.7s;A20 enforced) (8cd24d3, 2026-05-01)
+- [x] V32.M4.4 locust 性能骨架(parse_baseline.py + conftest_perf.py 1.5s P50 / 8s P95 mock + baseline.md 占位 + README + pyproject.toml norecursedirs;pytest collect 0 perf cases / 471 passed unchanged;A21 enforced) (01de0ae, 2026-05-01)
 
 ## Completed (P2/M3 — v3.2+)
 
