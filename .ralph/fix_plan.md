@@ -1,20 +1,25 @@
-# Eatit v3.2+ P2/M3 Fix Plan
+# Eatit v3.2+ P3/M4 Fix Plan
 
 Source of truth for what's left. Ralph picks the **first unchecked item** in "High Priority" each loop. Section specs live in:
 
-- **当前阶段(P2/M3)**: [`.ralph/specs/v32-p2-constraints.md`](specs/v32-p2-constraints.md) + [`.ralph/specs/v32-p2-sections.md`](specs/v32-p2-sections.md)
-- 上一阶段(P1,已完成 2026-04-30): [`.ralph/specs/v32-p1-constraints.md`](specs/v32-p1-constraints.md) + [`.ralph/specs/v32-p1-sections.md`](specs/v32-p1-sections.md)
+- **当前阶段(P3/M4)**: [`.ralph/specs/v32-p3-constraints.md`](specs/v32-p3-constraints.md) + [`.ralph/specs/v32-p3-sections.md`](specs/v32-p3-sections.md)
+- 上一阶段(P2/M3,已完成 2026-05-01): [`.ralph/specs/v32-p2-constraints.md`](specs/v32-p2-constraints.md) + [`.ralph/specs/v32-p2-sections.md`](specs/v32-p2-sections.md)
+- 上上阶段(P1/M2,已完成 2026-04-30): [`.ralph/specs/v32-p1-constraints.md`](specs/v32-p1-constraints.md) + [`.ralph/specs/v32-p1-sections.md`](specs/v32-p1-sections.md)
 - P0 阶段(已完成): [`.ralph/specs/v32-p0-constraints.md`](specs/v32-p0-constraints.md) + [`.ralph/specs/v32-p0-sections.md`](specs/v32-p0-sections.md)
 - 历史阶段(v3.1,已归档): `.ralph/specs/phase3-sections.md`、`phase3.5-sections.md`、`phase4-sections.md`、`phase5-sections.md`
 
-Match the section prefix(V32.M3.*)to 当前 spec 文件即可。
+Match the section prefix(V32.M4.*)to 当前 spec 文件即可。
 
 ## High Priority (work top-down)
 
-> P2 / M3 = Coach + Dashboard + Reflection 复盘报告。8 主节点 ✅ + 1 audit-fix ✅
-> M3 tester 复审 8.5/10,**无 🔴 必修,只补 G1+G2 双测试**(只动测试,不动产品代码)。
+> P3 / M4 = 收口阶段 = F-315 配额 mock + 字体本地子集化 + Playwright 烟雾 E2E + locust 性能基线 + 文档收尾。
+> 4 主节点 + 1 收尾。任一节点 fail 不向后跑。完成后 v3.3 全收尾,EXIT_SIGNAL: true。
 
-(empty — M3 全批收尾。下一阶段 M4 需要新 spec `v32-p3-sections.md`。)
+- [ ] V32.M4.1 — F-315 SidebarQuotaCard + quotaMock localStorage + 7 vitest 单测(L0 A18 enforced)
+- [ ] V32.M4.2 — woff2 字体本地子集化(Inter / Instrument Serif / JetBrains Mono 共 5 个 woff2 + LICENSE)+ index.css 改 @font-face,删 googleapis @import
+- [ ] V32.M4.3 — Playwright 烟雾 E2E(2 spec:upload-to-config + report-renders + mock backend fixtures)
+- [ ] V32.M4.4 — locust 性能骨架(parse_baseline.py + baseline.md + README + pytest collect 排除)
+- [ ] V32.M4.X — M4 收尾文档同步(FEATURES F-315 ✅ + fix_plan 收尾 banner + EXIT_SIGNAL=true)
 
 
 
