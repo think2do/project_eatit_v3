@@ -40,6 +40,17 @@ export type InterviewDirectionV32 =
 
 export type InterviewDurationV32 = 15 | 30 | 45;
 
+// F-308 InterviewerPersona names — A6 red line, locked to exactly
+// these four. Mirrored on the backend in
+// apps/api/app/agents/interviewer/personas.py.
+export type InterviewerPersonaName = "Sarah" | "Marcus" | "Lin" | "Daniel";
+
+export type InterviewerPersona = {
+  name: InterviewerPersonaName;
+  style: InterviewStyleV32;
+  keywords: [string, string, string];
+};
+
 export type InterviewSessionStatus =
   | "created"
   | "session_started"
