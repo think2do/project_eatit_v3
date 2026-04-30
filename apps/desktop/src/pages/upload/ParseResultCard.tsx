@@ -1,4 +1,4 @@
-import type { ParseResultPayload } from "@eatit/shared-types";
+import type { CandidateProfile, ParseResultPayload } from "@eatit/shared-types";
 
 interface Props {
   payload: ParseResultPayload;
@@ -13,6 +13,7 @@ const sectionTitle: React.CSSProperties = {
 };
 
 export function ParseResultCard({ payload }: Props): JSX.Element {
+  const profile = payload.candidate_profile;
   return (
     <section
       className="ds-card"
@@ -29,9 +30,12 @@ export function ParseResultCard({ payload }: Props): JSX.Element {
         >
           解析结果
         </h2>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--ink-500)", lineHeight: 1.6 }}>
-          {payload.match_summary}
-        </p>
+        {payload.match_summary ? (
+          <p style={{ margin: 0, fontSize: 13, color: "var(--ink-500)", lineHeight: 1.6 }}>
+            {payload.match_summary}
+          </p>
+        ) : null}
+        {profile ? <ProfileChips profile={profile} /> : null}
       </header>
 
       <Block title="岗位要求" items={payload.job_requirements.map(
@@ -76,6 +80,33 @@ export function ParseResultCard({ payload }: Props): JSX.Element {
         </div>
       ) : null}
     </section>
+  );
+}
+
+function ProfileChips({ profile }: { profile: CandidateProfile }): JSX.Element {
+  // F-303 V32.M2.2.2 — candidate_profile meta chips. Shown when ParseAgent
+  // emits the v3.2 profile block; legacy parses without it skip silently.
+  const roleAndYears = profile.years > 0
+    ? `${profile.role} · ${profile.years} 年`
+    : profile.role;
+  return (
+    <div className="row" style={{ gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+      {profile.role ? (
+        <span className="tag tag-line" data-testid="profile-chip-role">
+          {roleAndYears}
+        </span>
+      ) : null}
+      {profile.companies.map((company) => (
+        <span key={company} className="tag tag-line" data-testid="profile-chip-company">
+          {company}
+        </span>
+      ))}
+      {profile.domain_tags.map((tag) => (
+        <span key={tag} className="tag tag-info" data-testid="profile-chip-domain">
+          {tag}
+        </span>
+      ))}
+    </div>
   );
 }
 

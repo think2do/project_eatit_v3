@@ -8,6 +8,7 @@ import type {
   InterviewStyleV32,
 } from "@eatit/shared-types";
 import { createSession } from "@/api/sessions";
+import { PageStepIndicator } from "@/components/PageStepIndicator";
 import { TipsCarousel } from "@/components/TipsCarousel";
 import { selectTips } from "@/lib/tips";
 import { useAppStore } from "@/stores/app-store";
@@ -151,7 +152,7 @@ export function ConfigPage(): JSX.Element {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <div>
-        <div className="eyebrow">03 · 面试配置</div>
+        <PageStepIndicator step={2} />
         <h1 className="h1" style={{ margin: "10px 0 6px" }}>
           选一套和今天状态匹配的面试方式
         </h1>

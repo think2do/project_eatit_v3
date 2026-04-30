@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { getParseResult, triggerParse, uploadJd, uploadResume } from "@/api/assets";
 import { DropZone } from "@/pages/upload/DropZone";
 import { ParseResultCard } from "@/pages/upload/ParseResultCard";
+import { PageStepIndicator } from "@/components/PageStepIndicator";
 import { TipsCarousel } from "@/components/TipsCarousel";
 import { selectTips } from "@/lib/tips";
 import { useAppStore } from "@/stores/app-store";
@@ -103,7 +104,7 @@ export function UploadPage(): JSX.Element {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <div>
-        <div className="eyebrow">02 · 上传与解析</div>
+        <PageStepIndicator step={1} />
         <h1
           className="h-serif"
           style={{

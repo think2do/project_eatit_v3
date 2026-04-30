@@ -20,6 +20,7 @@ import {
 import { speakInterviewerLine, stopInterviewerLine } from "@/lib/tts";
 import { useGlobalKeymap } from "@/lib/useGlobalKeymap";
 import { EndConfirmDialog } from "@/components/EndConfirmDialog";
+import { PageStepIndicator } from "@/components/PageStepIndicator";
 import { getSession } from "@/api/sessions";
 import { FollowupHintChips } from "@/pages/interview/FollowupHintChips";
 import { KeyboardShortcutHelper } from "@/pages/interview/KeyboardShortcutHelper";
@@ -703,6 +704,8 @@ export function InterviewPage(): JSX.Element {
 
   const mainColumn = (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* F-304 V32.M2.2.2 — page-step eyebrow above the REC topbar. */}
+      <PageStepIndicator step={3} />
       {/* M2.1.5 — REC topbar (replaces the verbose page header). REC badge
           + clock on the left, 结束面试 button on the right routes through
           EndConfirmDialog (M2.1.3) instead of ending directly. */}
