@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import axios from "axios";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getParseResult, triggerParse, uploadJd, uploadResume } from "@/api/assets";
 import { DropZone } from "@/pages/upload/DropZone";
 import { ParseResultCard } from "@/pages/upload/ParseResultCard";
-import { WaitingTips } from "@/components/WaitingTips";
+import { TipsCarousel } from "@/components/TipsCarousel";
+import { selectTips } from "@/lib/tips";
 import { useAppStore } from "@/stores/app-store";
 
 function extractError(err: unknown): string {
@@ -21,6 +22,8 @@ export function UploadPage(): JSX.Element {
   const patchUpload = useAppStore((s) => s.patchUpload);
 
   const [globalError, setGlobalError] = useState<string | null>(null);
+
+  const parseTips = useMemo(() => selectTips("parsing", 0), []);
 
   const handleResume = async (file: File) => {
     setGlobalError(null);
@@ -198,10 +201,23 @@ export function UploadPage(): JSX.Element {
       </div>
 
       {upload.parseStatus === "running" ? (
-        <WaitingTips
-          title="AI 正在解析简历与岗位描述..."
-          subtitle="通常约 15 秒。在此期间可以看看面试技巧。"
-        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: "var(--ink-900)",
+              }}
+            >
+              AI 正在解析简历与岗位描述...
+            </div>
+            <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 4 }}>
+              通常约 15 秒。在此期间可以看看面试技巧。
+            </div>
+          </div>
+          <TipsCarousel tips={parseTips} size="large" />
+        </div>
       ) : null}
 
       {upload.parsePayload ? <ParseResultCard payload={upload.parsePayload} /> : null}

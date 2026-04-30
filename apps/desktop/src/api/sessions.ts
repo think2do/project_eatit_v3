@@ -18,7 +18,7 @@ export const createSession = async (
   // (free siliconflow / deepseek) the framework synthesis routinely
   // takes 40-90s. Default 30s axios timeout fires "timeout of 30000ms
   // exceeded" mid-call. Allow 3 minutes here — the user is staring at
-  // the WaitingTips carousel in the meantime.
+  // the TipsCarousel in the meantime.
   const response = await apiClient.post<CreateSessionResponse>("/api/v1/sessions", request, {
     timeout: 180_000,
   });

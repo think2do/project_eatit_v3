@@ -14,7 +14,8 @@ import { DimensionRow } from "@/pages/report/DimensionRow";
 import { HeroScoreCard } from "@/pages/report/HeroScoreCard";
 import { QuestionReview } from "@/pages/report/QuestionReview";
 import { ReasonRow } from "@/pages/report/ReasonRow";
-import { WaitingTips } from "@/components/WaitingTips";
+import { TipsCarousel } from "@/components/TipsCarousel";
+import { selectTips } from "@/lib/tips";
 import { useAppStore } from "@/stores/app-store";
 // Side-effect stylesheet: adds @media print rules that hide chrome
 // and paginate ReasonRow entries cleanly. See print.css for details.
@@ -41,6 +42,7 @@ export function ReportPage(): JSX.Element {
   const navigate = useNavigate();
   const setPresetConfig = useAppStore((s) => s.setPresetConfig);
   const [state, setState] = useState<ReportState>({ kind: "loading" });
+  const reportTips = useMemo(() => selectTips("report_generating", 0), []);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -161,14 +163,19 @@ export function ReportPage(): JSX.Element {
             <div className="shimmer" style={{ height: 12, width: "40%" }} />
           </div>
         </div>
-        <WaitingTips
-          title={
-            state.kind === "generating"
-              ? "AI 正在生成本场面试报告..."
-              : "正在加载报告..."
-          }
-          subtitle="通常约 20 秒。在此期间可以看看面试技巧。"
-        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink-900)" }}>
+              {state.kind === "generating"
+                ? "AI 正在生成本场面试报告..."
+                : "正在加载报告..."}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 4 }}>
+              通常约 20 秒。在此期间可以看看面试技巧。
+            </div>
+          </div>
+          <TipsCarousel tips={reportTips} size="full" />
+        </div>
       </div>
     );
   }

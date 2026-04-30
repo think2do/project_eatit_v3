@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -8,7 +8,8 @@ import type {
   InterviewStyleV32,
 } from "@eatit/shared-types";
 import { createSession } from "@/api/sessions";
-import { WaitingTips } from "@/components/WaitingTips";
+import { TipsCarousel } from "@/components/TipsCarousel";
+import { selectTips } from "@/lib/tips";
 import { useAppStore } from "@/stores/app-store";
 
 type StyleOption = {
@@ -87,6 +88,8 @@ export function ConfigPage(): JSX.Element {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const submitTips = useMemo(() => selectTips("parsing", 0), []);
 
   // F-317: consume one-shot preset handoff from ReportPage's dark CTA
   // and clear the slot. Runs once on mount; subsequent navigations
@@ -311,10 +314,23 @@ export function ConfigPage(): JSX.Element {
       </div>
 
       {submitting ? (
-        <WaitingTips
-          title="AI 正在为你定制面试框架..."
-          subtitle="通常约 30-60 秒。在此期间可以看看面试技巧。"
-        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: "var(--ink-900)",
+              }}
+            >
+              AI 正在为你定制面试框架...
+            </div>
+            <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 4 }}>
+              通常约 30-60 秒。在此期间可以看看面试技巧。
+            </div>
+          </div>
+          <TipsCarousel tips={submitTips} />
+        </div>
       ) : null}
     </div>
   );
