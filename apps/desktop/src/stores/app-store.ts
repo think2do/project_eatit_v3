@@ -5,6 +5,7 @@ import type {
   InterviewStyleV32,
   ParseResultPayload,
   PredictedQuestionBank,
+  ReflectionReport,
   ResearchResult,
   UserInsightCache,
 } from "@eatit/shared-types";
@@ -102,6 +103,14 @@ type AppStore = {
   insights: UserInsightCache | null;
   setInsights: (insights: UserInsightCache | null) => void;
 
+  // F-322 V32.M3.2.3 — ReportPage "[详细复盘]" tab payload. ``null``
+  // covers (a) ReportPage hasn't fetched yet, (b) API returned 204
+  // because the post_report_graph trigger hasn't produced a row yet.
+  // ReflectionView reads + writes this slot so a back-navigation to
+  // the same session avoids a redundant fetch.
+  reflection: ReflectionReport | null;
+  setReflection: (reflection: ReflectionReport | null) => void;
+
   // F-316 V32.M3.1.5 — "复用上次配置" jump-to-config flag.
   // ``HistoryFooterCTA`` calls ``reuseLastConfig`` with the most-recent
   // session's config snapshot; the action patches ``config`` and flips
@@ -181,6 +190,9 @@ export const useAppStore = create<AppStore>((set) => ({
 
   insights: null,
   setInsights: (insights) => set({ insights }),
+
+  reflection: null,
+  setReflection: (reflection) => set({ reflection }),
 
   skipUpload: false,
   reuseLastConfig: (config) =>

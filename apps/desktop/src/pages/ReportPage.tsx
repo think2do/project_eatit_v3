@@ -14,6 +14,8 @@ import { DimensionRow } from "@/pages/report/DimensionRow";
 import { HeroScoreCard } from "@/pages/report/HeroScoreCard";
 import { QuestionReview } from "@/pages/report/QuestionReview";
 import { ReasonRow } from "@/pages/report/ReasonRow";
+import { ReflectionView } from "@/pages/report/ReflectionView";
+import { SegmentTabs, type SegmentTab } from "@/pages/report/SegmentTabs";
 import { TipsCarousel } from "@/components/TipsCarousel";
 import { selectTips } from "@/lib/tips";
 import { useAppStore } from "@/stores/app-store";
@@ -26,6 +28,16 @@ type ReportState =
   | { kind: "generating" }
   | { kind: "ready"; data: InterviewReportResponse }
   | { kind: "error"; message: string };
+
+// F-322 V32.M3.2.3 — top-level segment tab on the ready state. The
+// "评估" view is the existing v3.2 report content; "复盘" pulls in the
+// teaching-tone Reflection from /api/v1/sessions/{id}/reflection.
+type ReportTab = "evaluation" | "reflection";
+
+const REPORT_TABS: SegmentTab<ReportTab>[] = [
+  { value: "evaluation", label: "评估报告" },
+  { value: "reflection", label: "详细复盘" },
+];
 
 const POLL_INTERVAL_MS = 1500;
 const POLL_TIMEOUT_MS = 120_000;
@@ -42,6 +54,7 @@ export function ReportPage(): JSX.Element {
   const navigate = useNavigate();
   const setPresetConfig = useAppStore((s) => s.setPresetConfig);
   const [state, setState] = useState<ReportState>({ kind: "loading" });
+  const [activeTab, setActiveTab] = useState<ReportTab>("evaluation");
   const reportTips = useMemo(() => selectTips("report_generating", 0), []);
 
   useEffect(() => {
@@ -245,34 +258,49 @@ export function ReportPage(): JSX.Element {
         </button>
       </div>
 
-      <section
-        className="ds-card"
-        style={{
-          padding: 22,
-          display: "flex",
-          flexDirection: "column",
-          gap: 18,
-        }}
-      >
-        <HeroScoreCard
-          overallScore={payload.overall_score ?? null}
-          passLikelihood={payload.pass_likelihood ?? null}
+      <div className="report-page__print-hide">
+        <SegmentTabs
+          tabs={REPORT_TABS}
+          active={activeTab}
+          onChange={setActiveTab}
+          ariaLabel="评估报告 / 详细复盘"
         />
-        <div
+      </div>
+
+      {activeTab === "reflection" ? (
+        <ReflectionView sessionId={sessionId} />
+      ) : null}
+
+      {activeTab === "evaluation" ? (
+        <section
+          className="ds-card"
           style={{
-            fontSize: 14,
-            lineHeight: 1.7,
-            color: "var(--ink-900)",
+            padding: 22,
+            display: "flex",
+            flexDirection: "column",
+            gap: 18,
           }}
         >
-          {payload.overall_summary}
-        </div>
-      </section>
+          <HeroScoreCard
+            overallScore={payload.overall_score ?? null}
+            passLikelihood={payload.pass_likelihood ?? null}
+          />
+          <div
+            style={{
+              fontSize: 14,
+              lineHeight: 1.7,
+              color: "var(--ink-900)",
+            }}
+          >
+            {payload.overall_summary}
+          </div>
+        </section>
+      ) : null}
 
       {/* F-312 维度分析卡 (M1.3). 严格 5 项 (post-normalize) 或空 (v3.1
           legacy report);非空时整段渲染,空时整段隐藏避免 v3.1 报告
-          崩溃。 */}
-      {payload.dimensions && payload.dimensions.length > 0 ? (
+          崩溃。M3.2.3 后这些块只在 evaluation tab 下渲染。 */}
+      {activeTab === "evaluation" && payload.dimensions && payload.dimensions.length > 0 ? (
         <section className="card card-pad">
           <div className="eyebrow" style={{ marginBottom: 10 }}>
             维度分析
@@ -293,7 +321,7 @@ export function ReportPage(): JSX.Element {
 
       {/* F-313 逐题复盘卡 (M1.3). v3.1 legacy report → round_reviews_v2
           为空,整段隐藏。第一题默认展开,其余折叠。 */}
-      {payload.round_reviews_v2 && payload.round_reviews_v2.length > 0 ? (
+      {activeTab === "evaluation" && payload.round_reviews_v2 && payload.round_reviews_v2.length > 0 ? (
         <section className="card">
           <div
             className="eyebrow"
@@ -319,7 +347,7 @@ export function ReportPage(): JSX.Element {
         </section>
       ) : null}
 
-      {payload.reasons.length > 0 ? (
+      {activeTab === "evaluation" && payload.reasons.length > 0 ? (
         <section>
           <div
             className="eyebrow"
@@ -347,7 +375,7 @@ export function ReportPage(): JSX.Element {
         </section>
       ) : null}
 
-      {payload.next_actions.length > 0 ? (
+      {activeTab === "evaluation" && payload.next_actions.length > 0 ? (
         <section
           className="ds-card"
           style={{ padding: 20, display: "flex", flexDirection: "column", gap: 10 }}
@@ -374,7 +402,7 @@ export function ReportPage(): JSX.Element {
         </section>
       ) : null}
 
-      {payload.next_actions_v2
+      {activeTab === "evaluation" && payload.next_actions_v2
         ? (() => {
             // F-317 V32.M1.5 — preset-driven 专项训练 dark CTA. Hidden
             // when backend's derive_preset_config returned null (every
