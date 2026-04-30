@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "lint:design-tokens": "bash scripts/lint-design-tokens.sh",
+    "test": "vitest run",
     "tauri": "tauri",
     "build:dmg": "tauri build --target aarch64-apple-darwin --bundles dmg"
   },
@@ -33,6 +34,8 @@
   "devDependencies": {
     "@eslint/js": "^9.13.0",
     "@tauri-apps/cli": "^2.10.1",
+    "@testing-library/jest-dom": "^6",
+    "@testing-library/react": "^16",
     "@types/node": "^22.8.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
@@ -43,6 +46,7 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.14",
     "globals": "^15.11.0",
+    "jsdom": "^25",
     "postcss": "^8.4.47",
     "prettier": "^3.3.3",
     "tailwindcss": "^3.4.14",
@@ -50,6 +54,7 @@
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.11.0",
     "vite": "^5.4.10",
-    "vite-tsconfig-paths": "^5.1.0"
+    "vite-tsconfig-paths": "^5.1.0",
+    "vitest": "^2"
   }
 }

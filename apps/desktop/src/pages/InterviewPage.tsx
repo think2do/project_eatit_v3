@@ -22,6 +22,7 @@ import { FollowupHintChips } from "@/pages/interview/FollowupHintChips";
 import { LiveCaption } from "@/pages/interview/LiveCaption";
 import { ObserverPanel } from "@/pages/interview/ObserverPanel";
 import { ReferencePanel } from "@/pages/interview/ReferencePanel";
+import { useTurnStats } from "@/pages/interview/useTurnStats";
 import { VoiceControl } from "@/pages/interview/VoiceControl";
 import { interviewMachine } from "@/statecharts/interview-machine";
 
@@ -471,6 +472,22 @@ export function InterviewPage(): JSX.Element {
     send({ type: "SUBMIT_ANSWER" });
   };
 
+  // F-310: per-turn wall-clock start. Resets the moment the user enters
+  // the answering state for a new turn (covers both voice and text
+  // modes). The hook freezes its timer when this is null, so we drop
+  // back to null after submit / when out of user_answering.
+  const [turnStartMs, setTurnStartMs] = useState<number | null>(null);
+  const isUserAnsweringNow = state.matches("user_answering");
+  const currentTurnIndexForStats = state.context.currentTurnIndex;
+  useEffect(() => {
+    if (isUserAnsweringNow) {
+      setTurnStartMs(Date.now());
+    } else {
+      setTurnStartMs(null);
+    }
+  }, [isUserAnsweringNow, currentTurnIndexForStats]);
+  const turnStats = useTurnStats(state.context.draftAnswer, turnStartMs);
+
   const statusLabel = useMemo(() => {
     if (state.matches("idle")) return "待启动";
     if (state.matches("connecting")) return "正在连接...";
@@ -658,6 +675,8 @@ export function InterviewPage(): JSX.Element {
           />
         )}
 
+        {isUserAnswering ? <TurnStatRow stats={turnStats} /> : null}
+
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <button
             type="button"
@@ -825,6 +844,40 @@ function StatusBar({ label, error }: { label: string; error: string | null }): J
     >
       <span>{label}</span>
       {error ? <span>· {error}</span> : null}
+    </div>
+  );
+}
+
+const RATE_LABEL_ZH: Record<"slow" | "moderate" | "fast", string> = {
+  slow: "偏慢",
+  moderate: "适中",
+  fast: "偏快",
+};
+
+function formatMmSs(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function TurnStatRow({
+  stats,
+}: {
+  stats: { elapsedSeconds: number; rateLabel: "slow" | "moderate" | "fast"; fillerCount: number };
+}): JSX.Element {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 18,
+        fontSize: 12,
+        color: "var(--ink-500)",
+        paddingTop: 4,
+      }}
+    >
+      <span>⏱ 本题用时 {formatMmSs(stats.elapsedSeconds)}</span>
+      <span>语速 {RATE_LABEL_ZH[stats.rateLabel]}</span>
+      <span>填充词 {stats.fillerCount} 次</span>
     </div>
   );
 }
