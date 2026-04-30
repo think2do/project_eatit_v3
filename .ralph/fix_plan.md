@@ -13,13 +13,13 @@ Match the section prefix(V32.M2.*)to 当前 spec 文件即可。
 > P1 / M2.2 = 解析体验扩展(F-301 ~ F-305 整页 ParsedPanel 重构)。共 4 节点。
 > 依赖关系见 v32-p1-sections.md M2.2 "Execution order" 表。Ralph 必须按下方顺序执行。
 
-- [ ] V32.M2.2.3 F-302 建议面试侧重可编辑 + F-305 解析态元信息(FocusCard + store 联动 + 重新解析 + relativeTime + ~4 测试)
 - [ ] V32.M2.2.4 ParsedPanel 整页重构(MatchDial SVG 圆环 + StrengthGapList 双栏 + 接入 M2.2.1-3 + 接入 M2.1.4 TipsCarousel + 删除老 ParseResultCard + ~6 测试)
 
 ## Completed (P1/M2.2 — v3.2+)
 
 - [x] V32.M2.2.1 F-301 后端 ParseResult schema 扩展(MatchScore + profile_summary + advantages/gaps + interview_focus + project_hooks_v32 + 7 子 schema + 30 边界测试) (d14ea15, 2026-04-30)
 - [x] V32.M2.2.2 F-303 候选 profile chips + F-304 PageStepIndicator(3 页统一 eyebrow + ParseResultCard ProfileChips + 4 tests;meta 行 file size/pages 推迟到 M2.2.4) (699ad5b, 2026-04-30)
+- [x] V32.M2.2.3 F-302 FocusCard + F-305 ParsedMetaBar(relativeTime + selectedFocusIds store 联动 ConfigPage directions + 14 tests) (827f63e, 2026-04-30)
 
 ## Completed (P1/M2.1 — v3.2+)
 
