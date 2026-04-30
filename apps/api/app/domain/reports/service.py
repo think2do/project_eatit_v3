@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from typing import Literal
@@ -14,9 +15,14 @@ from sqlalchemy.orm import selectinload
 from app.agents.report.schemas import ReportAgentInput, ReportAgentOutput
 from app.agents.report.service import ReportAgentService
 from app.api.dependencies.auth import AuthenticatedUser
+from app.domain.coach.service import build_default_coach_service
 from app.infra.db import AsyncSessionFactory
 from app.infra.llm import LLMConfig, build_gateway
 from app.infra.tasks import TaskQueueInterface
+from app.orchestrator.post_report_graph import (
+    PostReportState,
+    build_post_report_graph,
+)
 from app.models.enums import InterviewReportStatus, InterviewSessionStatus
 from app.models.report import InterviewReport
 from app.models.session import DirectionFramework, InterviewSession
@@ -36,6 +42,41 @@ from app.schemas.sessions import InterviewConfigRequest
 
 
 logger = logging.getLogger(__name__)
+
+
+# F-318 V32.M3.1.2 — strong references for fire-and-forget Coach tasks.
+# Without this, the Python GC can drop a Task mid-flight (asyncio docs
+# warn about the footgun). We add to the set on spawn and remove via the
+# task's done callback.
+_POST_REPORT_TASKS: set[asyncio.Task[None]] = set()
+
+
+def _spawn_post_report_coach_trigger(
+    *, user_id: str, last_session_id: str, llm_config: LLMConfig
+) -> asyncio.Task[None] | None:
+    """Spawn the post-report graph as a fire-and-forget task.
+
+    Returns the spawned task (mostly for tests). On any spawning error
+    (no running loop, etc.) returns ``None`` and logs — the caller's main
+    flow continues unaffected.
+    """
+    try:
+        coach_service = build_default_coach_service(AsyncSessionFactory)
+        gateway = build_gateway(llm_config)
+        graph = build_post_report_graph(coach_service, gateway)
+        state = PostReportState(
+            user_id=user_id, last_session_id=last_session_id
+        )
+        task = asyncio.create_task(graph.ainvoke(state.model_dump()))
+        _POST_REPORT_TASKS.add(task)
+        task.add_done_callback(_POST_REPORT_TASKS.discard)
+        return task
+    except Exception as exc:  # noqa: BLE001 — must never fail report flow
+        logger.warning(
+            "post_report_coach_spawn_failed",
+            extra={"reason": type(exc).__name__},
+        )
+        return None
 
 
 # F-314 L0 ethical guardrail. The user-facing "通过可能性" indicator is
@@ -372,8 +413,10 @@ class ReportsService:
 
             # Capture PK up front — after a rollback, attribute access on
             # `interview_session` triggers async lazy-load from a
-            # non-greenlet context (MissingGreenlet).
+            # non-greenlet context (MissingGreenlet). user_id captured
+            # alongside for the post-report Coach trigger (F-318).
             interview_session_pk = interview_session.id
+            interview_session_user_id = interview_session.user_id
 
             framework_json = await self._load_agent_framework_json(session, interview_session_pk)
 
@@ -436,6 +479,18 @@ class ReportsService:
                     report.requested_at = now
                 interview_session.status = InterviewSessionStatus.REPORT_READY
                 await session.commit()
+
+        # F-318 V32.M3.1.2 — fire-and-forget post-report Coach trigger.
+        # Spawn AFTER the report status is committed so Coach failure can
+        # never flip the user-facing report status off ``READY`` (PRD
+        # §0.4 + AGENTS.md §6 红线第 3 条). The trigger itself short-
+        # circuits when the user has < 3 ready reports or when the cache
+        # is already keyed on this session id (idempotent).
+        _spawn_post_report_coach_trigger(
+            user_id=interview_session_user_id,
+            last_session_id=str(interview_session_pk),
+            llm_config=llm_config,
+        )
 
     @staticmethod
     async def _load_agent_framework_json(
