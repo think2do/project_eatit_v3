@@ -24,7 +24,7 @@ Match the section prefix(V32.M4.*)to 当前 spec 文件即可。
 
 ## Completed (P3/M4 — v3.2+)
 
-- [x] V32.M4.1 F-315 SidebarQuotaCard + quotaMock localStorage(read/increment/reset/getRemaining + 跨月自动归零 + 默认 0/10 + "占位" 文案 + 5+4=9 vitest 单测;前端 160→169) (40cc5df, 2026-05-01)
+- [x] V32.M4.1 F-315 SidebarQuotaCard + quotaMock localStorage(read/increment/reset/getRemaining + 跨月自动归零 + 默认 0/10 + "占位" 文案 + 5+4=9 vitest 单测;前端 160→169) (bbfc3af, 2026-05-01)
 
 ## Completed (P2/M3 — v3.2+)
 
