@@ -191,6 +191,27 @@
     border-color: transparent;
   }
 
+  /* ===== Card (M0.1b — design-system shared classes) ===== */
+  .card {
+    background: var(--bg-elev);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-xs);
+  }
+  .card-pad {
+    padding: 22px 24px;
+  }
+  .card-pad-lg {
+    padding: 28px 32px;
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--line);
+  }
+
   /* ===== Reusable pattern components ===== */
   .ds-card {
     background: var(--bg-elev);
