@@ -55,22 +55,22 @@
 
 | F-ID | 功能 | 状态 | 计划节点 |
 |---|---|---|---|
-| F-306 | 等待态过场动画(Tips Carousel,parse 与 report 期间) | ⏳ pending | V32.M2.1.5 |
-| F-309 | 实时观察侧栏(NextQuestion.live_observation 字段) | ⏳ pending | V32.M2.1.1 |
-| F-310 | 实时统计(语速 / 填充词 / 用时 — 纯前端) | ⏳ pending | V32.M2.1.2 |
-| F-311 | 键盘快捷键(Space/R/Esc) | ⏳ pending | V32.M2.1.3 |
-| F-301 | 综合解析输出扩展(MatchScore + ProfileSummary + MatchAdvantages + Gaps) | ⏳ pending | V32.M2.2 |
-| F-302 | 建议面试侧重模块(InterviewFocus 可编辑) | ⏳ pending | V32.M2.2 |
-| F-303 | 上传卡元数据展示(文件大小、页数/字数、抽取标签) | ⏳ pending | V32.M2.2 |
-| F-304 | 进度指示器(第 X 步 · 共 3 步) | ⏳ pending | V32.M2.2 |
-| F-305 | 解析态元信息(由 Eatit AI · 于 N 秒前生成 + 重新解析按钮) | ⏳ pending | V32.M2.2 |
+| F-306 | 等待态过场动画(Tips Carousel,parse 与 report 期间) | ✅ done | `5bff886` | V32.M2.1.4 |
+| F-309 | 实时观察侧栏(NextQuestion.live_observation 字段) | ✅ done | `2d15550` | V32.M2.1.1 |
+| F-310 | 实时统计(语速 / 填充词 / 用时 — 纯前端) | ✅ done | `c180456` | V32.M2.1.2 |
+| F-311 | 键盘快捷键(Space/R/Esc) | ✅ done | `6071069` | V32.M2.1.3 |
+| F-301 | 综合解析输出扩展(MatchScore + ProfileSummary + MatchAdvantages + Gaps) | ✅ done | `d14ea15` | V32.M2.2.1 |
+| F-302 | 建议面试侧重模块(InterviewFocus 可编辑) | ✅ done | `827f63e` | V32.M2.2.3 |
+| F-303 | 上传卡元数据展示(文件大小、页数/字数、抽取标签) | ✅ done | `699ad5b + 557fc7d` | V32.M2.2.2 + audit-fix |
+| F-304 | 进度指示器(第 X 步 · 共 3 步) | ✅ done | `699ad5b` | V32.M2.2.2 |
+| F-305 | 解析态元信息(由 Eatit AI · 于 N 秒前生成 + 重新解析按钮) | ✅ done | `827f63e` | V32.M2.2.3 |
 
 ### P2 待做(M3)
 
 | F-ID | 功能 | 状态 | 计划节点 |
 |---|---|---|---|
-| F-316 | 面试记录 Dashboard(StatCards + AI 推荐卡 + 筛选 tabs + 表格) | ⏳ pending | V32.M3.1 |
-| F-318 | Coach Agent(跨 session 异步分析 + UserInsightCache) | ⏳ pending | V32.M3.1 |
+| F-316 | 面试记录 Dashboard(StatCards + AI 推荐卡 + 筛选 tabs + 表格) | ✅ done | `ea30874` | V32.M3.1.4 |
+| F-318 | Coach Agent(跨 session 异步分析 + UserInsightCache) | ✅ done | `13a3da5 + f62ffd5 + 8fff706` | V32.M3.1.1-3 |
 
 ### P2 待做(M4)
 
@@ -86,9 +86,9 @@
 
 | F-ID | 功能 | 状态 | 计划节点 | Agent |
 |---|---|---|---|---|
-| F-320 | 公司/行业情报抽取(联网模式,opt-in) | ⏳ pending | V32.M2.3.1 | **Research Agent**(新)|
-| F-321 | 解析阶段同步出预测面试题库(8-15 道) | ⏳ pending | V32.M2.3.2 | Framework Agent 扩展 |
-| F-322 | 独立于 Report 的 AI 复盘报告(教学版) | ⏳ pending | V32.M3.2 | **Reflection Agent**(新)|
+| F-320 | 公司/行业情报抽取(联网模式,opt-in) | ✅ done | `3b762bb + a322a57 + 821172e + 557fc7d` | V32.M2.3.1-4 + audit-fix | **Research Agent**(新,M2.3.1) |
+| F-321 | 解析阶段同步出预测面试题库(8-15 道) | ✅ done | `18d9b7b + 821172e + 557fc7d` | V32.M2.3.3-4 + audit-fix | Framework Agent 扩展 |
+| F-322 | 独立于 Report 的 AI 复盘报告(教学版) | ✅ done | `4ca25d9 + 0e92324 + eab98cf + d08ea08` | V32.M3.2.1-3 + audit-fix | **Reflection Agent**(新,M3.2.1) |
 
 ---
 
