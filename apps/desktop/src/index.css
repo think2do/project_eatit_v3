@@ -251,6 +251,116 @@
     display: inline-block;
   }
 
+  /* ===== Interactive (M0.1d — tile / kbd / input / bar) ===== */
+  .tile-group {
+    display: grid;
+    gap: 10px;
+  }
+  .tile {
+    display: flex;
+    gap: 14px;
+    padding: 16px 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--bg-elev);
+    cursor: pointer;
+    transition: all 120ms ease;
+    text-align: left;
+    width: 100%;
+  }
+  .tile:hover {
+    border-color: var(--line-strong);
+  }
+  .tile.selected {
+    border-color: var(--brand);
+    background: var(--brand-softer);
+    /* rgba(31, 107, 58, 0.08) = brand 透明描边光晕,无对应 token,D2 例外允许 */
+    box-shadow: 0 0 0 3px rgba(31, 107, 58, 0.08);
+  }
+  .tile-radio {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1.5px solid var(--line-strong);
+    flex-shrink: 0;
+    margin-top: 2px;
+    position: relative;
+  }
+  .tile.selected .tile-radio {
+    border-color: var(--brand);
+    background: var(--brand);
+  }
+  .tile.selected .tile-radio::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    background: white;
+    border-radius: 50%;
+  }
+  .tile-title {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink-900);
+  }
+  .tile-desc {
+    font-size: 12.5px;
+    color: var(--ink-500);
+    margin-top: 3px;
+  }
+
+  .kbd {
+    display: inline-grid;
+    place-items: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: var(--bg-elev);
+    font-family: var(--f-mono);
+    font-size: 10.5px;
+    color: var(--ink-500);
+  }
+
+  .input,
+  .textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--bg-elev);
+    font-size: 13.5px;
+    color: var(--ink-900);
+    transition: border 120ms ease;
+  }
+  .input:focus,
+  .textarea:focus {
+    outline: none;
+    border-color: var(--ink-500);
+  }
+  .textarea {
+    min-height: 120px;
+    resize: vertical;
+    line-height: 1.6;
+  }
+
+  .bar {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--line);
+    overflow: hidden;
+  }
+  .bar > i {
+    display: block;
+    height: 100%;
+    background: var(--brand);
+    border-radius: 2px;
+  }
+  .bar-warn > i {
+    background: var(--warn);
+  }
+
   /* ===== Reusable pattern components ===== */
   .ds-card {
     background: var(--bg-elev);
