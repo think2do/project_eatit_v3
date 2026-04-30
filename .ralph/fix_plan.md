@@ -10,9 +10,10 @@ Match the section prefix(V32.M2.*)to 当前 spec 文件即可。
 
 ## High Priority (work top-down)
 
-> P1 / M2.3 = **老板新需求**:F-320 公司/行业情报(联网 opt-in)+ F-321 题目预测 + intake_graph 新建。共 5 节点。
-> 依赖关系见 v32-p1-sections.md "P1/M2.3 — 老板新需求" 节 + Execution order 表。
-> ⚠️ M2.3.1 涉及联网,L0 A11 隐私护栏:严禁发送简历正文 / PII。
+> P1 / M2.3 = **老板新需求**:F-320 + F-321 + intake_graph。5 节点 ship,但 tester 复审 4/10 发现 3 连环功能死锁(实际 F-320 不工作)。
+> ⚠️ V32.M2.3.X audit-fix 是真功能修补(~150-200 行产品代码),不只是补测试。
+
+- [ ] V32.M2.3.X M2.3 audit-fix(真功能死锁修补:G1 _extract_company_and_role 真实现 via Parse Agent 输出 jd_* 字段 + G2 _resolve_tools 实现 + 去 line 119 注释 + G3 ParseRequestResponse 加 research_payload 透传 + G4 ResearchCache 真读写 + G5/G6/G7 补测试 + G8 narrow except + G9 DialogTitle;预期后端 +8-10 / 前端 +6-8;intake_graph 并行改 sequential trade-off)
 
 
 ## Completed (P1/M2.3 — v3.2+)

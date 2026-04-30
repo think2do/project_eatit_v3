@@ -2008,7 +2008,229 @@ INTAKE_GRAPH_NODES = {"parse_node", "research_node", "predict_questions_node"}
 
 ---
 
-## P1/M2.3 完工后
+## V32.M2.3.X — M2.3 audit-fix(真功能死锁修补)
 
-完成 5 节点后,P1 总进度:M2.1(5主+1audit)+ M2.2(4主+1audit)+ M2.3(5)= 16 节点。下一阶段 M3(Coach + Reflection + Dashboard,~8 节点)需要新 spec 文件 `v32-p2-sections.md`。
+**Goal.** 2026-04-30 tester 独立审计 M2.3 5 节点,评分 4/10。发现 **3 个连续 🔴 必修缺口**,导致 F-320 / F-321 核心功能在生产中**完全不工作**(UI 框架到位但全部空数据,Research Agent 从未被实际调用)。本节点统一修补 3🔴 + 5🟡 + 1🟢 共 9 个缺口。
+
+> ⚠️ 与 M2.1.X / M2.2.X audit-fix **本质不同**:这次不只是补测试,需要**实现 3 处真功能代码**(共 ~150-200 行产品代码 + ~10 测试)。
+
+### 缺口清单
+
+**🔴 必修 3 个**(F-320/F-321 死锁断点):
+
+- **G1**:`apps/api/app/domain/assets/service.py:342` 的 `_extract_company_and_role` 永远返回 `(None, None)` — Research input 入口死锁,即使用户 opt-in,Research Agent 也永远不被调用
+- **G2**:`apps/api/app/agents/research/service.py:119` `tools=[build_web_search_tool()]` 被注释掉 + `_resolve_tools` 函数从未实现 — 即使 probe=True,LLM 也没收到 web_search tool schema,联网检索从未真发生
+- **G3**:`ParseRequestResponse` schema 没有 `research_payload` 字段,`assets/service.py.trigger_parse` 从 graph_result 只取 parse_payload,Research/Predict 结果直接被丢弃 — 前端 store 永远拿不到数据
+
+**🟡 应修 5 个**:
+
+- **G4**:`ResearchCache` 表已 migration,但**没人读写** — M2.3.2 commit 自报 "30 天缓存" 但功能不存在
+- **G5**:ParsedPanel 没有 "researchOptIn=false 隐藏 3 卡" 测试
+- **G6**:ResearchOptInSection 集成测试缺(首次 ON → 拒绝 → 仍 false 路径)
+- **G7**:`probe=True` happy path 没测试(防止 G2 复发)
+- **G8**:`assets/service.py:196` `except Exception` 静默吞 ValidationError,应改 `except ValueError`(将来填充 JD 解析时安全)
+
+**🟢 可缓 1 个**:
+
+- **G9**:`PrivacyOptInDialog` 用 `<h2>` 而非 Radix `<DialogTitle>`(a11y 警告)
+
+### 实现策略
+
+#### G1 修补:让 Parse Agent 顺便输出 ResearchAgentInput
+
+最干净的方案:不在 `_extract_company_and_role` 里独立实现 JD 解析,而是**让 Parse Agent 一次性输出**这些字段。Parse Agent 本来就在解析 JD,加 3 个字段成本极小。
+
+**修改**:
+- `apps/api/app/agents/parse/schemas.py` — `ParseAgentOutput` 加 3 个新 optional 字段:
+  ```python
+  jd_company_name: str | None = Field(default=None, max_length=80)
+  jd_role_title: str | None = Field(default=None, max_length=80)
+  jd_industry_hints: list[str] = Field(default_factory=list, max_length=5)
+  ```
+- `apps/api/app/prompts/parse/system.j2` — 加输出说明:从 JD 抽 company / role / industry hints(2-5 keywords)
+- `apps/api/app/domain/assets/service.py` — `_extract_company_and_role` 改为从 `parse_payload` 直接取上述字段:
+  ```python
+  def _extract_company_and_role(parse_payload):
+      if not parse_payload:
+          return None, None, []
+      return (
+          parse_payload.jd_company_name,
+          parse_payload.jd_role_title,
+          parse_payload.jd_industry_hints,
+      )
+  ```
+- `_build_research_input` 调用顺序改为:**Parse 先跑 → 拿到 jd_* 字段 → 构造 ResearchAgentInput**
+- 但因为 intake_graph 是 `parse || research` 并行,这里需要小调整:
+  - 选项 A:让 research_node 等 parse_node 完成(改成 sequential,牺牲并行,保证正确)
+  - 选项 B:让 research_node 自己用极简 regex 从 jd_text 抽公司名(保持并行,但抽取质量差)
+  - **推荐选项 A**:Parse 8-15s,Research 5-10s,sequential 总时长 ~13-25s 仍可接受;且只有 Parse 解析过 JD 后才能精确知道 company/role
+  - intake_graph 改为:`parse_node → research_node → predict_questions_node`(全 sequential)
+  - 这是 spec 偏离(原 spec 写并行),需要在 commit body 说明 trade-off:正确性 > 并行性
+
+#### G2 修补:实现 `_resolve_tools` + 去注释
+
+**修改**:
+- `apps/api/app/agents/research/service.py:119` — 去掉 `# tools=` 行的注释
+- 实现 `_resolve_tools(can_tool_use: bool)` 函数:
+  ```python
+  def _resolve_tools(self, can_tool_use: bool) -> list[dict] | None:
+      if can_tool_use:
+          return [build_web_search_tool()]
+      return None
+  ```
+- `_tool_augmented_run` 内调用 `tools = self._resolve_tools(True)` 传给 gateway
+- `degraded_run` 不传 tools 参数
+
+#### G3 修补:API 透传 research_payload
+
+**修改**:
+- `apps/api/app/schemas/parse.py`(或 `schemas/assets.py`)— `ParseRequestResponse` 加:
+  ```python
+  research_payload: ResearchAgentOutput | None = None  # M2.3 新增,opt-in 时才有值
+  predicted_questions: PredictedQuestionBank | None = None  # M2.3 新增
+  ```
+- `apps/api/app/domain/assets/service.py.trigger_parse` — 从 `graph_result["research_payload"]` / `graph_result["predicted_questions"]` 取数,赋给 response
+- `apps/desktop/src/api/client.ts`(或类似)— ParseRequestResponse TS 类型同步加 2 个字段
+- `apps/desktop/src/stores/app-store.ts` — `upload.researchPayload: ResearchAgentOutput | null` + `upload.predictedQuestions: PredictedQuestionBank | null` 字段
+- `apps/desktop/src/pages/UploadPage.tsx` — `handleParse` 调用后 `patchUpload({ researchPayload: response.research_payload, predictedQuestions: response.predicted_questions })`
+- `apps/desktop/src/pages/upload/ParsedPanel.tsx` — 接 `researchPayload` / `predictedQuestions` prop,non-null 时渲染 CompanyCard / IndustryCard / PredictedQuestionList
+
+#### G4 修补:ResearchCache 读写
+
+**修改**:
+- `apps/api/app/agents/research/service.py.run()` 流程改为:
+  ```python
+  # 1. 计算 cache_key
+  cache_key = self._compute_cache_key(input)
+  # 2. 查 cache
+  cached = await self._repo.get_cache(cache_key)
+  if cached and not cached.is_expired():
+      logger.info("research_cache_hit", extra={"cache_key": cache_key})
+      return cached.payload
+  # 3. miss,调 LLM
+  result = await self._invoke_llm(...)
+  # 4. 写 cache(30 天 TTL)
+  await self._repo.set_cache(cache_key, result, ttl_days=30)
+  return result
+  ```
+- 新增 `apps/api/app/repositories/research_cache.py` — `get_cache / set_cache / is_expired`
+- `apps/api/tests/agents/test_research_cache.py` — 缓存命中 / 失效 / 写入测试
+
+#### G5-G7 修补:补测试
+
+- `apps/desktop/src/__tests__/ParsedPanel.research.test.tsx`(新)— 3 cases:
+  - `researchOptIn=false` → 3 卡不渲染
+  - `researchOptIn=true, researchPayload=null` → 3 卡不渲染
+  - `researchOptIn=true, researchPayload={...}` → 3 卡正常渲染
+- `apps/desktop/src/__tests__/ResearchOptInSection.test.tsx`(新)— 集成测试:首次 ON → Dialog 弹 → 取消 → researchOptIn 仍 false
+- `apps/api/tests/agents/test_research.py` 加 happy path:`probe=True` + mock LLM 返回真实 ResearchResult,验证 tool 参数被正确传(grep gateway.last_call_args)
+
+#### G8 修补:`except ValueError`
+
+`apps/api/app/domain/assets/service.py:196`:
+```python
+except ValueError:  # narrow from broad except Exception
+    return None
+```
+
+#### G9 修补:用 Radix DialogTitle
+
+`apps/desktop/src/components/PrivacyOptInDialog.tsx` — 把 `<h2 className="h2">` 改为 `<DialogTitle className="h2">`(从 `@/components/ui/dialog` 导入)。
+
+### Files (summary)
+
+**Backend modify**(产品代码):
+- `apps/api/app/agents/parse/schemas.py`
+- `apps/api/app/prompts/parse/system.j2`
+- `apps/api/app/domain/assets/service.py`(`_extract_company_and_role` + `trigger_parse` + L196 narrow except)
+- `apps/api/app/agents/research/service.py`(`_resolve_tools` + 去注释 + cache 读写流程)
+- `apps/api/app/orchestrator/intake_graph.py`(并行改 sequential:parse → research → predict)
+- `apps/api/app/schemas/parse.py`(ParseRequestResponse 加字段)
+
+**Backend new**:
+- `apps/api/app/repositories/research_cache.py`
+- `apps/api/tests/agents/test_research_cache.py`
+
+**Frontend modify**(产品代码):
+- `apps/desktop/src/api/client.ts`(同步类型)
+- `apps/desktop/src/stores/app-store.ts`(researchPayload / predictedQuestions 字段)
+- `apps/desktop/src/pages/UploadPage.tsx`(handleParse 接 response 字段)
+- `apps/desktop/src/pages/upload/ParsedPanel.tsx`(接 prop + 渲染门控)
+- `apps/desktop/src/components/PrivacyOptInDialog.tsx`(用 DialogTitle)
+- `packages/shared-types/src/index.ts`(同步)
+
+**Frontend new**:
+- `apps/desktop/src/__tests__/ParsedPanel.research.test.tsx`
+- `apps/desktop/src/__tests__/ResearchOptInSection.test.tsx`
+
+### Acceptance
+
+```bash
+# 1. 后端核心修复 + 缓存
+cd apps/api
+unset VIRTUAL_ENV
+uv run python -m pytest tests/agents/test_research.py tests/agents/test_research_cache.py -v
+# 全过(原 12 + cache 新增 ~5 = 17+)
+
+# 2. parse_payload 含 jd_* 字段
+uv run python -m pytest tests/agents/test_parse_v32_extended.py -v
+# 全过(包含新加的 3 字段边界测试)
+
+# 3. intake_graph sequential 改造
+uv run python -m pytest tests/orchestrator/test_intake_graph_contract.py -v
+# 全过(节点名锁不变,但并行改 sequential 后 latch 测试需调整)
+# turn_graph 节点名锁仍过
+uv run python -m pytest tests/orchestrator/test_graph_contract.py -v
+
+# 4. 后端全量回归(应 ≥ 370)
+uv run python -m pytest -q
+# 期望 370+ passed
+
+# 5. 前端新测试
+cd ../desktop
+corepack pnpm test src/__tests__/ParsedPanel.research.test.tsx -- --run
+corepack pnpm test src/__tests__/ResearchOptInSection.test.tsx -- --run
+# 各 3+ passed
+
+# 6. 前端全量(应 ≥ 110)
+corepack pnpm test -- --run
+
+# 7. tsc + lint + lint:design-tokens
+corepack pnpm exec tsc --noEmit
+corepack pnpm lint
+corepack pnpm lint:design-tokens
+corepack pnpm build  # vite build 成功
+
+# 8. 关键死锁验证(grep 验证 G1 G2 G3 真修)
+grep -A 8 "def _extract_company_and_role" apps/api/app/domain/assets/service.py | grep -v "(None, None)"
+# 应有命中(返回值不再永远 None)
+
+grep -A 3 "tools=\[build_web_search_tool" apps/api/app/agents/research/service.py
+# 应有命中(取消注释 + 实际传 tools)
+
+grep -E "research_payload" apps/api/app/schemas/parse.py
+# 应有命中(ParseRequestResponse 含此字段)
+```
+
+**Commit.** `fix(audit): M2.3 functional dead-locks — Research input + tool injection + API plumbing`
+
+提交 body 必须含:
+- 3🔴 死锁修补的具体 file:line 证据
+- intake_graph 并行改 sequential 的 trade-off 说明(正确性 > 并行)
+- ResearchCache 30 天 TTL 真实读写实现
+- 测试增量(后端 +8-10 / 前端 +6-8)
+- 不破坏 L0 红线声明(extra=forbid + cache_key sha256 + audit log 脱敏 + persona/dim/filler/turn_graph 节点名锁)
+
+### 风险 & 注意
+
+1. **intake_graph 改 sequential** 会导致 sessions 解析时长上升 ~30%(parse 8-15s + research 5-10s = 13-25s vs 原并行 8-15s)。但功能正确性 > 性能。M4 后期可视情况引入 cache + concurrent fetch 重新提速。
+2. **Parse Agent prompt 加 3 字段** 可能让 LLM 输出 token 增加 ~50-100 token,P95 解析时长 +1s 左右,可接受。
+3. **ResearchCache 30 天 TTL 命中后** 跳过 LLM 调用,后续测试需要 mock cache 命中 vs miss 两条路径。
+4. **prompt 改动后**,test_parse 现有测试可能 fail(LLM 没输出 jd_* 字段)。需要在 ScriptedGateway 的 _GOOD_PAYLOAD 加这些字段。
+
+---
+
+## P1/M2.3 完工后(含 audit-fix)
+
+完成 5 节点 + 1 audit-fix 后,M2 总进度:M2.1(5主+1audit)+ M2.2(4主+1audit)+ M2.3(5+1audit)= **17 节点**。下一阶段 M3(Coach + Reflection + Dashboard,~8 节点)需要新 spec 文件 `v32-p2-sections.md`。
 
