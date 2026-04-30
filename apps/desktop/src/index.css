@@ -51,29 +51,15 @@
     --shadow-md: 0 8px 24px -12px rgba(15, 19, 16, 0.1), 0 2px 4px rgba(15, 19, 16, 0.04);
     --shadow-lg: 0 24px 48px -20px rgba(15, 19, 16, 0.14), 0 4px 8px rgba(15, 19, 16, 0.04);
 
-    /* ===== shadcn/ui bridge ===== */
-    /* Expose the design palette under the HSL-triplet variable names that
-       existing shadcn components read, so Button/Card/Dialog render in the
-       new palette without requiring a component rewrite. */
-    --background: 60 20% 97%;
-    --foreground: 135 12% 7%;
-    --card: 0 0% 100%;
-    --card-foreground: 135 12% 7%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 135 12% 7%;
-    --primary: 135 12% 7%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 50 20% 92%;
-    --secondary-foreground: 135 12% 7%;
-    --muted: 50 20% 92%;
-    --muted-foreground: 100 4% 43%;
-    --accent: 50 20% 92%;
-    --accent-foreground: 135 12% 7%;
-    --destructive: 24 75% 41%;
-    --destructive-foreground: 0 0% 100%;
+    /* M0.1f retired the shadcn HSL-triplet bridge (was: --background /
+       --foreground / --card / --card-foreground / --popover /
+       --popover-foreground / --primary / --primary-foreground /
+       --secondary / --secondary-foreground / --muted /
+       --muted-foreground / --accent / --accent-foreground /
+       --destructive / --destructive-foreground / --input / --ring).
+       Only --border is kept because Tailwind's `border-border` apply
+       on `*` reads it; --radius is kept for borderRadius utilities. */
     --border: 50 13% 90%;
-    --input: 50 13% 90%;
-    --ring: 140 55% 27%;
     --radius: 0.75rem;
   }
 
@@ -389,6 +375,38 @@
   }
   .muted {
     color: var(--ink-500);
+  }
+
+  /* ===== Layout (M0.1f — row / col / between / wrap / grow / divider) ===== */
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .between {
+    justify-content: space-between;
+  }
+  .wrap {
+    flex-wrap: wrap;
+  }
+  .grow {
+    flex: 1;
+  }
+  .divider {
+    height: 1px;
+    background: var(--line);
+    border: 0;
+    margin: 0;
+  }
+  .divider-v {
+    width: 1px;
+    background: var(--line);
+    align-self: stretch;
   }
 
   /* ===== Reusable pattern components ===== */
