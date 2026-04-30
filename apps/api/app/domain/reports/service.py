@@ -21,6 +21,8 @@ from app.models.enums import InterviewReportStatus, InterviewSessionStatus
 from app.models.report import InterviewReport
 from app.models.session import DirectionFramework, InterviewSession
 from app.schemas.reports import (
+    Chip,
+    DimensionScore,
     InterviewReportPayload,
     InterviewReportResponse,
     PassLikelihood,
@@ -83,6 +85,52 @@ def coerce_pass_likelihood(
         match_score,
     )
     return derived
+
+
+# F-312 V32.M1.3 — five-dimension scorecard. The names below are an
+# A8 L0 red line and must stay in lock-step with `DIMENSION_NAMES`
+# Literal in app.schemas.reports.
+DEFAULT_DIMENSION_NAMES: tuple[str, ...] = (
+    "专业深度",
+    "结构化表达",
+    "批判性思考",
+    "业务直觉",
+    "沟通节奏",
+)
+
+
+def normalize_dimensions(raw: list[DimensionScore]) -> list[DimensionScore]:
+    """Pad an LLM-supplied dimension list to exactly 5 items in order.
+
+    The LLM is instructed to emit all five dimensions, but Instructor
+    occasionally returns < 5 (truncation, schema drift, etc.). Rather
+    than silently dropping the report, we project whatever the LLM
+    gave us into a fixed 5-slot list (canonical order) and fill the
+    gaps with score=50, description="评分异常,默认中性",
+    evidence_chips=[Chip(text="数据不足", good=False)]. A WARN log
+    fires per missing dimension so production drift can be monitored.
+
+    Returns 5 items unconditionally — callers are expected to guard
+    `if not raw: payload.dimensions = []` upstream when they want
+    the empty-state for v3.1 legacy reports.
+    """
+    by_name = {d.name: d for d in raw}
+    out: list[DimensionScore] = []
+    for name in DEFAULT_DIMENSION_NAMES:
+        if name in by_name:
+            out.append(by_name[name])
+        else:
+            logger.warning("Dimension %r missing, padding with 50", name)
+            out.append(
+                DimensionScore(
+                    name=name,  # type: ignore[arg-type]  # checked at runtime
+                    description="评分异常,默认中性",
+                    score=50,
+                    evidence_chips=[Chip(text="数据不足", good=False)],
+                )
+            )
+    assert len(out) == 5
+    return out
 
 
 class ReportsService:
@@ -367,6 +415,14 @@ class ReportsService:
         pass_likelihood: PassLikelihood = coerce_pass_likelihood(
             agent_output.pass_likelihood, overall, match
         )
+        # F-312 / F-313: pad dimensions to 5 when the LLM emitted any,
+        # preserve [] for v3.1 legacy reports so the UI can show the
+        # empty-state instead of a fake 5-row 50-score wall.
+        dimensions = (
+            normalize_dimensions(agent_output.dimensions)
+            if agent_output.dimensions
+            else []
+        )
         return InterviewReportPayload(
             overall_summary=agent_output.summary,
             round_reviews=[],
@@ -378,4 +434,6 @@ class ReportsService:
             pass_likelihood=pass_likelihood,
             overall_score=agent_output.overall_score,
             ai_verdict=agent_output.ai_verdict,
+            dimensions=dimensions,
+            round_reviews_v2=list(agent_output.round_reviews_v2),
         )

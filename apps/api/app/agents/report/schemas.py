@@ -47,3 +47,17 @@ class ReportAgentOutput(BaseModel):
     pass_likelihood: str | None = None
     overall_score: int | None = Field(default=None, ge=0, le=100)
     ai_verdict: str | None = None
+    # F-312 / F-313 V32.M1.3 — five-dimension scorecard + per-question
+    # review. Both default to []; the report service runs
+    # `normalize_dimensions` to pad to 5 (or preserve [] for v3.1
+    # legacy payloads). Schemas live in app.schemas.reports so the
+    # REST envelope can reuse them without circular imports.
+    dimensions: list["DimensionScore"] = Field(default_factory=list)
+    round_reviews_v2: list["RoundReviewV2"] = Field(default_factory=list)
+
+
+# Forward-ref imports — placed at module bottom to avoid circular
+# import (schemas.reports imports nothing from agents.report).
+from app.schemas.reports import DimensionScore, RoundReviewV2  # noqa: E402
+
+ReportAgentOutput.model_rebuild()

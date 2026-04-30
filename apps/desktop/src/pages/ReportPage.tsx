@@ -4,7 +4,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Printer } from "lucide-react";
 import type { InterviewReportResponse } from "@eatit/shared-types";
 import { generateReport, getSessionReport } from "@/api/sessions";
+import { DimensionRow } from "@/pages/report/DimensionRow";
 import { HeroScoreCard } from "@/pages/report/HeroScoreCard";
+import { QuestionReview } from "@/pages/report/QuestionReview";
 import { ReasonRow } from "@/pages/report/ReasonRow";
 import { WaitingTips } from "@/components/WaitingTips";
 // Side-effect stylesheet: adds @media print rules that hide chrome
@@ -251,6 +253,56 @@ export function ReportPage(): JSX.Element {
           {payload.overall_summary}
         </div>
       </section>
+
+      {/* F-312 维度分析卡 (M1.3). 严格 5 项 (post-normalize) 或空 (v3.1
+          legacy report);非空时整段渲染,空时整段隐藏避免 v3.1 报告
+          崩溃。 */}
+      {payload.dimensions && payload.dimensions.length > 0 ? (
+        <section className="card card-pad">
+          <div className="eyebrow" style={{ marginBottom: 10 }}>
+            维度分析
+          </div>
+          <div>
+            {payload.dimensions.map((d) => (
+              <DimensionRow
+                key={d.name}
+                name={d.name}
+                description={d.description}
+                score={d.score}
+                evidenceChips={d.evidence_chips}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* F-313 逐题复盘卡 (M1.3). v3.1 legacy report → round_reviews_v2
+          为空,整段隐藏。第一题默认展开,其余折叠。 */}
+      {payload.round_reviews_v2 && payload.round_reviews_v2.length > 0 ? (
+        <section className="card">
+          <div
+            className="eyebrow"
+            style={{ padding: "16px 24px 0", marginBottom: 0 }}
+          >
+            逐题复盘
+          </div>
+          <div>
+            {payload.round_reviews_v2.map((r, idx) => (
+              <QuestionReview
+                key={r.turn_index}
+                index={idx + 1}
+                questionTag={r.question_tag}
+                questionText={r.question_text}
+                score={r.score}
+                tone={r.tone}
+                answerSummary={r.answer_summary}
+                aiFeedback={r.ai_feedback}
+                defaultExpanded={idx === 0}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {payload.reasons.length > 0 ? (
         <section>

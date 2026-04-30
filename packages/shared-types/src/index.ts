@@ -51,6 +51,40 @@ export type InterviewerPersona = {
   keywords: [string, string, string];
 };
 
+// F-312 / F-313 V32.M1.3 — five-dimension scorecard + per-question
+// review. Five dimension names are an A8 red line; mirrored on the
+// backend in `app/schemas/reports.py` + `app/domain/reports/service.py`.
+export type DimensionName =
+  | "专业深度"
+  | "结构化表达"
+  | "批判性思考"
+  | "业务直觉"
+  | "沟通节奏";
+
+export type Chip = {
+  text: string;
+  good: boolean;
+};
+
+export type DimensionScore = {
+  name: DimensionName;
+  description: string;
+  score: number;
+  evidence_chips: Chip[];
+};
+
+export type RoundReviewTone = "good" | "ok" | "warn";
+
+export type RoundReviewV2 = {
+  turn_index: number;
+  question_tag: string;
+  question_text: string;
+  score: number;
+  tone: RoundReviewTone;
+  answer_summary: string;
+  ai_feedback: string;
+};
+
 export type InterviewSessionStatus =
   | "created"
   | "session_started"
@@ -294,6 +328,12 @@ export type InterviewReportPayload = {
   pass_likelihood?: PassLikelihood | null;
   overall_score?: number | null;
   ai_verdict?: string | null;
+  // F-312 / F-313 v3.2+ additions. `dimensions` is either exactly 5
+  // (post-normalize_dimensions on backend) or empty (v3.1 legacy
+  // reports). `round_reviews_v2` lives alongside the legacy
+  // `round_reviews` field rather than replacing it (L0 retention).
+  dimensions?: DimensionScore[];
+  round_reviews_v2?: RoundReviewV2[];
 };
 
 export type TriggerReportRequest = {
