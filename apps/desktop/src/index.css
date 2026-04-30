@@ -121,6 +121,76 @@
     font-family: var(--f-mono);
   }
 
+  /* ===== Button (M0.1a — design-system shared classes) ===== */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px;
+    border-radius: var(--r-sm);
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--bg-elev);
+    border: 1px solid var(--line);
+    color: var(--ink-900);
+    transition: all 120ms ease;
+    white-space: nowrap;
+  }
+  .btn:hover {
+    border-color: var(--line-strong);
+    background: var(--bg-warm);
+  }
+  .btn .ico {
+    width: 14px;
+    height: 14px;
+  }
+
+  .btn-primary {
+    background: var(--ink-900);
+    color: white;
+    border-color: var(--ink-900);
+  }
+  /* #1f2622 = var(--ink-900) hover 暗化,无对应 token,D2 例外允许 */
+  .btn-primary:hover {
+    background: #1f2622;
+    border-color: #1f2622;
+  }
+
+  .btn-brand {
+    background: var(--brand);
+    color: white;
+    border-color: var(--brand);
+  }
+  .btn-brand:hover {
+    background: var(--brand-ink);
+    border-color: var(--brand-ink);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--ink-700);
+  }
+  .btn-ghost:hover {
+    background: rgba(15, 19, 16, 0.05);
+  }
+
+  .btn-lg {
+    padding: 11px 18px;
+    font-size: 13.5px;
+    border-radius: var(--r-md);
+  }
+  .btn-sm {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .btn-danger-soft {
+    background: var(--warn-softer);
+    color: var(--warn);
+    border-color: transparent;
+  }
+
   /* ===== Reusable pattern components ===== */
   .ds-card {
     background: var(--bg-elev);
