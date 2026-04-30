@@ -22,6 +22,10 @@ import {
   type FilterTabKey,
 } from "@/pages/history/FilterTabs";
 import { SessionTable, type SessionTableRow } from "@/pages/history/SessionTable";
+import {
+  HistoryFooterCTA,
+  pickLastReusableConfig,
+} from "@/pages/history/HistoryFooterCTA";
 
 // V32.M3.1.4 — PRD §6.4 Dashboard rewrite (F-316 + F-318).
 //
@@ -150,6 +154,7 @@ export function HistoryPage(): JSX.Element {
   const navigate = useNavigate();
   const setInsights = useAppStore((s) => s.setInsights);
   const insights = useAppStore((s) => s.insights);
+  const reuseLastConfig = useAppStore((s) => s.reuseLastConfig);
 
   const sessionsQuery = useQuery<SessionListResponse>({
     queryKey: ["sessions", "list"],
@@ -374,6 +379,19 @@ export function HistoryPage(): JSX.Element {
           }
         />
       )}
+
+      <HistoryFooterCTA
+        lastConfig={pickLastReusableConfig(allItems)}
+        onReuseLastConfig={(cfg) => {
+          reuseLastConfig({
+            style: cfg.style,
+            directions: cfg.directions,
+            durationMinutes: cfg.durationMinutes,
+          });
+          navigate("/upload");
+        }}
+        onNewInterview={() => navigate("/upload")}
+      />
 
       {modalOpen ? (
         <MetaReportModal

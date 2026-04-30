@@ -101,6 +101,16 @@ type AppStore = {
   // ``insights.status``; clients should not render coach copy when null.
   insights: UserInsightCache | null;
   setInsights: (insights: UserInsightCache | null) => void;
+
+  // F-316 V32.M3.1.5 — "复用上次配置" jump-to-config flag.
+  // ``HistoryFooterCTA`` calls ``reuseLastConfig`` with the most-recent
+  // session's config snapshot; the action patches ``config`` and flips
+  // ``skipUpload`` true. ``UploadPage`` consumes (clears) the flag on
+  // mount and navigates straight to ``/config`` so the upload phase is
+  // genuinely skipped (no asset bundle re-upload required).
+  skipUpload: boolean;
+  reuseLastConfig: (config: Partial<CurrentConfig>) => void;
+  consumeSkipUpload: () => void;
 };
 
 const DEFAULT_UPLOAD: CurrentUpload = {
@@ -171,4 +181,15 @@ export const useAppStore = create<AppStore>((set) => ({
 
   insights: null,
   setInsights: (insights) => set({ insights }),
+
+  skipUpload: false,
+  reuseLastConfig: (config) =>
+    set((state) => ({
+      config: { ...state.config, ...config },
+      skipUpload: true,
+      // Hand-edits in ConfigPage should still stick on top of the reuse
+      // patch (mirrors the flag flip used by patchConfig).
+      hasSyncedFocusToConfig: true,
+    })),
+  consumeSkipUpload: () => set({ skipUpload: false }),
 }));

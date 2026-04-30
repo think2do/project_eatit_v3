@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -27,6 +27,20 @@ export function UploadPage(): JSX.Element {
   const upload = useAppStore((s) => s.upload);
   const patchUpload = useAppStore((s) => s.patchUpload);
   const researchOptIn = useAppStore((s) => s.researchOptIn);
+  const skipUpload = useAppStore((s) => s.skipUpload);
+  const consumeSkipUpload = useAppStore((s) => s.consumeSkipUpload);
+
+  // F-316 V32.M3.1.5 — when the user picked "复用上次配置" on the
+  // Dashboard footer CTA, the store carries the merged config + a
+  // ``skipUpload=true`` flag. Consume it on mount, then redirect
+  // straight to ConfigPage. Clearing the flag here prevents an
+  // infinite redirect loop if the user navigates back to /upload.
+  useEffect(() => {
+    if (skipUpload) {
+      consumeSkipUpload();
+      navigate("/config", { replace: true });
+    }
+  }, [skipUpload, consumeSkipUpload, navigate]);
 
   const [globalError, setGlobalError] = useState<string | null>(null);
 
