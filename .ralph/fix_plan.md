@@ -11,15 +11,16 @@ Match the section prefix(V32.M3.*)to 当前 spec 文件即可。
 
 ## High Priority (work top-down)
 
-> P2 / M3 = Coach + Dashboard + Reflection 复盘报告。8 主节点 ✅ + 1 audit-fix
+> P2 / M3 = Coach + Dashboard + Reflection 复盘报告。8 主节点 ✅ + 1 audit-fix ✅
 > M3 tester 复审 8.5/10,**无 🔴 必修,只补 G1+G2 双测试**(只动测试,不动产品代码)。
 
-- [ ] V32.M3.X M3 audit-fix(G1 reports fire-and-forget 隔离测试 2 case + G2 HistoryPage 集成测试 4 case;只补测试,不动产品代码;预期后端 +2 / 前端 +4)
+(empty — M3 全批收尾。下一阶段 M4 需要新 spec `v32-p3-sections.md`。)
 
 
 
 ## Completed (P2/M3 — v3.2+)
 
+- [x] V32.M3.X M3 audit-fix(G1 fire-and-forget 隔离测试 2 case:Coach build raise → report READY + Reflection build raise → report READY;G2 HistoryPage 集成测试 4 case:null/ok/running/failed AICoachCard 切分;只动测试,不动产品代码;后端 469→471 / 前端 156→160) (d08ea08, 2026-05-01)
 - [x] V32.M3.2.3 F-322 ReportPage [评估] [详细复盘] tabs + ReflectionView 状态机(SegmentTabs 通用组件 + MockDialogue 双向气泡 + PerQuestionCoachingCard 折叠卡 + ReflectionView 6 状态 absent/loading/running/ok/failed/error + 2s/180s 轮询 + cached store 跳过首次 fetch + getReflection API client + reflection store slot + 14 tests;前端 142→156) (eab98cf, 2026-05-01)
 - [x] V32.M3.2.2 F-322 reflection_node parallel coach + reflection_reports 表 + API(20260501_0001 迁移 + ReflectionReportRow session_id UNIQUE + ix_rr_session + SqlAlchemyReflectionReportRepository 4 lifecycle + uuid7 PK + DBReflectionReportLoader joins reports×turns + ReflectionService + GET /sessions/{id}/reflection 204/200/404 跨 user 鉴权 + POST_REPORT_GRAPH_NODES 锁扩到 {coach_node, reflection_node} + _generate_report_task 单 graph spawn 覆盖两节点 + 14 tests;后端 460→469) (0e92324, 2026-05-01)
 - [x] V32.M3.2.1 F-322 Reflection Agent + ReflectionReport schema + 教学语气护栏(reflection 包 schemas/service/__init__ + system.j2/user.j2 + AGENT_NAMES 10 + extra=forbid 拒 PII + 12 禁止词 sanitize_tone + ACCUSATORY_PREFIXES "建议下次" 重写 + AI_VERDICT_CORE_TERMS 后置 regex 防重复评价 + ReflectionReport TS 类型 + 40 tests;后端 418→460) (4ca25d9, 2026-05-01)
