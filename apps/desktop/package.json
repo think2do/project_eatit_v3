@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "lint:design-tokens": "bash scripts/lint-design-tokens.sh",
     "test": "vitest run",
+    "e2e": "playwright test",
     "tauri": "tauri",
     "build:dmg": "tauri build --target aarch64-apple-darwin --bundles dmg"
   },
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
+    "@playwright/test": "^1.59.1",
     "@tauri-apps/cli": "^2.10.1",
     "@testing-library/jest-dom": "^6",
     "@testing-library/react": "^16",
