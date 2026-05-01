@@ -370,17 +370,34 @@ export function HistoryPage(): JSX.Element {
             : "请检查后端连接"}
         </div>
       ) : (
-        <SessionTable
-          rows={tableRows}
-          onOpenRow={(id) => navigate(`/report/${id}`)}
-          emptyMessage={
-            activeTab === "starred"
-              ? "尚未标记任何面试。在报告页点击星标后会出现在这里。"
-              : activeTab === "incomplete"
-                ? "暂无未完成的面试,可以开始一场新面试。"
-                : "还没有面试记录。去「上传与解析」开始一场吧。"
-          }
-        />
+        <>
+          {/* design-reference/page-history.jsx — small ordering hint
+              just above the table so users have a referent for the
+              filter selection above. */}
+          {tableRows.length > 0 ? (
+            <div
+              className="muted"
+              style={{
+                fontSize: 12,
+                margin: "-4px 4px 6px",
+              }}
+              data-testid="session-table-meta"
+            >
+              按时间倒序 · 共 {tableRows.length} 条
+            </div>
+          ) : null}
+          <SessionTable
+            rows={tableRows}
+            onOpenRow={(id) => navigate(`/report/${id}`)}
+            emptyMessage={
+              activeTab === "starred"
+                ? "尚未标记任何面试。在报告页点击星标后会出现在这里。"
+                : activeTab === "incomplete"
+                  ? "暂无未完成的面试,可以开始一场新面试。"
+                  : "还没有面试记录。去「上传与解析」开始一场吧。"
+            }
+          />
+        </>
       )}
 
       <HistoryFooterCTA

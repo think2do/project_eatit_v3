@@ -1,5 +1,3 @@
-import { ChevronRight } from "lucide-react";
-
 // F-316 V32.M3.1.4 — Dashboard session table. PRD §6.4:
 // 6 列 grid:岗位·风格 / 日期 / 时长 / 评分 / 弱项 / 操作
 //
@@ -56,17 +54,24 @@ export function SessionTable({
           display: "grid",
           gridTemplateColumns: COLUMN_TEMPLATE,
           gap: 12,
-          padding: "12px 18px",
+          padding: "11px 22px",
           borderBottom: "1px solid var(--line)",
-          background: "var(--bg-sunken)",
+          // design-reference/page-history.jsx — bg-warm cream (not
+          // bg-sunken) so the header reads as a continuous warm strip
+          // with the rest of the page rather than a chrome overlay.
+          background: "var(--bg-warm)",
+          fontSize: 11,
+          color: "var(--ink-500)",
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
         }}
       >
-        <HeaderCell>岗位 · 风格</HeaderCell>
-        <HeaderCell>日期</HeaderCell>
-        <HeaderCell>时长</HeaderCell>
-        <HeaderCell>评分</HeaderCell>
-        <HeaderCell>弱项</HeaderCell>
-        <HeaderCell aria-label="操作" />
+        <div>岗位 · 风格</div>
+        <div>面试日期</div>
+        <div>时长</div>
+        <div>评分</div>
+        <div>弱项方向</div>
+        <div aria-label="操作" />
       </div>
 
       {rows.length === 0 ? (
@@ -144,31 +149,23 @@ export function SessionTable({
             <div className="muted" style={{ fontSize: 12.5 }}>
               {row.durationLabel}
             </div>
-            <div
-              data-testid={`session-row-${row.id}-score`}
-              style={{
-                fontFamily: "var(--f-serif)",
-                fontSize: 18,
-                color:
-                  row.overallScore == null
-                    ? "var(--ink-400)"
-                    : "var(--ink-900)",
-              }}
-            >
-              {row.overallScore == null ? "—" : row.overallScore}
-            </div>
+            <ScoreCell rowId={row.id} score={row.overallScore} />
             <div className="row wrap" style={{ gap: 4 }}>
               {row.weaknesses.length === 0 ? (
                 <span className="muted" style={{ fontSize: 12 }}>—</span>
               ) : (
                 row.weaknesses.slice(0, 2).map((w) => (
-                  <span key={w} className="tag tag-warn">
+                  <span
+                    key={w}
+                    className="tag tag-warn"
+                    style={{ fontSize: 10.5 }}
+                  >
                     {w}
                   </span>
                 ))
               )}
             </div>
-            <ChevronRight size={16} color="var(--ink-400)" />
+            <div />
           </div>
         ))
       )}
@@ -176,20 +173,61 @@ export function SessionTable({
   );
 }
 
-function HeaderCell({
-  children,
-  ...rest
+// Mirrors design-reference/page-history.jsx 评分 column.
+//   ≥ 75  → brand green (strong)
+//   60-74 → ink-900 + ink-700 bar (neutral)
+//   < 60  → warn (weak)
+// Null (report not ready) keeps the original "—" muted glyph.
+function ScoreCell({
+  rowId,
+  score,
 }: {
-  children?: React.ReactNode;
-  "aria-label"?: string;
+  rowId: string;
+  score: number | null;
 }): JSX.Element {
+  if (score == null) {
+    return (
+      <div
+        data-testid={`session-row-${rowId}-score`}
+        className="muted"
+        style={{ fontSize: 12 }}
+      >
+        —
+      </div>
+    );
+  }
+  const tone =
+    score >= 75
+      ? { numColor: "var(--brand)", barColor: "var(--brand)" }
+      : score >= 60
+        ? { numColor: "var(--ink-900)", barColor: "var(--ink-700)" }
+        : { numColor: "var(--warn)", barColor: "var(--warn)" };
   return (
     <div
-      className="eyebrow"
-      style={{ fontSize: 10.5 }}
-      {...rest}
+      data-testid={`session-row-${rowId}-score`}
+      data-tone={
+        score >= 75 ? "good" : score >= 60 ? "neutral" : "warn"
+      }
+      style={{ display: "flex", alignItems: "center", gap: 10 }}
     >
-      {children}
+      <span
+        style={{
+          fontFamily: "var(--f-serif)",
+          fontSize: 22,
+          lineHeight: 1,
+          color: tone.numColor,
+        }}
+      >
+        {score}
+      </span>
+      <div className="bar" style={{ width: 40 }}>
+        <i
+          style={{
+            width: `${Math.min(100, Math.max(0, score))}%`,
+            background: tone.barColor,
+          }}
+        />
+      </div>
     </div>
   );
 }
