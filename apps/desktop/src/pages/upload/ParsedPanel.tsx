@@ -211,7 +211,7 @@ export function ParsedPanel({
           }}
         >
           <div className="muted" style={{ fontSize: 12, maxWidth: 480 }}>
-            解析结果仅作为 AI 面试官出题参考,不代表对你能力的判断。
+            解析结果仅作为 AI 面试官出题参考,不会影响你的真实简历。
           </div>
           <button
             type="button"

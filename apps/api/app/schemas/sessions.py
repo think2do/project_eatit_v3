@@ -108,6 +108,12 @@ class SessionSummary(TimestampedResponse):
     ended_at: datetime | None = None
     turn_count: int = Field(ge=0)
     config_snapshot: dict
+    # M4-late additions for HistoryPage SessionTable. Both are optional
+    # so v3.1 clients (and not-yet-graded sessions) keep working with
+    # `None` / `[]` and the desktop renders the existing "—" placeholder.
+    # Sourced from the *latest* InterviewReport row joined per session.
+    latest_overall_score: int | None = None
+    latest_weaknesses: list[str] = Field(default_factory=list, max_length=2)
 
 
 class SessionDetailResponse(SessionSummary):

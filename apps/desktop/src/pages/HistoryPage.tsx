@@ -125,14 +125,17 @@ function toTableRows(items: SessionSummary[]): SessionTableRow[] {
     jobAndStyle: buildJobAndStyle(item.config_snapshot),
     dateLabel: formatDateShort(item.created_at),
     durationLabel: buildDuration(item.config_snapshot),
-    // M4 will plumb /reports → overall_score here. Until then the
-    // column shows "—" so users get a structurally complete row.
-    overallScore: null,
-    // M4 will plumb /reports → improvements[]. Same rationale.
-    weaknesses: [],
+    // V32.M1.1.X-followup — surfaced from the joined latest report.
+    // `null` when the session never finished or the report Agent has
+    // not yet produced a payload; SessionTable renders "—" in that
+    // case, matching the design-reference placeholder semantics.
+    overallScore: item.latest_overall_score ?? null,
+    weaknesses: item.latest_weaknesses ?? [],
     statusLabel: STATUS_LABEL[item.status] ?? item.status,
-    // "已标记" data lives in M4. Treat all rows as unstarred for now;
-    // the FilterTabs "starred" tab correctly yields 0 results.
+    // "已标记" remains a placeholder — it's a pure-local feature
+    // (no backend column) and the dedicated star toggle UI lands in
+    // a follow-up node alongside `eatit:starred:<sessionId>`
+    // localStorage plumbing.
     starred: false,
   }));
 }

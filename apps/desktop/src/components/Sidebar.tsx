@@ -202,6 +202,24 @@ function SidebarFooter(): JSX.Element {
       >
         BYOK · 本地
       </div>
+      <SidebarUserCard />
+    </div>
+  );
+}
+
+// Mirrors `.nav-user` block in design-reference/shell.jsx. The desktop
+// app is single-user BYOK with no auth backend, so name + plan are
+// placeholders until a real userProfile store slice lands.
+function SidebarUserCard(): JSX.Element {
+  return (
+    <div className="nav-user" data-testid="sidebar-user-card">
+      <div className="avatar" aria-hidden="true">
+        Y
+      </div>
+      <div>
+        <div className="nav-user-name">你</div>
+        <div className="nav-user-plan">本地 · 免费</div>
+      </div>
     </div>
   );
 }
