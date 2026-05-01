@@ -25,6 +25,8 @@ import { FollowupHintChips } from "@/pages/interview/FollowupHintChips";
 import { KeyboardShortcutHelper } from "@/pages/interview/KeyboardShortcutHelper";
 import { LiveCaption } from "@/pages/interview/LiveCaption";
 import { ObserverPanel } from "@/pages/interview/ObserverPanel";
+import { SessionPaceCard, type PaceTone } from "@/pages/interview/SessionPaceCard";
+import { DirectionProgressCard, type DirectionRow } from "@/pages/interview/DirectionProgressCard";
 import { RecBadge } from "@/pages/interview/RecBadge";
 import {
   RecentRounds,
@@ -577,15 +579,21 @@ export function InterviewPage(): JSX.Element {
     jobTitle: string;
     style: string;
     totalTurns: number;
+    /** Total session budget in minutes — drives SessionPaceCard's denominator. */
+    durationMinutes: number;
     // First selected direction id, or null when the snapshot is from a
     // v3.1 session (legacy single-direction) or somehow malformed.
     // Used by the current-question card header tag-line on the right.
     primaryDirection: string | null;
+    /** Full v3.2 directions list — drives DirectionProgressCard rows. */
+    directions: string[];
   }>({
     jobTitle: "—",
     style: "structured",
     totalTurns: 5,
+    durationMinutes: 30,
     primaryDirection: null,
+    directions: [],
   });
   useEffect(() => {
     if (!sessionId) return;
@@ -601,13 +609,14 @@ export function InterviewPage(): JSX.Element {
             ? config.duration_minutes
             : 30;
         const directionsRaw = config.directions;
-        const primaryDirection =
-          Array.isArray(directionsRaw) &&
-          typeof directionsRaw[0] === "string"
-            ? (directionsRaw[0] as string)
-            : typeof config.direction === "string"
-              ? (config.direction as string)
-              : null;
+        const directionsList: string[] = Array.isArray(directionsRaw)
+          ? directionsRaw.filter(
+              (d): d is string => typeof d === "string" && d.length > 0,
+            )
+          : typeof config.direction === "string" && config.direction.length > 0
+            ? [config.direction as string]
+            : [];
+        const primaryDirection = directionsList[0] ?? null;
         // job title not yet on session payload — fall back to candidate
         // asset id sliced (placeholder until backend exposes it).
         const titleFallback = detail.candidate_asset_id
@@ -617,7 +626,9 @@ export function InterviewPage(): JSX.Element {
           jobTitle: titleFallback,
           style,
           totalTurns: estimateTotalTurns(duration),
+          durationMinutes: duration,
           primaryDirection,
+          directions: directionsList,
         });
       })
       .catch(() => {
@@ -874,20 +885,28 @@ export function InterviewPage(): JSX.Element {
             resetKey={state.context.currentTurnIndex}
           />
         ) : null}
+      </section>
 
-        {/* design-reference/page-live.jsx — soft separator + "我的回答"
-            mini header so the response area has a visual identity even
-            though it shares the question card's enclosure. The design's
-            two-card split is a larger refactor; this header captures
-            most of the read. */}
+      {/* V32.M1.1.X-followup — design-reference/page-live.jsx splits the
+          question and the response into TWO cards. Previously they
+          shared a single `<section>` separated by a 1px divider; now
+          the my-response card is its own card-pad section so the
+          page reads as a structured turn-pair rather than one mega-card. */}
+      <section
+        className="ds-card"
+        data-testid="my-response-card"
+        style={{
+          padding: 22,
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+        }}
+      >
         <div
           className="row"
           style={{
             gap: 10,
             alignItems: "center",
-            marginTop: 6,
-            paddingTop: 14,
-            borderTop: "1px solid var(--line)",
           }}
           data-testid="my-response-header"
         >
@@ -1090,6 +1109,63 @@ export function InterviewPage(): JSX.Element {
     />
   );
 
+  // V32.M1.1.X-followup — design-reference/page-live.jsx right rail has
+  // 4 cards stacked: 本场节奏 → 提问方向进度 → AI 实时观察 → kbd hints.
+  // The first two are net-new; the latter two were already wired via
+  // LiveObservationCard + footerSlot. Build the rows defensively so a
+  // session with no directions (legacy v3.1 row) still renders cleanly.
+  const paceRateLabel: string = state.context.currentQuestion
+    ? RATE_LABEL_ZH[turnStats.rateLabel]
+    : "—";
+  const paceRateTone: PaceTone =
+    turnStats.rateLabel === "slow"
+      ? "warn"
+      : turnStats.rateLabel === "moderate"
+        ? "good"
+        : turnStats.rateLabel === "fast"
+          ? "warn"
+          : "muted";
+  const directionRows: DirectionRow[] = (() => {
+    const ids = sessionMeta.directions;
+    if (ids.length === 0) return [];
+    const perBudget = Math.max(1, Math.ceil(sessionMeta.totalTurns / ids.length));
+    // Naive projection: charge progress against the first direction
+    // (active) until its budget is full, then move on. Without a true
+    // per-direction map we'd rather show plausible motion than fake
+    // exact mapping.
+    const turnsAnswered = state.context.currentTurnIndex; // 0-based
+    return ids.map((id, idx) => {
+      const consumedSoFar = idx * perBudget;
+      const doneRaw = turnsAnswered - consumedSoFar;
+      const done = Math.max(0, Math.min(perBudget, doneRaw));
+      const isActive = doneRaw > 0 && done < perBudget;
+      const isFirstUnstarted = idx === 0 && turnsAnswered === 0;
+      return {
+        id,
+        label: DIRECTION_LABEL_ZH[id] ?? id,
+        done,
+        total: perBudget,
+        active: isActive || isFirstUnstarted,
+      };
+    });
+  })();
+
+  const railTopSlot = (
+    <>
+      <SessionPaceCard
+        elapsedSeconds={pageElapsedSeconds}
+        durationMinutes={sessionMeta.durationMinutes}
+        rateLabel={paceRateLabel}
+        rateTone={paceRateTone}
+        answeredTurns={progressTurn}
+        totalTurns={sessionMeta.totalTurns}
+      />
+      {directionRows.length > 0 ? (
+        <DirectionProgressCard rows={directionRows} />
+      ) : null}
+    </>
+  );
+
   if (!showObserverPanel) {
     return (
       <>
@@ -1116,6 +1192,7 @@ export function InterviewPage(): JSX.Element {
         onToggle={() => setObserverCollapsed((v) => !v)}
         liveObservation={state.context.currentQuestion?.live_observation ?? null}
         showLiveObservationCard={state.context.currentQuestion !== null}
+        topSlot={!observerCollapsed ? railTopSlot : null}
         footerSlot={!observerCollapsed ? <KeyboardShortcutHelper /> : null}
       />
       {endConfirm}

@@ -41,6 +41,7 @@ export function ObserverPanel({
   onToggle,
   liveObservation,
   showLiveObservationCard,
+  topSlot,
   footerSlot,
 }: {
   observations: ObserverEntry[];
@@ -54,6 +55,11 @@ export function ObserverPanel({
   // only once the page actually has a current question to observe; the
   // page passes false during connecting / pre-first-question.
   showLiveObservationCard?: boolean;
+  // V32.M1.1.X-followup — design-reference/page-live.jsx renders TWO
+  // additional cards above the AI 实时观察 callout: 本场节奏 (timer +
+  // metrics) and 提问方向进度 (per-direction bars). Pages compose them
+  // and pass via `topSlot`.
+  topSlot?: React.ReactNode;
   // F-311 — pinned to the aside's bottom (e.g. KeyboardShortcutHelper).
   footerSlot?: React.ReactNode;
 }): JSX.Element {
@@ -150,6 +156,7 @@ export function ObserverPanel({
           <ChevronRight size={14} />
         </button>
       </header>
+      {topSlot}
       {showLiveObservationCard ? (
         <LiveObservationCard
           text={liveObservation ?? null}
