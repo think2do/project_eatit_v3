@@ -557,6 +557,11 @@ export function ResearchOptInSection(): JSX.Element {
 
   useEffect(() => {
     let mounted = true;
+    // Mount-time reset: an `error` left over from a transient PUT
+    // failure (HMR window, router restart) shouldn't stick across
+    // page navigations or hot-edits. The next genuine save will
+    // re-set it; until then we render a clean section.
+    setError(null);
     getResearchOptIn()
       .then(({ enabled }) => {
         if (!mounted) return;
@@ -587,6 +592,11 @@ export function ResearchOptInSection(): JSX.Element {
   };
 
   const handleChange = (next: boolean) => {
+    // Any new user interaction supersedes a stale error from a prior
+    // attempt (HMR window, transient backend reload, etc.). Without
+    // this, an old "Request failed" inline error sticks forever even
+    // after the user opens the modal again or toggles back.
+    setError(null);
     if (next && !researchOptIn) {
       // Flipping ON requires the privacy modal to surface the L0 A11
       // contract and the user's explicit confirmation.

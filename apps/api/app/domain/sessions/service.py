@@ -70,11 +70,21 @@ class SessionsService:
         session.add(interview_session)
         await session.flush()
 
+        # v3.2 clients send only `directions: list`. The legacy
+        # `InterviewConfig.direction` column is `nullable=False`, so
+        # writing None triggers an IntegrityError → 409. Mirror the
+        # `_agent_to_legacy_framework` shim: prefer the first v3.2
+        # direction, fall back to the legacy field.
+        primary_direction = (
+            request.config.directions[0]
+            if request.config.directions
+            else request.config.direction
+        )
         session.add(
             InterviewConfig(
                 interview_session_id=interview_session.id,
                 style=request.config.style,
-                direction=request.config.direction,
+                direction=primary_direction,
                 duration_minutes=request.config.duration_minutes,
             )
         )
@@ -121,6 +131,10 @@ class SessionsService:
             .order_by(InterviewSession.created_at.desc())
             .offset((query.page - 1) * query.page_size)
             .limit(query.page_size)
+            # Eager-load the joined report so _serialize_session_summary
+            # can read overall_score + improvements without an N+1 lazy
+            # fetch (which would also fail under the async session).
+            .options(selectinload(InterviewSession.report))
         )
         items = [self._serialize_session_summary(item) for item in result.scalars().all()]
         return SessionListResponse(
@@ -188,6 +202,11 @@ class SessionsService:
             .options(
                 selectinload(InterviewSession.config),
                 selectinload(InterviewSession.direction_framework),
+                # Joining the report here means
+                # `_serialize_session_summary(detail)` populates the M4
+                # latest_overall_score / latest_weaknesses without a
+                # lazy-load round-trip on the async session.
+                selectinload(InterviewSession.report),
             )
             .where(
                 InterviewSession.id == session_id,
@@ -231,9 +250,19 @@ class SessionsService:
             "回答跑偏",
             "数据不具体",
         ]
+        # v3.2 clients send `directions: list` (1-3) and leave the legacy
+        # singular `direction` as None. The legacy `DirectionFramework`
+        # schema still requires a non-None `direction`. Prefer the first
+        # v3.2 direction (always present per `min_length=1` validator);
+        # fall back to the legacy field for v3.1 clients.
+        primary_direction = (
+            request.config.directions[0]
+            if request.config.directions
+            else request.config.direction
+        )
         return DirectionFrameworkSchema(
             style=request.config.style,
-            direction=request.config.direction,
+            direction=primary_direction,
             duration_minutes=request.config.duration_minutes,
             stages=stages,
             focus_points=focus_points,
@@ -242,6 +271,27 @@ class SessionsService:
 
     @staticmethod
     def _serialize_session_summary(interview_session: InterviewSession) -> SessionSummary:
+        # M4-late: pluck overall_score + weakness titles from the joined
+        # InterviewReport.payload so the History dashboard can render the
+        # 评分 / 弱项 columns instead of "—" placeholders. Defensive about
+        # payload shape — old reports may lack v3.2 keys.
+        latest_overall_score: int | None = None
+        latest_weaknesses: list[str] = []
+        report = interview_session.report
+        if report is not None and isinstance(report.payload, dict):
+            score = report.payload.get("overall_score")
+            if isinstance(score, int):
+                latest_overall_score = score
+            elif isinstance(score, float):
+                latest_overall_score = int(score)
+            improvements = report.payload.get("improvements")
+            if isinstance(improvements, list):
+                for item in improvements:
+                    title = item.get("title") if isinstance(item, dict) else None
+                    if isinstance(title, str) and title:
+                        latest_weaknesses.append(title)
+                    if len(latest_weaknesses) >= 2:
+                        break
         return SessionSummary(
             id=interview_session.id,
             created_at=interview_session.created_at,
@@ -253,6 +303,8 @@ class SessionsService:
             ended_at=interview_session.ended_at,
             turn_count=interview_session.turn_count,
             config_snapshot=interview_session.config_snapshot,
+            latest_overall_score=latest_overall_score,
+            latest_weaknesses=latest_weaknesses,
         )
 
     def _serialize_session_detail(self, interview_session: InterviewSession) -> SessionDetailResponse:

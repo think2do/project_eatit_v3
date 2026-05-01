@@ -47,6 +47,12 @@ export const triggerParse = async (assetBundleId: string): Promise<ParseRequestR
 };
 
 export const getParseResult = async (assetBundleId: string): Promise<ParseResultResponse> => {
-  const response = await apiClient.get<ParseResultResponse>(`/api/v1/assets/${assetBundleId}/parse`);
+  // skipErrorToast: 404 = "no parse on file yet" is a *legitimate* state
+  // for a fresh upload or a stale store-cached assetBundleId from a prior
+  // dev session. The caller decides whether to surface the absence.
+  const response = await apiClient.get<ParseResultResponse>(
+    `/api/v1/assets/${assetBundleId}/parse`,
+    { skipErrorToast: true },
+  );
   return response.data;
 };
