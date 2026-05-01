@@ -38,7 +38,7 @@ export type InterviewDirectionV32 =
   | "user-research"
   | "strategy";
 
-export type InterviewDurationV32 = 15 | 30 | 45;
+export type InterviewDurationV32 = 15 | 30 | 45 | 60;
 
 // F-308 InterviewerPersona names — A6 red line, locked to exactly
 // these four. Mirrored on the backend in
@@ -437,6 +437,13 @@ export type SessionSummary = TimestampedEntity & {
   ended_at?: string | null;
   turn_count: number;
   config_snapshot: Record<string, unknown>;
+  // M4-late: surfaced from the joined latest InterviewReport row so the
+  // History dashboard renders the 评分 / 弱项 columns without an extra
+  // per-row fetch. Both fields are optional — sessions without a report
+  // (status != "ended") leave them at `null` / `[]` and the table
+  // renders the existing "—" placeholder.
+  latest_overall_score?: number | null;
+  latest_weaknesses?: string[];
 };
 
 export type SessionDetailResponse = SessionSummary & {

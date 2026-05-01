@@ -57,13 +57,15 @@ def test_duration_20_minutes_coerces_to_30() -> None:
     assert cfg.duration_minutes == 30
 
 
-def test_duration_60_minutes_snaps_to_45() -> None:
+def test_duration_60_minutes_is_legal_v32() -> None:
+    # V32.M1.1.X — 60min was reinstated as a 4th legal v3.2 duration
+    # ("深度 · 含 case") to match the design-reference page-config.jsx.
     cfg = InterviewConfigRequest(
         style="structured",
         directions=["ai-insight"],
         duration_minutes=60,
     )
-    assert cfg.duration_minutes == 45
+    assert cfg.duration_minutes == 60
 
 
 def test_legacy_style_auto_upgrades() -> None:

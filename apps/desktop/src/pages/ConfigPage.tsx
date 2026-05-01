@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type {
   InterviewDirectionV32,
@@ -10,6 +9,7 @@ import type {
 import { createSession } from "@/api/sessions";
 import { PageStepIndicator } from "@/components/PageStepIndicator";
 import { TipsCarousel } from "@/components/TipsCarousel";
+import { SummarySidebar } from "@/pages/config/SummarySidebar";
 import { selectTips } from "@/lib/tips";
 import { useAppStore } from "@/stores/app-store";
 
@@ -64,9 +64,10 @@ const DIRECTION_OPTIONS: DirectionOption[] = [
 ];
 
 const DURATION_OPTIONS: { value: InterviewDurationV32; label: string; hint: string }[] = [
-  { value: 15, label: "15 分钟", hint: "短练,聚焦一个主题" },
-  { value: 30, label: "30 分钟", hint: "默认,覆盖 3-4 个轮次" },
-  { value: 45, label: "45 分钟", hint: "完整体验,含反问" },
+  { value: 15, label: "15 分钟", hint: "精简 · 3~4 题" },
+  { value: 30, label: "30 分钟", hint: "标准 · 6~8 题" },
+  { value: 45, label: "45 分钟", hint: "完整 · 10~12 题" },
+  { value: 60, label: "60 分钟", hint: "深度 · 含 case" },
 ];
 
 const MAX_DIRECTIONS = 3;
@@ -167,8 +168,31 @@ export function ConfigPage(): JSX.Element {
     patchConfig({ directions: [...config.directions, value] });
   };
 
+  // V32.M1.1.X — derive sidebar inputs from current store state.
+  const jobTitle = (() => {
+    const payload = upload.parsePayload;
+    if (!payload) return null;
+    const company = payload.jd_company_name?.trim();
+    const role = payload.jd_role_title?.trim();
+    if (company && role) return `${company} · ${role}`;
+    return role ?? company ?? null;
+  })();
+  const styleLabel =
+    STYLE_OPTIONS.find((opt) => opt.value === config.style)?.label ?? config.style;
+  const directionDetail = config.directions.map((value) => ({
+    value,
+    label: DIRECTION_OPTIONS.find((opt) => opt.value === value)?.label ?? value,
+  }));
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+    <div
+      style={{
+        display: "flex",
+        gap: 24,
+        alignItems: "flex-start",
+      }}
+    >
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 24, minWidth: 0 }}>
       <div>
         <PageStepIndicator step={2} />
         <h1 className="h1" style={{ margin: "10px 0 6px" }}>
@@ -196,8 +220,8 @@ export function ConfigPage(): JSX.Element {
 
       <Section
         eyebrow="01 · 面试风格"
-        title="选择 1 个面试官风格"
-        description="影响 AI 面试官的语气与追问强度。"
+        title="面试风格"
+        description="选择 AI 面试官的人设。不同风格会影响问题的追问深度、节奏与反馈语气。"
       >
         <div className="tile-group">
           {STYLE_OPTIONS.map((opt) => (
@@ -227,9 +251,9 @@ export function ConfigPage(): JSX.Element {
       </Section>
 
       <Section
-        eyebrow="02 · 面试方向"
+        eyebrow="02 · 提问方向"
         title="选择 1–3 个方向(可多选)"
-        description="决定 AI 把重心放在哪里。最多选 3 个。"
+        description="AI 将在这些方向上出题。可多选,顺序无关。系统已根据你的简历与 JD 预选两项。"
       >
         <div
           style={{
@@ -273,9 +297,9 @@ export function ConfigPage(): JSX.Element {
       </Section>
 
       <Section
-        eyebrow="03 · 期望时长"
+        eyebrow="03 · 面试时长"
         title="选择面试时长"
-        description="会按比例切分各环节(暖场 / 深挖 / 反问)。"
+        description="会影响问题数量与追问深度,可随时提前结束。"
       >
         <div
           style={{
@@ -301,6 +325,9 @@ export function ConfigPage(): JSX.Element {
         </div>
       </Section>
 
+      {/* V32.M1.1.X: bottom dual-CTA row removed — SummarySidebar's main
+          CTA replaces it. Inline error stays so the user sees validation
+          feedback above the fold without scrolling to the sidebar. */}
       {error ? (
         <div
           style={{
@@ -311,26 +338,11 @@ export function ConfigPage(): JSX.Element {
             border: "1px solid var(--warn)",
             fontSize: 13,
           }}
+          data-testid="config-inline-error"
         >
           {error}
         </div>
       ) : null}
-
-      <div className="row">
-        <button type="button" className="btn" onClick={() => navigate("/upload")}>
-          返回上传
-        </button>
-        <button
-          type="button"
-          className={ready && !submitting ? "btn btn-brand btn-lg" : "btn btn-lg"}
-          onClick={handleStart}
-          disabled={!ready || submitting}
-          style={!ready || submitting ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
-        >
-          {submitting ? <Loader2 size={14} className="spin" /> : null}
-          {submitting ? "生成面试框架..." : "开始面试"}
-        </button>
-      </div>
 
       {submitting ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -351,6 +363,17 @@ export function ConfigPage(): JSX.Element {
           <TipsCarousel tips={submitTips} />
         </div>
       ) : null}
+      </div>
+
+      <SummarySidebar
+        jobTitle={jobTitle}
+        styleLabel={styleLabel}
+        directions={directionDetail}
+        durationMinutes={config.durationMinutes}
+        ready={ready}
+        submitting={submitting}
+        onStart={handleStart}
+      />
     </div>
   );
 }

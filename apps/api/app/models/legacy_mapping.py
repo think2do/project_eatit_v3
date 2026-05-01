@@ -61,7 +61,7 @@ VALID_V32_DIRECTIONS: frozenset[str] = frozenset(
         "strategy",
     }
 )
-VALID_V32_DURATIONS: frozenset[int] = frozenset({15, 30, 45})
+VALID_V32_DURATIONS: frozenset[int] = frozenset({15, 30, 45, 60})
 
 
 def upgrade_legacy_style(value: Any) -> Any:
@@ -98,7 +98,7 @@ LEGACY_DURATION_MAP: dict[int, int] = {
     20: 30,
     30: 30,
     45: 45,
-    60: 45,
+    60: 60,  # v3.2.1 — 60 is a legal v3.2 duration (深度·含 case)
 }
 
 

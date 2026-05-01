@@ -17,7 +17,7 @@ InterviewDirectionV32 = Literal[
     "user-research",
     "strategy",
 ]
-InterviewDurationV32 = Literal[15, 30, 45]
+InterviewDurationV32 = Literal[15, 30, 45, 60]
 
 
 class CandidateAssetStatus(StrEnum):
