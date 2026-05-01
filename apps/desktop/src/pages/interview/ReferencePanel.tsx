@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Lightbulb, ChevronDown, ChevronRight } from "lucide-react";
+import { Lightbulb, ChevronDown, Lock } from "lucide-react";
 import type { ReferenceAnswerHint } from "@/statecharts/interview-machine";
 
 type Props = {
@@ -53,28 +53,47 @@ export function ReferencePanel({ reference, resetKey }: Props): JSX.Element {
   }
 
   if (!revealed) {
+    // design-reference/page-live.jsx — collapsed state is a neutral
+    // bg-warm strip (NOT a green CTA button) so it sits quietly inside
+    // the question card and doesn't compete with the question text.
+    // Lock icon + tertiary text emphasise "answer first, then peek".
     return (
       <button
         type="button"
         onClick={() => setRevealed(true)}
+        data-testid="reference-panel-collapsed"
         style={{
+          width: "100%",
           display: "flex",
           alignItems: "center",
+          justifyContent: "space-between",
           gap: 8,
           padding: "10px 14px",
           borderRadius: "var(--r-md)",
-          border: "1px solid var(--brand)",
-          background: "var(--brand-softer)",
-          color: "var(--brand-ink)",
-          fontSize: 13,
-          fontWeight: 500,
+          border: "1px solid var(--line)",
+          background: "var(--bg-warm)",
+          color: "var(--ink-700)",
+          fontSize: 12.5,
           cursor: "pointer",
-          alignSelf: "flex-start",
+          textAlign: "left",
         }}
       >
-        <Lightbulb size={14} />
-        查看 AI 参考答案
-        <ChevronRight size={14} />
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <Lock size={13} />
+          <span style={{ fontWeight: 500, color: "var(--ink-900)" }}>
+            AI 参考回答
+          </span>
+          <span className="muted" style={{ fontSize: 11.5 }}>
+            默认折叠 · 回答后再查看效果更好
+          </span>
+        </span>
+        <ChevronDown size={14} style={{ transform: "rotate(-90deg)" }} />
       </button>
     );
   }

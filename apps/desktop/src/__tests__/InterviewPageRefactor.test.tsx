@@ -70,7 +70,10 @@ describe("SessionMetaStrip", () => {
     expect(getByText("进度")).toBeTruthy();
     expect(getByText("高级 AI 产品经理")).toBeTruthy();
     // styleLabel · personaName 复合显示
-    expect(container.textContent).toMatch(/结构化\s*·\s*Sarah/);
+    // V32.M1.1.X-followup: SessionMetaStrip now appends 面试官 to the
+    // style label so the value reads "结构化面试官 · Sarah", matching
+    // design-reference/page-live.jsx exactly.
+    expect(container.textContent).toMatch(/结构化面试官\s*·\s*Sarah/);
     expect(container.textContent).toMatch(/3\s*\/\s*6/);
   });
 });

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMachine } from "@xstate/react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, Pause, Volume2, ChevronRight as ChevronRightIcon } from "lucide-react";
 import type {
   ClientTextEvent,
   ServerEvent,
@@ -21,6 +21,7 @@ import { speakInterviewerLine, stopInterviewerLine } from "@/lib/tts";
 import { useGlobalKeymap } from "@/lib/useGlobalKeymap";
 import { EndConfirmDialog } from "@/components/EndConfirmDialog";
 import { getSession } from "@/api/sessions";
+import { getParseResult } from "@/api/assets";
 import { FollowupHintChips } from "@/pages/interview/FollowupHintChips";
 import { KeyboardShortcutHelper } from "@/pages/interview/KeyboardShortcutHelper";
 import { LiveCaption } from "@/pages/interview/LiveCaption";
@@ -618,8 +619,8 @@ export function InterviewPage(): JSX.Element {
             ? [config.direction as string]
             : [];
         const primaryDirection = directionsList[0] ?? null;
-        // job title not yet on session payload — fall back to candidate
-        // asset id sliced (placeholder until backend exposes it).
+        // Provisional title from the asset id slice; replaced below
+        // once the parse payload returns the real JD company + role.
         const titleFallback = detail.candidate_asset_id
           ? `候选人 · ${detail.candidate_asset_id.slice(0, 6)}`
           : "AI 模拟面试";
@@ -631,6 +632,27 @@ export function InterviewPage(): JSX.Element {
           primaryDirection,
           directions: directionsList,
         });
+        // Chain a parse-result fetch so the strip can show
+        // "{company} · {role}" exactly like design-reference. 404 here
+        // is fine (parse not run yet, or stale id) — we keep the
+        // placeholder.
+        if (!detail.candidate_asset_id) return;
+        getParseResult(detail.candidate_asset_id)
+          .then((parse) => {
+            if (cancelled) return;
+            const company = parse.payload.jd_company_name?.trim() ?? "";
+            const role = parse.payload.jd_role_title?.trim() ?? "";
+            const composed =
+              company && role
+                ? `${company} · ${role}`
+                : role || company || null;
+            if (composed) {
+              setSessionMeta((prev) => ({ ...prev, jobTitle: composed }));
+            }
+          })
+          .catch(() => {
+            /* parse missing — keep the placeholder */
+          });
       })
       .catch(() => {
         /* keep placeholder values; non-fatal */
@@ -752,6 +774,20 @@ export function InterviewPage(): JSX.Element {
           recording={state.context.isRecording}
           elapsedSeconds={pageElapsedSeconds}
         />
+        {/* 暂停: stops the active recording (no-op when not recording).
+            design-reference/page-live.jsx places this between REC and
+            结束面试. For hold-to-talk mode the button mostly acts as a
+            quick-release affordance; in text mode it simply disables. */}
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={handleVoiceStop}
+          disabled={!state.context.isRecording}
+          aria-label="暂停录音"
+        >
+          <Pause size={13} />
+          暂停
+        </button>
         <button
           type="button"
           className="btn btn-danger-soft btn-sm"
@@ -832,15 +868,51 @@ export function InterviewPage(): JSX.Element {
                   </div>
                 </div>
               </div>
-              {sessionMeta.primaryDirection ? (
-                <span
-                  className="tag tag-line"
-                  data-testid="question-direction-tag"
+              <div
+                className="row"
+                style={{ gap: 6, alignItems: "center", flexShrink: 0 }}
+              >
+                {sessionMeta.primaryDirection ? (
+                  <span
+                    className="tag tag-line"
+                    data-testid="question-direction-tag"
+                  >
+                    {DIRECTION_LABEL_ZH[sessionMeta.primaryDirection] ??
+                      sessionMeta.primaryDirection}
+                  </span>
+                ) : null}
+                {/* 重听: replays the TTS for the current question text. The
+                    auto-speak useEffect runs once on turn change; this lets
+                    users explicitly hear it again after that initial playback. */}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  title="重听问题"
+                  aria-label="重听问题"
+                  onClick={() => {
+                    if (state.context.currentQuestion?.question) {
+                      speakInterviewerLine(state.context.currentQuestion.question);
+                    }
+                  }}
+                  style={{ padding: "4px 8px" }}
                 >
-                  {DIRECTION_LABEL_ZH[sessionMeta.primaryDirection] ??
-                    sessionMeta.primaryDirection}
-                </span>
-              ) : null}
+                  <Volume2 size={13} />
+                </button>
+                {/* 下一题: skip the current turn. We don't yet wire a
+                    server-side skip event, so the button surfaces the
+                    affordance but stays disabled until the current
+                    answer flow completes. */}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  title="跳过本题(暂未启用)"
+                  disabled
+                  style={{ padding: "4px 8px" }}
+                >
+                  下一题
+                  <ChevronRightIcon size={13} />
+                </button>
+              </div>
             </div>
             <div
               className="h-serif"

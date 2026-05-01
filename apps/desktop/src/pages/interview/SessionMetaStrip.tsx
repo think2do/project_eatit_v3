@@ -40,7 +40,9 @@ export function SessionMetaStrip({
         <div>
           <div className="eyebrow">面试官风格</div>
           <div style={{ fontSize: 13.5, fontWeight: 500, marginTop: 2 }}>
-            {styleLabel} · {personaName}
+            {/* design-reference/page-live.jsx — full word "面试官", not just
+                the style label. The persona name follows after a middle dot. */}
+            {styleLabel}面试官 · {personaName}
           </div>
         </div>
         <div className="divider-v" style={{ height: 28 }} />

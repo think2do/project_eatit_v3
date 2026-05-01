@@ -13,7 +13,10 @@ const ROUTE_CRUMBS: Record<string, string[]> = {
   "/": ["首页"],
   "/upload": ["面试流程", "上传与解析"],
   "/config": ["面试流程", "面试配置"],
-  "/interview": ["面试流程", "实时面试"],
+  // /interview/:id appends a "进行中" crumb so the user reads the
+  // breadcrumb as a status line (matches design-reference/page-live.jsx).
+  // The bare /interview route stays at 2 segments.
+  "/interview": ["面试流程", "实时面试", "进行中"],
   "/history": ["我的数据", "面试记录"],
   "/report": ["我的数据", "评估报告"],
   "/settings": ["设置"],
