@@ -20,7 +20,6 @@ import {
 import { speakInterviewerLine, stopInterviewerLine } from "@/lib/tts";
 import { useGlobalKeymap } from "@/lib/useGlobalKeymap";
 import { EndConfirmDialog } from "@/components/EndConfirmDialog";
-import { PageStepIndicator } from "@/components/PageStepIndicator";
 import { getSession } from "@/api/sessions";
 import { FollowupHintChips } from "@/pages/interview/FollowupHintChips";
 import { KeyboardShortcutHelper } from "@/pages/interview/KeyboardShortcutHelper";
@@ -731,11 +730,12 @@ export function InterviewPage(): JSX.Element {
 
   const mainColumn = (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* F-304 V32.M2.2.2 — page-step eyebrow above the REC topbar. */}
-      <PageStepIndicator step={3} />
       {/* M2.1.5 — REC topbar (replaces the verbose page header). REC badge
           + clock on the left, 结束面试 button on the right routes through
-          EndConfirmDialog (M2.1.3) instead of ending directly. */}
+          EndConfirmDialog (M2.1.3) instead of ending directly.
+          design-reference/page-live.jsx omits PageStepIndicator on the
+          live page (the breadcrumb in the global topbar already locates
+          the user); dropping it tightens the page above the fold. */}
       <div className="row between" style={{ paddingTop: 4 }}>
         <RecBadge
           recording={state.context.isRecording}
@@ -761,7 +761,12 @@ export function InterviewPage(): JSX.Element {
         totalTurns={sessionMeta.totalTurns}
       />
 
-      <StatusBar label={statusLabel} error={state.context.error} />
+      {/* design-reference/page-live.jsx: no full-width "轮到你作答"
+          green status banner — the my-response card header already
+          carries the active-state cue. Keep error surfacing only. */}
+      {state.context.error ? (
+        <StatusBar label={statusLabel} error={state.context.error} />
+      ) : null}
 
       <section
         className="ds-card"
@@ -857,6 +862,18 @@ export function InterviewPage(): JSX.Element {
             )}
           </div>
         )}
+
+        {/* design-reference/page-live.jsx — AI 参考回答 lives INSIDE the
+            question card as a collapsed footer right under the question
+            text. Reveal happens on click (per-turn state via resetKey).
+            Previously this sat OUTSIDE the card under the response area,
+            which made it easy to miss. */}
+        {state.context.currentQuestion ? (
+          <ReferencePanel
+            reference={state.context.referenceAnswer}
+            resetKey={state.context.currentTurnIndex}
+          />
+        ) : null}
 
         {/* design-reference/page-live.jsx — soft separator + "我的回答"
             mini header so the response area has a visual identity even
@@ -1048,12 +1065,9 @@ export function InterviewPage(): JSX.Element {
         </div>
       </section>
 
-      {state.context.currentQuestion ? (
-        <ReferencePanel
-          reference={state.context.referenceAnswer}
-          resetKey={state.context.currentTurnIndex}
-        />
-      ) : null}
+      {/* V32.M1.1.X-followup — ReferencePanel relocated INSIDE the
+          question card (above), per design-reference/page-live.jsx.
+          The previous out-of-card render is removed. */}
 
       {/*
         Per-turn assessment summary intentionally suppressed in the live
