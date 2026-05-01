@@ -27,6 +27,7 @@ import { LiveCaption } from "@/pages/interview/LiveCaption";
 import { ObserverPanel } from "@/pages/interview/ObserverPanel";
 import { SessionPaceCard, type PaceTone } from "@/pages/interview/SessionPaceCard";
 import { DirectionProgressCard, type DirectionRow } from "@/pages/interview/DirectionProgressCard";
+import { TopbarActionsPortal } from "@/components/TopbarActionsPortal";
 import { RecBadge } from "@/pages/interview/RecBadge";
 import {
   RecentRounds,
@@ -741,28 +742,25 @@ export function InterviewPage(): JSX.Element {
 
   const mainColumn = (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* M2.1.5 — REC topbar (replaces the verbose page header). REC badge
-          + clock on the left, 结束面试 button on the right routes through
-          EndConfirmDialog (M2.1.3) instead of ending directly.
-          design-reference/page-live.jsx omits PageStepIndicator on the
-          live page (the breadcrumb in the global topbar already locates
-          the user); dropping it tightens the page above the fold. */}
-      <div className="row between" style={{ paddingTop: 4 }}>
+      {/* V32.M1.1.X-followup — REC + 结束面试 moved to the global Topbar
+          via TopbarActionsPortal so the page above-the-fold is dominated
+          by the question card (matches design-reference/page-live.jsx).
+          The portal renders nothing inside `mainColumn`; its children
+          land in Topbar's actions slot at the top of the window. */}
+      <TopbarActionsPortal>
         <RecBadge
           recording={state.context.isRecording}
           elapsedSeconds={pageElapsedSeconds}
         />
-        <div className="row" style={{ gap: 8 }}>
-          <button
-            type="button"
-            className="btn btn-danger-soft"
-            onClick={() => setEndConfirmOpen(true)}
-            disabled={state.matches("ended") || state.matches("idle")}
-          >
-            结束面试
-          </button>
-        </div>
-      </div>
+        <button
+          type="button"
+          className="btn btn-danger-soft btn-sm"
+          onClick={() => setEndConfirmOpen(true)}
+          disabled={state.matches("ended") || state.matches("idle")}
+        >
+          结束面试
+        </button>
+      </TopbarActionsPortal>
 
       <SessionMetaStrip
         jobTitle={sessionMeta.jobTitle}

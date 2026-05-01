@@ -4,6 +4,11 @@ import {
   type ConnectivityState,
 } from "@/stores/connectivity-store";
 
+// V32.M1.1.X-followup — fixed DOM id of the actions slot inside Topbar.
+// Pages mount per-page topbar buttons here via React's createPortal,
+// so the global Topbar stays decoupled from any single page's chrome.
+export const TOPBAR_ACTIONS_SLOT_ID = "eatit-topbar-actions-slot";
+
 const ROUTE_CRUMBS: Record<string, string[]> = {
   "/": ["首页"],
   "/upload": ["面试流程", "上传与解析"],
@@ -78,6 +83,19 @@ export function Topbar(): JSX.Element {
           </span>
         ))}
       </div>
+      {/* V32.M1.1.X-followup — page-level actions slot. Pages render
+          their topbar buttons (e.g. live page's REC + 暂停 + 结束面试)
+          into this slot via React's createPortal so the global Topbar
+          stays a presentation component without tight coupling. */}
+      <div
+        id={TOPBAR_ACTIONS_SLOT_ID}
+        data-testid="topbar-actions-slot"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+      />
       <ConnectivityDot state={connectivityState} detail={connectivityDetail} />
     </header>
   );
