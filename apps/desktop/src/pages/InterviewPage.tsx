@@ -63,6 +63,19 @@ const STYLE_LABEL_ZH: Record<string, string> = {
   high_pressure_followup: "高压追问",
 };
 
+// V32.M1.1.X-followup — direction id → 中文 label for the question card
+// header tag-line. Mirrors `DIRECTION_OPTIONS` in ConfigPage.tsx but kept
+// inline to avoid pulling the entire ConfigPage type-graph into the
+// interview machine bundle. If a third site needs this map, extract.
+const DIRECTION_LABEL_ZH: Record<string, string> = {
+  "ai-insight": "AI 场景洞察",
+  "data-driven": "数据驱动决策",
+  "cross-func": "跨职能协作",
+  "zero-to-one": "从 0 到 1",
+  "user-research": "用户洞察",
+  strategy: "产品战略",
+};
+
 // Rough turns/duration heuristic — backend's FrameworkAgent doesn't
 // surface the planned turn count separately, so we approximate from the
 // duration. 3 minutes/turn matches the PRD §6.3.4 pacing guidance.
@@ -565,10 +578,15 @@ export function InterviewPage(): JSX.Element {
     jobTitle: string;
     style: string;
     totalTurns: number;
+    // First selected direction id, or null when the snapshot is from a
+    // v3.1 session (legacy single-direction) or somehow malformed.
+    // Used by the current-question card header tag-line on the right.
+    primaryDirection: string | null;
   }>({
     jobTitle: "—",
     style: "structured",
     totalTurns: 5,
+    primaryDirection: null,
   });
   useEffect(() => {
     if (!sessionId) return;
@@ -583,6 +601,14 @@ export function InterviewPage(): JSX.Element {
           typeof config.duration_minutes === "number"
             ? config.duration_minutes
             : 30;
+        const directionsRaw = config.directions;
+        const primaryDirection =
+          Array.isArray(directionsRaw) &&
+          typeof directionsRaw[0] === "string"
+            ? (directionsRaw[0] as string)
+            : typeof config.direction === "string"
+              ? (config.direction as string)
+              : null;
         // job title not yet on session payload — fall back to candidate
         // asset id sliced (placeholder until backend exposes it).
         const titleFallback = detail.candidate_asset_id
@@ -592,6 +618,7 @@ export function InterviewPage(): JSX.Element {
           jobTitle: titleFallback,
           style,
           totalTurns: estimateTotalTurns(duration),
+          primaryDirection,
         });
       })
       .catch(() => {
@@ -748,17 +775,68 @@ export function InterviewPage(): JSX.Element {
       >
         {state.context.currentQuestion ? (
           <>
-            <div style={{ fontSize: 12, color: "var(--ink-500)" }}>
-              第 {state.context.currentQuestion.turn_index} 轮 ·{" "}
-              {state.context.currentQuestion.expected_depth}
+            {/* design-reference/page-live.jsx — header row with AI
+                avatar + persona name + meta line on the left, direction
+                tag on the right. Mirrors the live mockup. */}
+            <div
+              className="row between"
+              style={{ gap: 12, alignItems: "flex-start" }}
+            >
+              <div className="row" style={{ gap: 10, alignItems: "center" }}>
+                <div
+                  aria-hidden="true"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 10,
+                    background: "var(--ink-900)",
+                    color: "white",
+                    display: "grid",
+                    placeItems: "center",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    flexShrink: 0,
+                  }}
+                >
+                  AI
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>
+                    面试官 {personaName}
+                  </div>
+                  <div
+                    className="muted mono"
+                    style={{ fontSize: 10.5 }}
+                  >
+                    刚刚 · 问题 {state.context.currentQuestion.turn_index + 1}
+                    {sessionMeta.primaryDirection
+                      ? ` · ${
+                          DIRECTION_LABEL_ZH[sessionMeta.primaryDirection] ??
+                          sessionMeta.primaryDirection
+                        }`
+                      : null}
+                  </div>
+                </div>
+              </div>
+              {sessionMeta.primaryDirection ? (
+                <span
+                  className="tag tag-line"
+                  data-testid="question-direction-tag"
+                >
+                  {DIRECTION_LABEL_ZH[sessionMeta.primaryDirection] ??
+                    sessionMeta.primaryDirection}
+                </span>
+              ) : null}
             </div>
             <div
               className="h-serif"
               style={{
-                fontSize: 24,
-                lineHeight: 1.3,
+                fontSize: 26,
+                lineHeight: 1.35,
+                letterSpacing: "-0.01em",
                 color: "var(--ink-900)",
                 fontWeight: 400,
+                margin: "4px 0 0",
               }}
             >
               {state.context.currentQuestion.question}
@@ -779,6 +857,46 @@ export function InterviewPage(): JSX.Element {
             )}
           </div>
         )}
+
+        {/* design-reference/page-live.jsx — soft separator + "我的回答"
+            mini header so the response area has a visual identity even
+            though it shares the question card's enclosure. The design's
+            two-card split is a larger refactor; this header captures
+            most of the read. */}
+        <div
+          className="row"
+          style={{
+            gap: 10,
+            alignItems: "center",
+            marginTop: 6,
+            paddingTop: 14,
+            borderTop: "1px solid var(--line)",
+          }}
+          data-testid="my-response-header"
+        >
+          <div
+            className="avatar"
+            style={{
+              background: "var(--brand-soft)",
+              color: "var(--brand-ink)",
+            }}
+            aria-hidden="true"
+          >
+            W
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500 }}>我的回答</div>
+            <div className="muted" style={{ fontSize: 11.5 }}>
+              {state.context.isRecording
+                ? "正在录音 · 实时转写中"
+                : isUserAnswering
+                  ? inputMode === "voice"
+                    ? "按下「按住说话」开始"
+                    : "在下方输入你的回答"
+                  : "等待问题加载"}
+            </div>
+          </div>
+        </div>
 
         <ModeToggle
           mode={inputMode}
