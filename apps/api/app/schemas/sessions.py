@@ -79,8 +79,14 @@ class InterviewConfigResponse(TimestampedResponse):
     style: InterviewStyleV32
     directions: list[InterviewDirectionV32] = Field(default_factory=list)
     duration_minutes: InterviewDurationV32
-    # Old single-direction echoed back for v3.1 clients (L0 retention).
-    direction: InterviewDirection | None = None
+    # `direction` echoes back whatever was stored in the legacy column
+    # (string(64), nullable=False). The create_session shim now writes
+    # the FIRST v3.2 direction id (e.g. "ai-insight") for v3.2+ clients
+    # and falls back to the v3.1 enum value for legacy ones — so the
+    # response type must accept either palette. Without this Union, GET
+    # /sessions/{id} blows up with a Pydantic ValidationError on every
+    # session whose primary direction is a v3.2 id.
+    direction: InterviewDirectionV32 | InterviewDirection | None = None
 
 
 class CreateSessionRequest(SchemaModel):

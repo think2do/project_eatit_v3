@@ -310,12 +310,25 @@ class SessionsService:
     def _serialize_session_detail(self, interview_session: InterviewSession) -> SessionDetailResponse:
         config = None
         if interview_session.config is not None:
+            # The legacy InterviewConfig table only carries the singular
+            # `direction` column. The v3.2 multi-select lives in the
+            # session's `config_snapshot` JSON (mirrored from the create
+            # request payload). Echo it back so clients reading the
+            # detail endpoint see the same shape they posted.
+            snapshot = interview_session.config_snapshot or {}
+            snapshot_directions = snapshot.get("directions")
+            directions: list[str] = (
+                [d for d in snapshot_directions if isinstance(d, str)]
+                if isinstance(snapshot_directions, list)
+                else []
+            )
             config = InterviewConfigResponse(
                 id=interview_session.config.id,
                 created_at=interview_session.config.created_at,
                 updated_at=interview_session.config.updated_at,
                 interview_session_id=interview_session.config.interview_session_id,
                 style=interview_session.config.style,
+                directions=directions,
                 direction=interview_session.config.direction,
                 duration_minutes=interview_session.config.duration_minutes,
             )
