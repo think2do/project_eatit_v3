@@ -45,25 +45,57 @@ _logger = logging.getLogger(__name__)
 
 
 def _total_question_budget(framework_json: str) -> int | None:
-    """Sum `question_budget` across all framework stages.
+    """Sum the framework's planned question count across either schema.
 
-    Returns None when the framework is missing / malformed so the caller
-    can fall through to the LLM's own `should_end` decision instead of
-    cutting the interview short on a parse glitch.
+    Two shapes flow through this code path:
+
+    1. Legacy `DirectionFramework`:
+         {"stages": [{"name": ..., "question_budget": int, ...}, ...]}
+       Sum is straightforward — `sum(stage.question_budget)`.
+
+    2. v3.2 `FrameworkAgentOutput` (what `_load_framework_json` actually
+       returns to keep `predicted_questions` in scope for the
+       Interviewer Agent):
+         {"pace_plan": {"segments": [{"rough_minutes": int, ...}], ...}}
+       The legacy mapping in `SessionsService._agent_to_legacy_framework`
+       converts each segment's rough_minutes via `max(1, rough_minutes
+       // 3)` to produce the question_budget — mirror that exactly so
+       the guard ends the interview at the same turn count the
+       FrameworkAgent's UI surfaces (X / total) advertises.
+
+    Returns None when the framework is missing / malformed so the
+    caller can fall through to the LLM's own `should_end` decision
+    instead of cutting the interview short on a parse glitch.
     """
     try:
         framework = json.loads(framework_json)
     except (TypeError, ValueError):
         return None
-    stages = framework.get("stages") if isinstance(framework, dict) else None
-    if not isinstance(stages, list) or not stages:
+    if not isinstance(framework, dict):
         return None
-    total = 0
-    for stage in stages:
-        budget = stage.get("question_budget") if isinstance(stage, dict) else None
-        if isinstance(budget, int) and budget > 0:
-            total += budget
-    return total if total > 0 else None
+    # Shape 1: legacy DirectionFramework with explicit `stages`.
+    stages = framework.get("stages")
+    if isinstance(stages, list) and stages:
+        total = 0
+        for stage in stages:
+            budget = stage.get("question_budget") if isinstance(stage, dict) else None
+            if isinstance(budget, int) and budget > 0:
+                total += budget
+        if total > 0:
+            return total
+    # Shape 2: agent output with `pace_plan.segments[*].rough_minutes`.
+    pace_plan = framework.get("pace_plan")
+    if isinstance(pace_plan, dict):
+        segments = pace_plan.get("segments")
+        if isinstance(segments, list) and segments:
+            total = 0
+            for seg in segments:
+                rough = seg.get("rough_minutes") if isinstance(seg, dict) else None
+                if isinstance(rough, int) and rough > 0:
+                    total += max(1, rough // 3)
+            if total > 0:
+                return total
+    return None
 
 _TURN_ASSESSMENT_SYSTEM = (
     "你是面试复盘助理。对候选人在单轮问答里的表现做简短打点:"

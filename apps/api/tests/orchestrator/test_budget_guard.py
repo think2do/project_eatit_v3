@@ -77,3 +77,71 @@ def test_total_budget_returns_none_when_all_budgets_invalid() -> None:
 
 def test_total_budget_handles_non_dict_input() -> None:
     assert _total_question_budget(json.dumps([1, 2, 3])) is None
+
+
+def test_total_budget_supports_agent_pace_plan_shape() -> None:
+    # FrameworkAgentOutput shape — what `_load_framework_json` actually
+    # returns when the WS endpoint serialises the agent payload (so
+    # the Interviewer Agent keeps `predicted_questions` in scope).
+    # `_agent_to_legacy_framework` converts via max(1, rough_minutes // 3).
+    framework = {
+        "pace_plan": {
+            "total_minutes": 30,
+            "segments": [
+                {"name": "暖场", "rough_minutes": 4, "goal": "..."},
+                {"name": "项目深挖", "rough_minutes": 12, "goal": "..."},
+                {"name": "能力追问", "rough_minutes": 9, "goal": "..."},
+                {"name": "反问", "rough_minutes": 5, "goal": "..."},
+            ],
+        },
+        "predicted_questions": None,
+    }
+    # 4//3=1, 12//3=4, 9//3=3, 5//3=1 → 1+4+3+1 = 9
+    assert _total_question_budget(json.dumps(framework)) == 9
+
+
+def test_total_budget_pace_plan_floors_at_one_per_segment() -> None:
+    # rough_minutes < 3 should still contribute 1 (max(1, ...)).
+    framework = {
+        "pace_plan": {
+            "total_minutes": 5,
+            "segments": [
+                {"name": "a", "rough_minutes": 1, "goal": "..."},
+                {"name": "b", "rough_minutes": 2, "goal": "..."},
+                {"name": "c", "rough_minutes": 6, "goal": "..."},
+            ],
+        },
+    }
+    # 1+1+2 = 4
+    assert _total_question_budget(json.dumps(framework)) == 4
+
+
+def test_total_budget_legacy_stages_take_precedence_over_pace_plan() -> None:
+    # If both shapes are present (defensive), explicit stages win
+    # because they're the canonical legacy contract.
+    framework = {
+        "stages": [
+            {"name": "stage", "question_budget": 6},
+        ],
+        "pace_plan": {
+            "total_minutes": 90,
+            "segments": [
+                {"name": "x", "rough_minutes": 30, "goal": "..."},
+            ],
+        },
+    }
+    assert _total_question_budget(json.dumps(framework)) == 6
+
+
+def test_total_budget_returns_none_when_pace_plan_segments_invalid() -> None:
+    framework = {
+        "pace_plan": {
+            "total_minutes": 30,
+            "segments": [
+                {"name": "bad", "rough_minutes": "twelve"},
+                {"name": "missing"},
+                {"name": "neg", "rough_minutes": -5},
+            ],
+        },
+    }
+    assert _total_question_budget(json.dumps(framework)) is None
