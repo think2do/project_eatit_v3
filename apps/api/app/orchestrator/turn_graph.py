@@ -24,6 +24,9 @@
 
 from __future__ import annotations
 
+import json
+import logging
+
 from langgraph.graph import END, START, StateGraph
 
 from app.agents.compression.schemas import CompressionAgentInput, CompressionTurn
@@ -37,6 +40,30 @@ from app.agents.interviewer.service import InterviewerAgentService
 from app.infra.llm import LLMGateway
 from app.infra.llm.instructor_client import make_instructor, structured_completion
 from app.orchestrator.state import TurnAssessment, TurnState
+
+_logger = logging.getLogger(__name__)
+
+
+def _total_question_budget(framework_json: str) -> int | None:
+    """Sum `question_budget` across all framework stages.
+
+    Returns None when the framework is missing / malformed so the caller
+    can fall through to the LLM's own `should_end` decision instead of
+    cutting the interview short on a parse glitch.
+    """
+    try:
+        framework = json.loads(framework_json)
+    except (TypeError, ValueError):
+        return None
+    stages = framework.get("stages") if isinstance(framework, dict) else None
+    if not isinstance(stages, list) or not stages:
+        return None
+    total = 0
+    for stage in stages:
+        budget = stage.get("question_budget") if isinstance(stage, dict) else None
+        if isinstance(budget, int) and budget > 0:
+            total += budget
+    return total if total > 0 else None
 
 _TURN_ASSESSMENT_SYSTEM = (
     "你是面试复盘助理。对候选人在单轮问答里的表现做简短打点:"
@@ -111,6 +138,28 @@ def build_turn_graph(gateway: LLMGateway):
             ),
             gateway,
         )
+        # Hard budget guard: the LLM is supposed to set `should_end=true`
+        # once the framework's planned `sum(question_budget)` is reached,
+        # but in practice it sometimes drifts past the limit (observed:
+        # 5/5 progress with a 7th question still being asked). The budget
+        # comes off the framework JSON so it stays honest about whatever
+        # the FrameworkAgent actually planned for THIS session.
+        #
+        # `state.turn_index` is 0-based and points at the turn that just
+        # finished. After this node fires we'd advance to turn N+2 (the
+        # response is the *next* question). So we end as soon as we've
+        # already covered the budget — i.e. (turn_index + 1) >= budget.
+        budget = _total_question_budget(state.framework_json)
+        if budget is not None and not next_q.should_end:
+            answered = state.turn_index + 1
+            if answered >= budget:
+                _logger.info(
+                    "interviewer.budget_guard: forcing should_end=true "
+                    "(answered=%d, budget=%d)",
+                    answered,
+                    budget,
+                )
+                next_q = next_q.model_copy(update={"should_end": True})
         return {"next_question": next_q}
 
     graph = StateGraph(TurnState)
