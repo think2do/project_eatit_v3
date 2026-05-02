@@ -619,6 +619,26 @@ export function InterviewPage(): JSX.Element {
             ? [config.direction as string]
             : [];
         const primaryDirection = directionsList[0] ?? null;
+        // V32.M1.1.X-followup — totalTurns must match the backend's
+        // actual budget (sum of `direction_framework.stages[*]`
+        // .question_budget). Otherwise the progress strip lies (10/10
+        // while the FrameworkAgent planned 12). The backend's
+        // `_total_question_budget` guard ends the interview at this
+        // sum, so frontend + backend stay in sync.
+        // Fall back to the duration estimate when the framework hasn't
+        // landed yet (first GET race) or stages are missing.
+        const stages =
+          detail.direction_framework &&
+          Array.isArray(detail.direction_framework.stages)
+            ? detail.direction_framework.stages
+            : [];
+        const frameworkBudget = stages.reduce<number>((sum, stage) => {
+          const budget = (stage as { question_budget?: unknown })
+            .question_budget;
+          return sum + (typeof budget === "number" && budget > 0 ? budget : 0);
+        }, 0);
+        const totalTurns =
+          frameworkBudget > 0 ? frameworkBudget : estimateTotalTurns(duration);
         // Provisional title from the asset id slice; replaced below
         // once the parse payload returns the real JD company + role.
         const titleFallback = detail.candidate_asset_id
@@ -627,7 +647,7 @@ export function InterviewPage(): JSX.Element {
         setSessionMeta({
           jobTitle: titleFallback,
           style,
-          totalTurns: estimateTotalTurns(duration),
+          totalTurns,
           durationMinutes: duration,
           primaryDirection,
           directions: directionsList,
