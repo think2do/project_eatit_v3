@@ -123,7 +123,14 @@ CI / 本地开发不得用更老版本(包括 Apple Silicon 与 Intel macOS 共�
 
 ### B8 — Xcode 工程不得 manual 编辑
 
-`Eatit.xcodeproj/project.pbxproj` 必须由 Xcode 自身或 `xcodebuild` 生成,人工不可手改(避免 merge conflict 黑洞)。如果需要新增文件,必须打开 Xcode GUI 添加或用 [`tuist`](https://tuist.io)/[`xcodegen`](https://github.com/yonaskolb/XcodeGen)(本项目暂不引入 tuist/xcodegen,直接 Xcode GUI)。
+`Eatit.xcodeproj/project.pbxproj` 必须由 Xcode 自身或 `xcodebuild` 或 `xcodegen` 生成,人工不可手改(避免 merge conflict 黑洞)。新增文件可通过:
+1. Xcode GUI(`File → Add Files to "Eatit"`)
+2. `xcodegen generate --spec apps/macos/project.yml`(生成器从 yml 重建 .xcodeproj)
+3. ~~`tuist`~~(暂不引入,过重)
+
+**xcodegen 启用决策**(2026-05-04,Ralph autonomous loop M1.1.dev 期):为支持 headless 自动化创建 `.xcodeproj`(Ralph loop 没有 GUI 驱动能力),引入 [`xcodegen`](https://github.com/yonaskolb/XcodeGen) v2.x 作为唯一允许的项目生成器。`apps/macos/project.yml` 是工程结构的**唯一权威**,`Eatit.xcodeproj/` 是从 yml 生成的派生物 + commit 进 git(避免 CI 装 xcodegen)。新增 Swift 文件、Build Phase、SPM 依赖时:**先改 `project.yml` → 跑 `xcodegen generate` → commit 二者**。**永不**直接手改 `pbxproj`(会被下次 generate 覆盖,且违反"avoid merge conflict 黑洞"原则)。
+
+⚠️ 若未来发现 xcodegen 能力不足(例如 SPM private-products 不支持),不得回退到手改 pbxproj — 选项是切到 `tuist` 并再次更新本节。
 
 ### B9 — Bridge 协议双端契约
 
