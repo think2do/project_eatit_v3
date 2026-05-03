@@ -30,7 +30,7 @@ Match the section prefix(`V34.M*.*`)to 当前 spec 文件即可。
 
 ### M1 — Xcode 工程脚手架(1 周,5 节点 + 1 audit)
 
-- [ ] M1.1.arch Xcode 工程结构设计(architect)— 产 `.ralph/docs/v34-design/M1.1-xcode-project-structure.md`
+- [x] M1.1.arch Xcode 工程结构设计(architect)— 产 `.ralph/docs/v34-design/M1.1-xcode-project-structure.md`(303 行 / 10 H2 段;占位 + 终态 entitlements 双段 + ATS 仅 ark/openspeech 双 host + 严禁项白名单 6 项 + 14 条 M1.1.dev 实施 checklist)(85d35a9, 2026-05-04)
 - [ ] M1.1.dev Xcode 工程脚手架 + WKWebView Hello World(developer)— 产 `apps/macos/Eatit.xcodeproj/` + 5 个 Swift 文件
 - [ ] M1.2 WKURLSchemeHandler + React build 加载(developer)— 产 `EatitURLSchemeHandler.swift` + `vite.config.ts` 改 base
 - [ ] M1.3 Apple Developer 证书 + TestFlight 第一份 build(developer)— 产 `archive-and-upload.sh` + 第一份 .pkg
