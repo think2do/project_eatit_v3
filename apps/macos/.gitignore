@@ -2,3 +2,7 @@ build/
 DerivedData/
 *.xcuserstate
 xcuserdata/
+
+# Vite build artefacts — regenerated on every xcodebuild via preBuildScript
+Eatit/Resources/web/*
+!Eatit/Resources/web/.gitkeep

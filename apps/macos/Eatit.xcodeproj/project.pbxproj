@@ -7,10 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		12877B5CFC5FA06436E473BE /* EatitURLSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ABC08D39D205B42554753E9 /* EatitURLSchemeHandler.swift */; };
 		2DF11A4F786459CE4BB395B5 /* EatitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D97BCF787590B906ED24F7A /* EatitApp.swift */; };
+		7C9CFAA95FE6109226165496 /* web in Resources */ = {isa = PBXBuildFile; fileRef = E4714382CFE28019C4559054 /* web */; };
 		9A30ADC9DCBE4E3B830B240E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7B8AE0D949E13AD6E0C220D /* AppDelegate.swift */; };
 		A124C35BA81F3FB27B49C690 /* WebViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C779B031475689C5A3249527 /* WebViewController.swift */; };
-		D6951E43449E0BB7111F1F42 /* Resources in Resources */ = {isa = PBXBuildFile; fileRef = 2E6A1348A65F0F99E47F6D92 /* Resources */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -26,12 +27,13 @@
 /* Begin PBXFileReference section */
 		1D97BCF787590B906ED24F7A /* EatitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EatitApp.swift; sourceTree = "<group>"; };
 		24D007F9DD23D7323372CF2A /* Eatit.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Eatit.entitlements; sourceTree = "<group>"; };
-		2E6A1348A65F0F99E47F6D92 /* Resources */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Resources; path = Eatit/Resources; sourceTree = SOURCE_ROOT; };
 		376F711F8F6001004EF9471A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		84234450F65D5CF7E0E02A2A /* EatitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EatitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8ABC08D39D205B42554753E9 /* EatitURLSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EatitURLSchemeHandler.swift; sourceTree = "<group>"; };
 		A2CF8E15614176A28DF57FFF /* Eatit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Eatit.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C779B031475689C5A3249527 /* WebViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewController.swift; sourceTree = "<group>"; };
 		C7B8AE0D949E13AD6E0C220D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		E4714382CFE28019C4559054 /* web */ = {isa = PBXFileReference; lastKnownFileType = folder; name = web; path = Eatit/Resources/web; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -44,11 +46,27 @@
 			);
 			sourceTree = "<group>";
 		};
+		3714B46D9C44F2A220B67E38 /* WebView */ = {
+			isa = PBXGroup;
+			children = (
+				8ABC08D39D205B42554753E9 /* EatitURLSchemeHandler.swift */,
+			);
+			path = WebView;
+			sourceTree = "<group>";
+		};
 		3B271E85835D69FFF05CC653 /* EatitTests */ = {
 			isa = PBXGroup;
 			children = (
 			);
 			path = EatitTests;
+			sourceTree = "<group>";
+		};
+		AF4CEE95509F31FCC22C340C /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				E4714382CFE28019C4559054 /* web */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		BC2E2CC04CE62E05C1FA7FFB /* Products */ = {
@@ -63,11 +81,12 @@
 		C7D3C551970BAC0BDCE3397E /* Eatit */ = {
 			isa = PBXGroup;
 			children = (
+				AF4CEE95509F31FCC22C340C /* Resources */,
+				3714B46D9C44F2A220B67E38 /* WebView */,
 				C7B8AE0D949E13AD6E0C220D /* AppDelegate.swift */,
 				24D007F9DD23D7323372CF2A /* Eatit.entitlements */,
 				1D97BCF787590B906ED24F7A /* EatitApp.swift */,
 				376F711F8F6001004EF9471A /* Info.plist */,
-				2E6A1348A65F0F99E47F6D92 /* Resources */,
 				C779B031475689C5A3249527 /* WebViewController.swift */,
 			);
 			path = Eatit;
@@ -159,7 +178,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D6951E43449E0BB7111F1F42 /* Resources in Resources */,
+				7C9CFAA95FE6109226165496 /* web in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -210,15 +229,17 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
+				"$(SRCROOT)/scripts/sync-web-resources.sh",
 			);
 			name = "Sync Vite Build to Resources/web";
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"$(SRCROOT)/Eatit/Resources/web/index.html",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "echo \"[M1.1.dev placeholder] vite sync deferred to M1.2\"\n";
+			shellScript = "\"${SRCROOT}/scripts/sync-web-resources.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -229,6 +250,7 @@
 			files = (
 				9A30ADC9DCBE4E3B830B240E /* AppDelegate.swift in Sources */,
 				2DF11A4F786459CE4BB395B5 /* EatitApp.swift in Sources */,
+				12877B5CFC5FA06436E473BE /* EatitURLSchemeHandler.swift in Sources */,
 				A124C35BA81F3FB27B49C690 /* WebViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -35,12 +35,16 @@ targets:
       - path: Eatit
         excludes:
           - "Resources/**"
-      - path: Eatit/Resources
+      - path: Eatit/Resources/web
         type: folder
     preBuildScripts:
       - name: "Sync Vite Build to Resources/web"
         script: |
-          echo "[M1.1.dev placeholder] vite sync deferred to M1.2"
+          "${SRCROOT}/scripts/sync-web-resources.sh"
+        inputFiles:
+          - "$(SRCROOT)/scripts/sync-web-resources.sh"
+        outputFiles:
+          - "$(SRCROOT)/Eatit/Resources/web/index.html"
     postBuildScripts:
       - name: "Verify Entitlements"
         script: |
