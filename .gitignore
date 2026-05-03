@@ -75,5 +75,9 @@ apps/desktop/src-tauri/resources/backend/*
 .ralph/status.json
 .ralph/.loop_start_sha
 .ralph/progress.json
-.ralph/logs/
+.ralph/logs/*
+!.ralph/logs/*-audit.md
 .ralph/docs/generated/
+
+# Ralph runtime — last output length tracker (per-loop ephemeral)
+.ralph/.last_output_length
