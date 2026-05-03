@@ -1,0 +1,494 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		2DF11A4F786459CE4BB395B5 /* EatitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D97BCF787590B906ED24F7A /* EatitApp.swift */; };
+		9A30ADC9DCBE4E3B830B240E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7B8AE0D949E13AD6E0C220D /* AppDelegate.swift */; };
+		A124C35BA81F3FB27B49C690 /* WebViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C779B031475689C5A3249527 /* WebViewController.swift */; };
+		D6951E43449E0BB7111F1F42 /* Resources in Resources */ = {isa = PBXBuildFile; fileRef = 2E6A1348A65F0F99E47F6D92 /* Resources */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		552CFF45D8B092066BB2CFA6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 03719CD011F9E02BFBCFBC8C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E5EC5143DE42C1C4FC676DC1;
+			remoteInfo = Eatit;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		1D97BCF787590B906ED24F7A /* EatitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EatitApp.swift; sourceTree = "<group>"; };
+		24D007F9DD23D7323372CF2A /* Eatit.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Eatit.entitlements; sourceTree = "<group>"; };
+		2E6A1348A65F0F99E47F6D92 /* Resources */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Resources; path = Eatit/Resources; sourceTree = SOURCE_ROOT; };
+		376F711F8F6001004EF9471A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		84234450F65D5CF7E0E02A2A /* EatitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EatitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2CF8E15614176A28DF57FFF /* Eatit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Eatit.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C779B031475689C5A3249527 /* WebViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewController.swift; sourceTree = "<group>"; };
+		C7B8AE0D949E13AD6E0C220D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		3207EDFB2C14763B647D0A54 = {
+			isa = PBXGroup;
+			children = (
+				C7D3C551970BAC0BDCE3397E /* Eatit */,
+				3B271E85835D69FFF05CC653 /* EatitTests */,
+				BC2E2CC04CE62E05C1FA7FFB /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		3B271E85835D69FFF05CC653 /* EatitTests */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = EatitTests;
+			sourceTree = "<group>";
+		};
+		BC2E2CC04CE62E05C1FA7FFB /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A2CF8E15614176A28DF57FFF /* Eatit.app */,
+				84234450F65D5CF7E0E02A2A /* EatitTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C7D3C551970BAC0BDCE3397E /* Eatit */ = {
+			isa = PBXGroup;
+			children = (
+				C7B8AE0D949E13AD6E0C220D /* AppDelegate.swift */,
+				24D007F9DD23D7323372CF2A /* Eatit.entitlements */,
+				1D97BCF787590B906ED24F7A /* EatitApp.swift */,
+				376F711F8F6001004EF9471A /* Info.plist */,
+				2E6A1348A65F0F99E47F6D92 /* Resources */,
+				C779B031475689C5A3249527 /* WebViewController.swift */,
+			);
+			path = Eatit;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8BEA0381BDF80C378D8B7CB3 /* EatitTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C9C94EF07AA4B431F186DAC7 /* Build configuration list for PBXNativeTarget "EatitTests" */;
+			buildPhases = (
+				82955C6A2279A335EAA381FC /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C63132C23A64B386CC4BC37A /* PBXTargetDependency */,
+			);
+			name = EatitTests;
+			packageProductDependencies = (
+			);
+			productName = EatitTests;
+			productReference = 84234450F65D5CF7E0E02A2A /* EatitTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		E5EC5143DE42C1C4FC676DC1 /* Eatit */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A2B88052B7CA66D04DDFFC89 /* Build configuration list for PBXNativeTarget "Eatit" */;
+			buildPhases = (
+				C742ACB800364C0F1B4E57BD /* Sync Vite Build to Resources/web */,
+				5BA828EFCC7E0D5F4873B5E1 /* Sources */,
+				97651711B9FBA8F0638F9E54 /* Resources */,
+				51DAD4BC0303CE4EED09B3E7 /* Verify Entitlements */,
+				1FDAE18DC6C8E207C0BCE5F9 /* Verify Embedded Binary Team ID */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Eatit;
+			packageProductDependencies = (
+			);
+			productName = Eatit;
+			productReference = A2CF8E15614176A28DF57FFF /* Eatit.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		03719CD011F9E02BFBCFBC8C /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					8BEA0381BDF80C378D8B7CB3 = {
+						DevelopmentTeam = 469QTH6TU2;
+						ProvisioningStyle = Manual;
+					};
+					E5EC5143DE42C1C4FC676DC1 = {
+						DevelopmentTeam = 469QTH6TU2;
+						ProvisioningStyle = Manual;
+					};
+				};
+			};
+			buildConfigurationList = 3C63219615A07F5570B20DC5 /* Build configuration list for PBXProject "Eatit" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 3207EDFB2C14763B647D0A54;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = BC2E2CC04CE62E05C1FA7FFB /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E5EC5143DE42C1C4FC676DC1 /* Eatit */,
+				8BEA0381BDF80C378D8B7CB3 /* EatitTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		97651711B9FBA8F0638F9E54 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D6951E43449E0BB7111F1F42 /* Resources in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		1FDAE18DC6C8E207C0BCE5F9 /* Verify Embedded Binary Team ID */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Verify Embedded Binary Team ID";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "echo \"[M1.1.dev placeholder] team-id sweep deferred to M1.4\"\n";
+		};
+		51DAD4BC0303CE4EED09B3E7 /* Verify Entitlements */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Verify Entitlements";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "echo \"[M1.1.dev placeholder] entitlements verification deferred to M1.4\"\n";
+		};
+		C742ACB800364C0F1B4E57BD /* Sync Vite Build to Resources/web */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Sync Vite Build to Resources/web";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "echo \"[M1.1.dev placeholder] vite sync deferred to M1.2\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5BA828EFCC7E0D5F4873B5E1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9A30ADC9DCBE4E3B830B240E /* AppDelegate.swift in Sources */,
+				2DF11A4F786459CE4BB395B5 /* EatitApp.swift in Sources */,
+				A124C35BA81F3FB27B49C690 /* WebViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		82955C6A2279A335EAA381FC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		C63132C23A64B386CC4BC37A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E5EC5143DE42C1C4FC676DC1 /* Eatit */;
+			targetProxy = 552CFF45D8B092066BB2CFA6 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		175A14EF0B010F6C5FC99D23 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Eatit/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		4087868EE5B1227C102537C3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_ENTITLEMENTS = Eatit/Eatit.entitlements;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 469QTH6TU2;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Eatit/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 3.4.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eatit.desktop;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_LANGUAGE_VERSION = 5;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		66D0042B0BC7584FDBBE4B47 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Eatit.app/Contents/MacOS/Eatit";
+			};
+			name = Release;
+		};
+		76947A77E2FD5694C25FC4EE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_ENTITLEMENTS = Eatit/Eatit.entitlements;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 469QTH6TU2;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Eatit/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 3.4.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.eatit.desktop;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_LANGUAGE_VERSION = 5;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		AC0C86FA896B2066B5A6E3A6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Eatit/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		DBED45AE04AE30571753A763 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Eatit.app/Contents/MacOS/Eatit";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3C63219615A07F5570B20DC5 /* Build configuration list for PBXProject "Eatit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				76947A77E2FD5694C25FC4EE /* Debug */,
+				4087868EE5B1227C102537C3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A2B88052B7CA66D04DDFFC89 /* Build configuration list for PBXNativeTarget "Eatit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				175A14EF0B010F6C5FC99D23 /* Debug */,
+				AC0C86FA896B2066B5A6E3A6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C9C94EF07AA4B431F186DAC7 /* Build configuration list for PBXNativeTarget "EatitTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DBED45AE04AE30571753A763 /* Debug */,
+				66D0042B0BC7584FDBBE4B47 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 03719CD011F9E02BFBCFBC8C /* Project object */;
+}

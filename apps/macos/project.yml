@@ -1,0 +1,66 @@
+name: Eatit
+options:
+  bundleIdPrefix: com.eatit
+  deploymentTarget:
+    macOS: "14.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+  groupSortPosition: top
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    SWIFT_LANGUAGE_VERSION: "5"
+    SWIFT_STRICT_CONCURRENCY: minimal
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    PRODUCT_BUNDLE_IDENTIFIER: com.eatit.desktop
+    MARKETING_VERSION: "3.4.0"
+    CURRENT_PROJECT_VERSION: "1"
+    GENERATE_INFOPLIST_FILE: NO
+    INFOPLIST_FILE: Eatit/Info.plist
+    CODE_SIGN_ENTITLEMENTS: Eatit/Eatit.entitlements
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: 469QTH6TU2
+    CODE_SIGN_IDENTITY: "Developer ID Application"
+    ENABLE_HARDENED_RUNTIME: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+
+targets:
+  Eatit:
+    type: application
+    platform: macOS
+    sources:
+      - path: Eatit
+        excludes:
+          - "Resources/**"
+      - path: Eatit/Resources
+        type: folder
+    preBuildScripts:
+      - name: "Sync Vite Build to Resources/web"
+        script: |
+          echo "[M1.1.dev placeholder] vite sync deferred to M1.2"
+    postBuildScripts:
+      - name: "Verify Entitlements"
+        script: |
+          echo "[M1.1.dev placeholder] entitlements verification deferred to M1.4"
+      - name: "Verify Embedded Binary Team ID"
+        script: |
+          echo "[M1.1.dev placeholder] team-id sweep deferred to M1.4"
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+
+  EatitTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: EatitTests
+        excludes:
+          - "README.md"
+    dependencies:
+      - target: Eatit
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
