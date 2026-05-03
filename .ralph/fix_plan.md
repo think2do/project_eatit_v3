@@ -31,11 +31,7 @@ Match the section prefix(`V34.M*.*`)to 当前 spec 文件即可。
 ### M1 — Xcode 工程脚手架(1 周,5 节点 + 1 audit)
 
 - [x] M1.1.arch Xcode 工程结构设计(architect)— 产 `.ralph/docs/v34-design/M1.1-xcode-project-structure.md`(303 行 / 10 H2 段;占位 + 终态 entitlements 双段 + ATS 仅 ark/openspeech 双 host + 严禁项白名单 6 项 + 14 条 M1.1.dev 实施 checklist)(85d35a9, 2026-05-04)
-- [ ] M1.1.dev Xcode 工程脚手架 + WKWebView Hello World(developer)— 产 `apps/macos/Eatit.xcodeproj/` + 5 个 Swift 文件
-  - **🟡 PARTIAL @ 1e815a7 (2026-05-04)**:8 个确定性源文件已 pre-staged 到 `apps/macos/Eatit/` + `apps/macos/EatitTests/`(EatitApp.swift / AppDelegate.swift / WebViewController.swift / Eatit.entitlements 占位 / Info.plist 占位 / Resources/web/index.html / 2 README)。swiftc -parse + plutil -lint + 红线扫描全绿。
-  - **🚫 BLOCKED**:`Eatit.xcodeproj/` 创建步骤需要 Xcode GUI 操作(design doc §9 step 1:File → New → Project → macOS App → 选 SwiftUI/Swift),Ralph headless loop 无法驱动。Acceptance 命令(`xcodebuild build -scheme Eatit`)在 .xcodeproj 落地前无法跑。
-  - **NEXT ACTION (人工 5 分钟)**:开 Xcode → File → New → Project → macOS → App → Product Name `Eatit`,Bundle Id `com.eatit.desktop`,Interface SwiftUI,Storage None,Include Tests ✓ → 存到 `apps/macos/`(确保 `Eatit.xcodeproj` 落 `apps/macos/Eatit.xcodeproj/`)→ File → Add Files to "Eatit"... 把 pre-staged 的 `apps/macos/Eatit/` 全部内容 + `apps/macos/EatitTests/` 加进 target → 删除 Xcode 默认生成的 ContentView.swift / Preview Content / Eatit.entitlements / Info.plist(我们的 pre-staged 版替代)→ Signing & Capabilities 勾 App Sandbox(默认勾)+ Outgoing Connections (Client),其他不勾。完成后再起 Ralph loop。
-  - **替代路径(若用户授权 §B8 软规则放宽)**:在 constraints §B8 显式允许引入 `xcodegen`,Ralph 后续 loop 用 `brew install xcodegen` + 写 `apps/macos/project.yml` + `xcodegen generate` 自动产 `Eatit.xcodeproj`。本 loop 不擅自做这件事(系统级安装 + 软规则破坏需要明确授权)。
+- [x] M1.1.dev Xcode 工程脚手架 + WKWebView Hello World(developer)— 产 `apps/macos/Eatit.xcodeproj/`(xcodegen v2.45.4 生成,project.yml 67 行权威 + pbxproj 494 行派生)+ 8 个 pre-staged 源文件(1e815a7)+ §B8 amendment(1533a2c 授权 xcodegen)。xcodebuild build SUCCEEDED, codesign 校验:app-sandbox=true / network.client=true / 5 项禁项全无 / Bundle Id = com.eatit.desktop。(8ba27a9, 2026-05-04)
 - [ ] M1.2 WKURLSchemeHandler + React build 加载(developer)— 产 `EatitURLSchemeHandler.swift` + `vite.config.ts` 改 base
 - [ ] M1.3 Apple Developer 证书 + TestFlight 第一份 build(developer)— 产 `archive-and-upload.sh` + 第一份 .pkg
 - [ ] M1.4 entitlements + Info.plist + PrivacyInfo 占位(developer)— 产 entitlements 三件套
