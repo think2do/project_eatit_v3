@@ -12,6 +12,7 @@
 		7C9CFAA95FE6109226165496 /* web in Resources */ = {isa = PBXBuildFile; fileRef = E4714382CFE28019C4559054 /* web */; };
 		9A30ADC9DCBE4E3B830B240E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7B8AE0D949E13AD6E0C220D /* AppDelegate.swift */; };
 		A124C35BA81F3FB27B49C690 /* WebViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C779B031475689C5A3249527 /* WebViewController.swift */; };
+		C72BF0F75A83CC59AF604D5A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9C4F92E482943CF0EAFEC515 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -30,6 +31,7 @@
 		376F711F8F6001004EF9471A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		84234450F65D5CF7E0E02A2A /* EatitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EatitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8ABC08D39D205B42554753E9 /* EatitURLSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EatitURLSchemeHandler.swift; sourceTree = "<group>"; };
+		9C4F92E482943CF0EAFEC515 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		A2CF8E15614176A28DF57FFF /* Eatit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Eatit.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C779B031475689C5A3249527 /* WebViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewController.swift; sourceTree = "<group>"; };
 		C7B8AE0D949E13AD6E0C220D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -87,6 +89,7 @@
 				24D007F9DD23D7323372CF2A /* Eatit.entitlements */,
 				1D97BCF787590B906ED24F7A /* EatitApp.swift */,
 				376F711F8F6001004EF9471A /* Info.plist */,
+				9C4F92E482943CF0EAFEC515 /* PrivacyInfo.xcprivacy */,
 				C779B031475689C5A3249527 /* WebViewController.swift */,
 			);
 			path = Eatit;
@@ -178,6 +181,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C72BF0F75A83CC59AF604D5A /* PrivacyInfo.xcprivacy in Resources */,
 				7C9CFAA95FE6109226165496 /* web in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -201,25 +205,28 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "echo \"[M1.1.dev placeholder] team-id sweep deferred to M1.4\"\n";
+			shellScript = "echo \"[M1.1.dev placeholder] team-id sweep deferred to M2.3+ when SPM deps land\"\n";
 		};
 		51DAD4BC0303CE4EED09B3E7 /* Verify Entitlements */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputFileListPaths = (
 			);
 			inputPaths = (
+				"$(SRCROOT)/scripts/verify-entitlements.sh",
 			);
 			name = "Verify Entitlements";
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"$(DERIVED_FILE_DIR)/verify-entitlements.stamp",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "echo \"[M1.1.dev placeholder] entitlements verification deferred to M1.4\"\n";
+			shellScript = "\"${SRCROOT}/scripts/verify-entitlements.sh\"\n";
 		};
 		C742ACB800364C0F1B4E57BD /* Sync Vite Build to Resources/web */ = {
 			isa = PBXShellScriptBuildPhase;
