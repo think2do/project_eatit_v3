@@ -39,7 +39,7 @@ Match the section prefix(`V34.M*.*`)to 当前 spec 文件即可。
 
 ### M2 — Swift Native Services(1.5 周,12 节点 + 1 audit)
 
-- [ ] M2.1.arch Bridge 协议设计(architect)— 产 `.ralph/docs/v34-design/M2.1-bridge-protocol.md`
+- [x] M2.1.arch Bridge 协议设计(architect)— 产 `.ralph/docs/v34-design/M2.1-bridge-protocol.md`(472 行 / 12 H2 + 23 H3;18 method PRD §4.4.3 锁;§C3 keychain.get 仅返 `{exists}` 不返 secret;§K #6 反模式显式拒绝;手写 Codable+Zod 双端 schema 策略 + §B9 SOP;starter 错误码 codebook 22 行;in-process bridge 零 entitlement 增量)。(e02396b, 2026-05-04)
 - [ ] M2.1.dev BridgeRouter + Codable + Zod 双端契约(developer)— 产 Swift Bridge 三件套 + JS nativeBridge.ts
 - [ ] M2.2 KeychainService(developer,**Parallel-safe**)— 产 KeychainService.swift + keychain.ts
 - [ ] M2.3 DatabaseService(GRDB.swift)(developer,**Parallel-safe**)— 产 DatabaseService.swift + db.ts + Migrations 框架
