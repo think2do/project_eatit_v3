@@ -1,27 +1,138 @@
-# Eatit v3.2+ P3/M4 Fix Plan
+# Eatit v3.4 macOS App Store Port — Fix Plan
 
 Source of truth for what's left. Ralph picks the **first unchecked item** in "High Priority" each loop. Section specs live in:
 
-- **当前阶段(P3/M4)**: [`.ralph/specs/v32-p3-constraints.md`](specs/v32-p3-constraints.md) + [`.ralph/specs/v32-p3-sections.md`](specs/v32-p3-sections.md)
-- 上一阶段(P2/M3,已完成 2026-05-01): [`.ralph/specs/v32-p2-constraints.md`](specs/v32-p2-constraints.md) + [`.ralph/specs/v32-p2-sections.md`](specs/v32-p2-sections.md)
-- 上上阶段(P1/M2,已完成 2026-04-30): [`.ralph/specs/v32-p1-constraints.md`](specs/v32-p1-constraints.md) + [`.ralph/specs/v32-p1-sections.md`](specs/v32-p1-sections.md)
-- P0 阶段(已完成): [`.ralph/specs/v32-p0-constraints.md`](specs/v32-p0-constraints.md) + [`.ralph/specs/v32-p0-sections.md`](specs/v32-p0-sections.md)
-- 历史阶段(v3.1,已归档): `.ralph/specs/phase3-sections.md`、`phase3.5-sections.md`、`phase4-sections.md`、`phase5-sections.md`
+- **当前阶段(v3.4 — macOS App Store 重构)**: [`.ralph/specs/v34-macos-port-constraints.md`](specs/v34-macos-port-constraints.md) + [`.ralph/specs/v34-macos-port-sections.md`](specs/v34-macos-port-sections.md)
+- v3.3 全收尾(P3/M4,已完成 2026-05-01): [`.ralph/specs/v32-p3-constraints.md`](specs/v32-p3-constraints.md) + [`.ralph/specs/v32-p3-sections.md`](specs/v32-p3-sections.md)
+- v3.3 P2/M3(已完成 2026-05-01): [`.ralph/specs/v32-p2-constraints.md`](specs/v32-p2-constraints.md) + [`.ralph/specs/v32-p2-sections.md`](specs/v32-p2-sections.md)
+- v3.3 P1/M2(已完成 2026-04-30): [`.ralph/specs/v32-p1-constraints.md`](specs/v32-p1-constraints.md) + [`.ralph/specs/v32-p1-sections.md`](specs/v32-p1-sections.md)
+- v3.2 P0(已完成 2026-04-30): [`.ralph/specs/v32-p0-constraints.md`](specs/v32-p0-constraints.md) + [`.ralph/specs/v32-p0-sections.md`](specs/v32-p0-sections.md)
+- v3.1 历史阶段(已归档): `.ralph/specs/phase3-sections.md` / `phase3.5-sections.md` / `phase4-sections.md` / `phase5-sections.md`
 
-Match the section prefix(V32.M4.*)to 当前 spec 文件即可。
+Match the section prefix(`V34.M*.*`)to 当前 spec 文件即可。
 
-## High Priority (work top-down)
+> 🚫🚫🚫 **总纲红线**(L0 优先级 = MAX):
+> Mac App Store 上架是 v3.4 不可妥协的最终交付定义。详 [`AGENTS.md` 第 6 节条款 13](../AGENTS.md) + [PRD v3.4 §9.2.17](../docs/PRD/Eatit_PRD_v3_4_macos_appstore.md)。
+>
+> **永久排除清单**:Tauri + Python sidecar + faster-whisper + PyAV(任何节点试图回退立即报告)
+> **唯一分发渠道**:App Store + TestFlight 内测,**禁止** DMG / ad-hoc / Homebrew Cask / 自家网站
 
-> **v3.3 全收尾(2026-05-01)** — P0 / P1 / P2 / P3 全部节点已完成。
-> M4.1-M4.4 + M4.X 收口落地;F-315 配额前端 mock(L0 A18)+ woff2 字体本地
-> 子集化(A19)+ Playwright 烟雾 E2E(A20)+ locust 性能骨架(A21)。
-> 后端 471 passed / 前端 169 vitest + 2 playwright passed。Ralph 进入待命态。
+## High Priority (work top-down,52 节点 / 8-12 周)
 
-_(High Priority 已清空。下一阶段需要新 spec 文件,例如 v32-p4-sections.md。)_
+> **节点 ID 规范**:
+> - `M{n}.{m}` — 普通实施节点(developer 主导)
+> - `M{n}.{m}.arch` — 架构设计节点(architect 主导,产 design doc)
+> - `M{n}.{m}.dev` — 实施节点(developer 主导,跟在 .arch 后)
+> - `M{n}.X` — milestone 末 audit 节点(tester 主导)
+> - `M{n}.X.audit-fix` — audit 后修复节点(若 audit 发现 🔴)
+>
+> **多 Agent 协作模式**:每个节点 spec 头部声明 `Lead Agent`,Ralph loop 内根据声明派对应 subagent。架构敏感节点拆 .arch + .dev 两个 loop 跑。详 [`v34-macos-port-constraints.md` §H](specs/v34-macos-port-constraints.md)。
+
+### M1 — Xcode 工程脚手架(1 周,5 节点 + 1 audit)
+
+- [ ] M1.1.arch Xcode 工程结构设计(architect)— 产 `.ralph/docs/v34-design/M1.1-xcode-project-structure.md`
+- [ ] M1.1.dev Xcode 工程脚手架 + WKWebView Hello World(developer)— 产 `apps/macos/Eatit.xcodeproj/` + 5 个 Swift 文件
+- [ ] M1.2 WKURLSchemeHandler + React build 加载(developer)— 产 `EatitURLSchemeHandler.swift` + `vite.config.ts` 改 base
+- [ ] M1.3 Apple Developer 证书 + TestFlight 第一份 build(developer)— 产 `archive-and-upload.sh` + 第一份 .pkg
+- [ ] M1.4 entitlements + Info.plist + PrivacyInfo 占位(developer)— 产 entitlements 三件套
+- [ ] M1.X tester audit M1 全段(tester)— 产 `.ralph/logs/M1.X-audit.md`
+
+### M2 — Swift Native Services(1.5 周,12 节点 + 1 audit)
+
+- [ ] M2.1.arch Bridge 协议设计(architect)— 产 `.ralph/docs/v34-design/M2.1-bridge-protocol.md`
+- [ ] M2.1.dev BridgeRouter + Codable + Zod 双端契约(developer)— 产 Swift Bridge 三件套 + JS nativeBridge.ts
+- [ ] M2.2 KeychainService(developer,**Parallel-safe**)— 产 KeychainService.swift + keychain.ts
+- [ ] M2.3 DatabaseService(GRDB.swift)(developer,**Parallel-safe**)— 产 DatabaseService.swift + db.ts + Migrations 框架
+- [ ] M2.4 FilePickerService(developer,**Parallel-safe**)— 产 FilePickerService.swift + file.ts
+- [ ] M2.5 PDFParserService(PDFKit)(developer,**Parallel-safe**)— 产 PDFParserService.swift + pdf.ts
+- [ ] M2.6 AudioCaptureService(AVAudioEngine)(developer)— 产 AudioCaptureService.swift,16kHz mono PCM 200ms 切包
+- [ ] M2.7.arch LLMGateway SSE 设计(architect)— 产 `.ralph/docs/v34-design/M2.7-llm-gateway.md`
+- [ ] M2.7.dev LLMGateway + ARK 接通(developer)— 产 LLMGateway.swift + llm.ts,真调火山 ARK 一次成功
+- [ ] M2.8.arch ASRGateway WS 设计(architect)— 产 `.ralph/docs/v34-design/M2.8-asr-gateway.md`
+- [ ] M2.8.dev ASRGateway + 火山 SAUC 接通(developer)— 产 ASRGateway.swift + asr.ts,真调火山 SAUC 一次冒烟
+- [ ] M2.X tester audit M2 全段(tester)— 产 `.ralph/logs/M2.X-audit.md`,评分 ≥ 7/10 才能进 M3
+
+### M3 — 后端逻辑迁 TS(3-4 周,21 节点 + 2 audit)
+
+#### M3.1 — 基础设施(3-5 天)
+
+- [ ] M3.1.1 Zod schemas × 11(developer)— 产 11 个 .ts schema + contract test(5 维度/4 人格/7 填充词/3 档/12 禁止词锁)
+- [ ] M3.1.2 LLM provider 抽象 + ARK provider TS(developer)— 产 `core/llm/` + Vercel AI SDK retry 包装
+- [ ] M3.1.3 LangGraph.js 接入 + Hello World graph(developer)— 验证 LangGraph.js v0.2 可用
+
+#### M3.2 — 4 个简单 Agent(3-5 天,**全部 Parallel-safe**,可同时启 4 个 Ralph 实例)
+
+- [ ] M3.2.1 Parse Agent (TS)(developer,**Parallel-safe**)— 产 `core/agents/parse/`
+- [ ] M3.2.2 Reference Agent (TS)(developer,**Parallel-safe**)— 产 `core/agents/reference/`
+- [ ] M3.2.3 Compression Agent (TS)(developer,**Parallel-safe**)— 产 `core/agents/compression/`,asyncio.wait_for 3s → Promise.race + AbortController
+- [ ] M3.2.4 Observer Agent (TS)(developer,**Parallel-safe**)— 产 `core/agents/observer/`,fillerWords 7 词锁
+
+#### M3.3 — 核心 Agent + LangGraph.js 三图(5-7 天,节点名锁 L0)
+
+- [ ] M3.3.1.arch turn_graph 设计(architect)— 产 `.ralph/docs/v34-design/M3.3.1-turn-graph.md`
+- [ ] M3.3.1.dev turn_graph + Interviewer Agent(developer)— 产 turnGraph.ts + interviewer/ + 节点名锁 contract test + 4 Persona 名锁
+- [ ] M3.3.2.arch intake_graph 设计(architect)— 产 `.ralph/docs/v34-design/M3.3.2-intake-graph.md`
+- [ ] M3.3.2.dev intake_graph + Framework + Research(developer)— 产 intakeGraph.ts + framework/ + research/(Research strict() 隐私护栏)
+- [ ] M3.3.3.arch post_report_graph 设计(architect)— 产 `.ralph/docs/v34-design/M3.3.3-post-report-graph.md`
+- [ ] M3.3.3.dev post_report_graph + Coach + Reflection + Report(developer)— 产 postReportGraph.ts + coach/ + reflection/ + report/(12 禁止词 + 3 档 + 教学护栏)
+- [ ] **M3.3.X tester re-audit 三图(必须)**(tester)— 产 `.ralph/logs/M3.3.X-audit.md`,评分 ≥ 8/10 才能进 M3.4
+
+#### M3.4 — 流式 ASR 接入(2-3 天,端到端关键)
+
+- [ ] M3.4.1.arch 流式 ASR Bridge → AsyncIterator 设计(architect)— 产 `.ralph/docs/v34-design/M3.4.1-streaming-asr-async-iterator.md`
+- [ ] M3.4.1.dev volcStreamAsr + InterviewPage 接入(developer)— 产 volcStreamAsr.ts + LiveCaption.tsx,"边说边出字"
+- [ ] **M3.4.X tester re-audit 流式 ASR(必须)**(tester)— 端到端真录音验证,首字 < 800ms / 松手 < 1.5s
+
+### M4 — UI 改造(1 周,3 节点 + 1 E2E)
+
+- [ ] M4.1 Tauri invoke → nativeBridge 全替换(developer)— grep `@tauri-apps` 应为 0
+- [ ] M4.2 WS interview stream → AsyncIterator(developer)— 删 `apps/desktop/src/api/ws.ts`
+- [ ] M4.3 21 F-ID UI 走查 + 修(developer)— 对照 design-reference 7 页面
+- [ ] M4.X tester E2E smoke 全流程(tester)— Onboarding → Settings → Upload → Parse → Config → Live → Report → History → Reflection
+
+### M5 — 测试迁移 + 后端删除(1-2 周,5 节点)
+
+- [ ] M5.1 后端 471 pytest 分类(tester)— 产 `.ralph/docs/v34-design/M5.1-pytest-migration-triage.md`,目标 KEEP ~300 / REWRITE ~50 / DELETE ~120
+- [ ] M5.2 Vitest 扩充至 ≥ 400(developer)— 翻译 ~350 个 pytest 到 Vitest
+- [ ] M5.3 Playwright E2E 改造为启 Eatit.app(developer)— 5 个金标 E2E 在 .app 内跑通
+- [ ] M5.4.arch apps/api 删除决策(architect)— 产 `.ralph/docs/v34-design/M5.4-python-retirement-decision.md`
+- [ ] M5.4.dev 删除 apps/api + 残余清理(developer)— `apps/api/` 整目录删,grep Python 库引用应为 0
+- [ ] M5.5 README + AGENTS.md + workspace 同步(developer)— pnpm-workspace 移除 api workspace
+
+### M6 — Privacy Manifest + App Store 准备(3-5 天,5 节点 + 1 dual-audit)
+
+- [ ] M6.1 PrivacyInfo.xcprivacy 完整版(developer)— FileTimestamp + UserDefaults 两类 NSPrivacyAccessedAPI
+- [ ] M6.2 5 张截图 + 文案(product-manager,**Parallel-safe with M6.3/M6.4**)— 1280×800 macOS 14
+- [ ] M6.3 隐私政策网页(product-manager,**Parallel-safe**)— 中英双语
+- [ ] M6.4 App Store Connect 元数据(product-manager,**Parallel-safe**)— 描述/关键词/Review Notes
+- [ ] **M6.X tester + product-manager 双审**(tester+product-manager)— 提交 Review 前最后一关
+- [ ] M6.5 第一次 Archive + 上传 App Store Connect(developer)— `archive-and-upload.sh`
+
+### M7 — Review 处理 + 上架(反应式,1+ 节点)
+
+- [ ] M7.1+ Review reject 处理(按 reject 内容现场拆节点)(architect/developer/tester/product-manager,视情况)
+
+> ⚠️ **第 3 次 reject 触发架构 review meeting**(constraints §K),**不得选择"放弃 App Store"作为兜底**。
+
+---
+
+## 待命态(EXIT_SIGNAL: true)条件
+
+所有 M1~M7 节点 [x] + 应用上架到 App Store + 用户能搜索/下载/双击运行。
+
+任何状态(功能跑通但未提交 / 提交被拒未处理 / 上架但 Sandbox 关闭)均**视为未完成**。
+
+---
+
+## Archived(v3.0~v3.3 已完成,v3.4 视为新 app,不读取老数据)
+
+> v3.4 总纲红线规定 Tauri + Python + faster-whisper + PyAV 永久排除,以下章节仅作历史归档,Ralph 不再读取。
+
+### Completed (v3.3 全收尾 / P3/M4 — 2026-05-01)
 
 
 
-## Completed (P3/M4 — v3.2+)
+## Completed (P3/M4 — v3.2+, ARCHIVED v3.4)
 
 - [x] V32.M4.X M4 收口文档同步(FEATURES.md F-315 ⏳→✅ + 把 P2 待做(M4)段改写成 P3 已完成(M4)+ v3.3 全收尾 banner;fix_plan High Priority 清空) (7488597, 2026-05-01)
 - [x] V32.M4.1 F-315 SidebarQuotaCard + quotaMock localStorage(read/increment/reset/getRemaining + 跨月自动归零 + 默认 0/10 + "占位" 文案 + 5+4=9 vitest 单测;前端 160→169) (bbfc3af, 2026-05-01)
