@@ -43,6 +43,13 @@ build/
 apps/desktop/dist/
 .turbo/
 
+# Apple signing artefacts (NEVER commit certs / profiles / API keys)
+*.xcarchive
+*.p12
+*.cer
+*.mobileprovision
+AuthKey_*.p8
+
 # Playwright (V32.M4.3) — local-only artefacts; specs/fixtures stay tracked
 apps/desktop/test-results/
 apps/desktop/playwright-report/
