@@ -17,6 +17,7 @@
 		2DF11A4F786459CE4BB395B5 /* EatitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D97BCF787590B906ED24F7A /* EatitApp.swift */; };
 		3B1A12F54CE3561F830C50D5 /* BridgeError.swift in Sources */ = {isa = PBXBuildFile; fileRef = E57C7DE7F4C06D749B9EEAD6 /* BridgeError.swift */; };
 		46CFD08BFA28F55C008DA677 /* DatabaseServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84A1C10BF214F3B9C20D9C99 /* DatabaseServiceTests.swift */; };
+		4BB9750208A9C76B1A2E5FEA /* ASRGatewayFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 789CA37961FC130117599586 /* ASRGatewayFrame.swift */; };
 		62368A2C9618C8F5EA99C5AD /* AudioCaptureServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00254BA0742E6AE2B81E90 /* AudioCaptureServiceTests.swift */; };
 		6F36C2DBA11CF3C503D4BB49 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 50AC1480FF709D1CDD73F0EB /* GRDB */; };
 		72DD76D89A2E681BDF370A65 /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29BA4CD12763DB886C67A4C9 /* DatabaseService.swift */; };
@@ -25,6 +26,7 @@
 		9A30ADC9DCBE4E3B830B240E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7B8AE0D949E13AD6E0C220D /* AppDelegate.swift */; };
 		A124C35BA81F3FB27B49C690 /* WebViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C779B031475689C5A3249527 /* WebViewController.swift */; };
 		B111728351EC4034DC0075C4 /* KeychainServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78EA1BE62430794ECCF5180B /* KeychainServiceTests.swift */; };
+		B92FCBC07EA92ED8244601F2 /* ASRGatewayFrameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5674783458C04C808F3AF706 /* ASRGatewayFrameTests.swift */; };
 		C72BF0F75A83CC59AF604D5A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9C4F92E482943CF0EAFEC515 /* PrivacyInfo.xcprivacy */; };
 		D0931A2EBAC2396B6C57777B /* LLMTypesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC6E03864EC3C7AB2ECD3093 /* LLMTypesTests.swift */; };
 		D7B912071A26D6B1F55BB1CA /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = EB6C3281A76DF9FEC0ECC39C /* GRDB */; };
@@ -33,6 +35,7 @@
 		E65B6758081226158E022E42 /* BridgeMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DCBBE303E57BB0D2DBDC5C7 /* BridgeMessage.swift */; };
 		E8262C9FB5A4A6A6EB15D53A /* AudioCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2BDD48C47FA2C8804AC270C /* AudioCaptureService.swift */; };
 		F2608B5578A37B276C915E7A /* LLMTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 662B1731127C5013918D1DAF /* LLMTypes.swift */; };
+		F32C373A809F2FED45CBE7D2 /* ASRMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = F55B16B79A183F4015DA6C2C /* ASRMessages.swift */; };
 		F38861CD9B82CB95B3D49ADB /* PDFParserServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C28DBEEC58E17874061AF6 /* PDFParserServiceTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -58,7 +61,9 @@
 		47B0A1C75CC77F33B8806EAC /* FilePickerServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePickerServiceTests.swift; sourceTree = "<group>"; };
 		4DCBBE303E57BB0D2DBDC5C7 /* BridgeMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeMessage.swift; sourceTree = "<group>"; };
 		52966AFF5F89B7324625F160 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		5674783458C04C808F3AF706 /* ASRGatewayFrameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRGatewayFrameTests.swift; sourceTree = "<group>"; };
 		662B1731127C5013918D1DAF /* LLMTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMTypes.swift; sourceTree = "<group>"; };
+		789CA37961FC130117599586 /* ASRGatewayFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRGatewayFrame.swift; sourceTree = "<group>"; };
 		78EA1BE62430794ECCF5180B /* KeychainServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainServiceTests.swift; sourceTree = "<group>"; };
 		827D64E28B1441E3C1AFF23A /* FilePickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePickerService.swift; sourceTree = "<group>"; };
 		84234450F65D5CF7E0E02A2A /* EatitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EatitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -75,6 +80,7 @@
 		D1A7F87BEE0962BBA16ADAB3 /* PDFParserService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFParserService.swift; sourceTree = "<group>"; };
 		E4714382CFE28019C4559054 /* web */ = {isa = PBXFileReference; lastKnownFileType = folder; name = web; path = Eatit/Resources/web; sourceTree = SOURCE_ROOT; };
 		E57C7DE7F4C06D749B9EEAD6 /* BridgeError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeError.swift; sourceTree = "<group>"; };
+		F55B16B79A183F4015DA6C2C /* ASRMessages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRMessages.swift; sourceTree = "<group>"; };
 		FC6E03864EC3C7AB2ECD3093 /* LLMTypesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMTypesTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -98,6 +104,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		09090520D1C74C35E00E49DC /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				F55B16B79A183F4015DA6C2C /* ASRMessages.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
 		3207EDFB2C14763B647D0A54 = {
 			isa = PBXGroup;
 			children = (
@@ -142,6 +156,7 @@
 			isa = PBXGroup;
 			children = (
 				9422B5F55223C58E745A553C /* Methods */,
+				09090520D1C74C35E00E49DC /* Models */,
 				E57C7DE7F4C06D749B9EEAD6 /* BridgeError.swift */,
 				4DCBBE303E57BB0D2DBDC5C7 /* BridgeMessage.swift */,
 				A5EA76747759170E42A8C8E4 /* BridgeRouter.swift */,
@@ -152,6 +167,7 @@
 		9C1DD7C3618B91838C7AB1BA /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				5674783458C04C808F3AF706 /* ASRGatewayFrameTests.swift */,
 				32BAC8BAAED38EB71FFA21EE /* LLMGatewayTests.swift */,
 			);
 			path = Services;
@@ -202,6 +218,7 @@
 		E786947D98D2BE0B8D4CA42F /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				789CA37961FC130117599586 /* ASRGatewayFrame.swift */,
 				B2BDD48C47FA2C8804AC270C /* AudioCaptureService.swift */,
 				29BA4CD12763DB886C67A4C9 /* DatabaseService.swift */,
 				827D64E28B1441E3C1AFF23A /* FilePickerService.swift */,
@@ -380,6 +397,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4BB9750208A9C76B1A2E5FEA /* ASRGatewayFrame.swift in Sources */,
+				F32C373A809F2FED45CBE7D2 /* ASRMessages.swift in Sources */,
 				9A30ADC9DCBE4E3B830B240E /* AppDelegate.swift in Sources */,
 				E8262C9FB5A4A6A6EB15D53A /* AudioCaptureService.swift in Sources */,
 				3B1A12F54CE3561F830C50D5 /* BridgeError.swift in Sources */,
@@ -402,6 +421,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B92FCBC07EA92ED8244601F2 /* ASRGatewayFrameTests.swift in Sources */,
 				62368A2C9618C8F5EA99C5AD /* AudioCaptureServiceTests.swift in Sources */,
 				1A5207CBA5AED8FA837F5CF9 /* BridgeRouterTests.swift in Sources */,
 				46CFD08BFA28F55C008DA677 /* DatabaseServiceTests.swift in Sources */,
