@@ -5,4 +5,7 @@ export * from "./frameworks";
 export * from "./turns";
 export * from "./sessions";
 export * from "./reports";
-// M3.1.1.d extends with coach + reflection + research + meta_reports
+export * from "./coach";
+export * from "./reflection";
+export * from "./research";
+export * from "./meta_reports";

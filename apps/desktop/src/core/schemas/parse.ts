@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TimestampedResponseSchema } from "./common";
 import { PredictedQuestionBankSchema } from "./frameworks";
+import { ResearchAgentOutputSchema } from "./research";
 
 // ===== parse.py sub-schemas (legacy — L0 A10 retained) =====
 
@@ -193,7 +194,7 @@ export type ParseResultPayload = z.infer<typeof ParseResultPayloadSchema>;
 
 /**
  * Mirror of Python ParseRequestResponse(SchemaModel).
- * research_payload: z.unknown() forward-ref — TODO M3.1.1.d: replace with ResearchAgentOutputSchema.
+ * research_payload: ResearchAgentOutputSchema (resolved from forward-ref in M3.1.1.b).
  * predicted_questions: PredictedQuestionBankSchema (defined in frameworks.ts this loop).
  * .strict() enforces no extra fields (v3.4 spec line 1417).
  */
@@ -202,8 +203,7 @@ export const ParseRequestResponseSchema = z
     asset_bundle_id: z.string().uuid(),
     status: z.string(),
     payload: ParseResultPayloadSchema,
-    // TODO M3.1.1.d: replace z.unknown() with ResearchAgentOutputSchema once research.ts lands
-    research_payload: z.unknown().nullable().optional(),
+    research_payload: ResearchAgentOutputSchema.nullable().optional(),
     predicted_questions: PredictedQuestionBankSchema.nullable().optional(),
   })
   .strict();

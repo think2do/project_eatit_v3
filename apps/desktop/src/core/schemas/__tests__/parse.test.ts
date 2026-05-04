@@ -355,12 +355,11 @@ describe("parse.ts schemas", () => {
       expect(result.research_payload).toBeNull();
     });
 
-    it("accepts research_payload as non-null unknown object (forward-ref M3.1.1.d)", () => {
+    it("accepts research_payload as undefined (omitted, forward-ref resolved in M3.1.1.d)", () => {
       const result = ParseRequestResponseSchema.parse({
         ...baseRequest,
-        research_payload: { agent_version: "1.0", findings: ["Finding A", "Finding B"] },
       });
-      expect(result.research_payload).toMatchObject({ agent_version: "1.0" });
+      expect(result.research_payload).toBeUndefined();
     });
 
     it("accepts research_payload as undefined (omitted)", () => {
