@@ -89,3 +89,25 @@ export const ReferenceAnswerSchema = z
   .strict();
 
 export type ReferenceAnswer = z.infer<typeof ReferenceAnswerSchema>;
+
+// M3.2.2: Reference Agent contract input
+// §A11 PII guard: .strict() rejects extra fields (resume_text / candidate_email / candidate_phone etc.)
+export const ReferenceAgentInputSchema = z
+  .object({
+    question: z.string().min(1),
+    job_context: z.string().nullable().optional(),
+    candidate_answer: z.string().nullable().optional(),
+  })
+  .strict();
+export type ReferenceAgentInput = z.infer<typeof ReferenceAgentInputSchema>;
+
+// M3.2.2: Reference Agent contract output (LLM-generated reference answer payload)
+export const ReferenceAgentOutputSchema = z
+  .object({
+    answer_outline: z.array(z.string()),
+    ideal_answer: z.string(),
+    key_evaluation_points: z.array(z.string()),
+    common_pitfalls: z.array(z.string()),
+  })
+  .strict();
+export type ReferenceAgentOutput = z.infer<typeof ReferenceAgentOutputSchema>;
