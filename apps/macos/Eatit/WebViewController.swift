@@ -6,6 +6,10 @@ final class WebViewController: NSViewController {
     let bridgeRouter = BridgeRouter()  // internal — accessible from tests and future service registration
     private var webView: WKWebView!
     private let keychainService = KeychainService()
+    private let databaseService: DatabaseService = {
+        do { return try DatabaseService() }
+        catch { fatalError("DatabaseService init failed: \(error)") }
+    }()
 
     override func loadView() {
         let config = WKWebViewConfiguration()
@@ -23,6 +27,7 @@ final class WebViewController: NSViewController {
         bridgeRouter.webView = webView
         registerEchoHandler()
         registerKeychainHandlers()
+        registerDatabaseHandlers()
     }
 
     private func registerEchoHandler() {
@@ -76,6 +81,61 @@ final class WebViewController: NSViewController {
                 return EmptyResponse()
             } catch {
                 throw BridgeError(code: "keychain.delete-failed", message: "\(error)")
+            }
+        }
+    }
+
+    /// Registers database bridge methods: db.exec / db.query / db.tx.
+    /// §B9: Swift Codable + JS Zod schemas updated in same commit.
+    /// §A0.4 / §E3: callers must not pass ARK_API_KEY / volc-asr-credentials / app-encryption-key as params.
+    /// Design note: registration lives here (not AppDelegate), matching M2.1.dev / M2.2 pattern.
+    private func registerDatabaseHandlers() {
+        struct ExecParams: Codable { let sql: String; let params: [BridgeDBValue]? }
+        struct QueryParams: Codable { let sql: String; let params: [BridgeDBValue]? }
+        struct TxBridgeStatement: Codable { let sql: String; let params: [BridgeDBValue]? }
+        struct TxParams: Codable { let statements: [TxBridgeStatement] }
+        struct EmptyResponse: Codable {}
+
+        bridgeRouter.register(method: "db.exec") { [weak self] (p: ExecParams) -> DatabaseService.ExecResult in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            do {
+                return try await self.databaseService.exec(
+                    sql: p.sql,
+                    params: (p.params ?? []).map(\.dbValue)
+                )
+            } catch {
+                throw BridgeError(code: "db.exec-failed", message: "\(error)")
+            }
+        }
+
+        bridgeRouter.register(method: "db.query") { [weak self] (p: QueryParams) -> [[String: DatabaseValueRepresentation]] in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            do {
+                return try await self.databaseService.query(
+                    sql: p.sql,
+                    params: (p.params ?? []).map(\.dbValue)
+                )
+            } catch {
+                throw BridgeError(code: "db.query-failed", message: "\(error)")
+            }
+        }
+
+        bridgeRouter.register(method: "db.tx") { [weak self] (p: TxParams) -> EmptyResponse in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            do {
+                let txStmts = p.statements.map {
+                    DatabaseService.TxStatement(sql: $0.sql, params: $0.params?.map(\.dbValue) ?? [])
+                }
+                try await self.databaseService.tx(statements: txStmts)
+                return EmptyResponse()
+            } catch {
+                throw BridgeError(code: "db.tx-failed", message: "\(error)")
             }
         }
     }

@@ -27,6 +27,11 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
 
+packages:
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: 7.10.0
+
 targets:
   Eatit:
     type: application
@@ -57,6 +62,8 @@ targets:
       - name: "Verify Embedded Binary Team ID"
         script: |
           echo "[M1.1.dev placeholder] team-id sweep deferred to M2.3+ when SPM deps land"
+    dependencies:
+      - package: GRDB
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: ""
@@ -70,6 +77,7 @@ targets:
           - "README.md"
     dependencies:
       - target: Eatit
+      - package: GRDB
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
