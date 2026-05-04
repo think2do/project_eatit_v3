@@ -30,6 +30,7 @@
     "react-router-dom": "^6.28.0",
     "tailwind-merge": "^2.5.4",
     "xstate": "^5.18.2",
+    "zod": "^4.4.2",
     "zustand": "^5.0.0"
   },
   "devDependencies": {

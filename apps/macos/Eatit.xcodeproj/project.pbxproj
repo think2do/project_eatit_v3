@@ -8,11 +8,15 @@
 
 /* Begin PBXBuildFile section */
 		12877B5CFC5FA06436E473BE /* EatitURLSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ABC08D39D205B42554753E9 /* EatitURLSchemeHandler.swift */; };
+		1A5207CBA5AED8FA837F5CF9 /* BridgeRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45C767D9E819A827DDC9D2F4 /* BridgeRouterTests.swift */; };
 		2DF11A4F786459CE4BB395B5 /* EatitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D97BCF787590B906ED24F7A /* EatitApp.swift */; };
+		3B1A12F54CE3561F830C50D5 /* BridgeError.swift in Sources */ = {isa = PBXBuildFile; fileRef = E57C7DE7F4C06D749B9EEAD6 /* BridgeError.swift */; };
 		7C9CFAA95FE6109226165496 /* web in Resources */ = {isa = PBXBuildFile; fileRef = E4714382CFE28019C4559054 /* web */; };
+		990D042CC8641ACD609EB151 /* BridgeRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5EA76747759170E42A8C8E4 /* BridgeRouter.swift */; };
 		9A30ADC9DCBE4E3B830B240E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7B8AE0D949E13AD6E0C220D /* AppDelegate.swift */; };
 		A124C35BA81F3FB27B49C690 /* WebViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C779B031475689C5A3249527 /* WebViewController.swift */; };
 		C72BF0F75A83CC59AF604D5A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9C4F92E482943CF0EAFEC515 /* PrivacyInfo.xcprivacy */; };
+		E65B6758081226158E022E42 /* BridgeMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DCBBE303E57BB0D2DBDC5C7 /* BridgeMessage.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -29,13 +33,17 @@
 		1D97BCF787590B906ED24F7A /* EatitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EatitApp.swift; sourceTree = "<group>"; };
 		24D007F9DD23D7323372CF2A /* Eatit.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Eatit.entitlements; sourceTree = "<group>"; };
 		376F711F8F6001004EF9471A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		45C767D9E819A827DDC9D2F4 /* BridgeRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeRouterTests.swift; sourceTree = "<group>"; };
+		4DCBBE303E57BB0D2DBDC5C7 /* BridgeMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeMessage.swift; sourceTree = "<group>"; };
 		84234450F65D5CF7E0E02A2A /* EatitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EatitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8ABC08D39D205B42554753E9 /* EatitURLSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EatitURLSchemeHandler.swift; sourceTree = "<group>"; };
 		9C4F92E482943CF0EAFEC515 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		A2CF8E15614176A28DF57FFF /* Eatit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Eatit.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A5EA76747759170E42A8C8E4 /* BridgeRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeRouter.swift; sourceTree = "<group>"; };
 		C779B031475689C5A3249527 /* WebViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewController.swift; sourceTree = "<group>"; };
 		C7B8AE0D949E13AD6E0C220D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		E4714382CFE28019C4559054 /* web */ = {isa = PBXFileReference; lastKnownFileType = folder; name = web; path = Eatit/Resources/web; sourceTree = SOURCE_ROOT; };
+		E57C7DE7F4C06D749B9EEAD6 /* BridgeError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeError.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -59,8 +67,19 @@
 		3B271E85835D69FFF05CC653 /* EatitTests */ = {
 			isa = PBXGroup;
 			children = (
+				45C767D9E819A827DDC9D2F4 /* BridgeRouterTests.swift */,
 			);
 			path = EatitTests;
+			sourceTree = "<group>";
+		};
+		998BCC706D0C6280CE22B7A1 /* Bridge */ = {
+			isa = PBXGroup;
+			children = (
+				E57C7DE7F4C06D749B9EEAD6 /* BridgeError.swift */,
+				4DCBBE303E57BB0D2DBDC5C7 /* BridgeMessage.swift */,
+				A5EA76747759170E42A8C8E4 /* BridgeRouter.swift */,
+			);
+			path = Bridge;
 			sourceTree = "<group>";
 		};
 		AF4CEE95509F31FCC22C340C /* Resources */ = {
@@ -83,6 +102,7 @@
 		C7D3C551970BAC0BDCE3397E /* Eatit */ = {
 			isa = PBXGroup;
 			children = (
+				998BCC706D0C6280CE22B7A1 /* Bridge */,
 				AF4CEE95509F31FCC22C340C /* Resources */,
 				3714B46D9C44F2A220B67E38 /* WebView */,
 				C7B8AE0D949E13AD6E0C220D /* AppDelegate.swift */,
@@ -256,6 +276,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				9A30ADC9DCBE4E3B830B240E /* AppDelegate.swift in Sources */,
+				3B1A12F54CE3561F830C50D5 /* BridgeError.swift in Sources */,
+				E65B6758081226158E022E42 /* BridgeMessage.swift in Sources */,
+				990D042CC8641ACD609EB151 /* BridgeRouter.swift in Sources */,
 				2DF11A4F786459CE4BB395B5 /* EatitApp.swift in Sources */,
 				12877B5CFC5FA06436E473BE /* EatitURLSchemeHandler.swift in Sources */,
 				A124C35BA81F3FB27B49C690 /* WebViewController.swift in Sources */,
@@ -266,6 +289,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1A5207CBA5AED8FA837F5CF9 /* BridgeRouterTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
