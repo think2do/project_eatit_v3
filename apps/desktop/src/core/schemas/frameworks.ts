@@ -153,3 +153,95 @@ export const PredictedQuestionBankSchema = z
   .strict();
 
 export type PredictedQuestionBank = z.infer<typeof PredictedQuestionBankSchema>;
+
+// ===== agents/framework/schemas.py — FrameworkAgent v3.4 (M3.3.2.dev.a) =====
+// §A11 PII guard: all schemas below use .strict() — unknown fields are rejected at every level.
+// §L0 #14: predicted_questions 8-15 lock is enforced in PredictedQuestionBankSchema above (consumed here).
+// §C3: No secret access; schemas are data-shape contracts only.
+
+/**
+ * Mirror of Python FrameworkConfigInput(BaseModel).
+ * .strict() rejects any extra field at the nested config level (§A11).
+ */
+export const FrameworkConfigInputSchema = z
+  .object({
+    level: z.string(),
+    style: z.string(),
+    duration_minutes: z.number().int().min(1),
+  })
+  .strict();
+export type FrameworkConfigInput = z.infer<typeof FrameworkConfigInputSchema>;
+
+/**
+ * Mirror of Python FrameworkAgentInput(BaseModel).
+ * research_payload_json mirrors Python `str | None = None` (F-321 — None when Research unavailable).
+ * .strict() at both outer and nested config level (§A11 nested .strict()).
+ */
+export const FrameworkAgentInputSchema = z
+  .object({
+    parse_payload_json: z.string(),
+    config: FrameworkConfigInputSchema,
+    research_payload_json: z.string().nullable().optional(),
+  })
+  .strict();
+export type FrameworkAgentInput = z.infer<typeof FrameworkAgentInputSchema>;
+
+/**
+ * Mirror of Python FocusCompetency(BaseModel).
+ * .strict() enforces no extra fields (§A11).
+ */
+export const FocusCompetencySchema = z
+  .object({ title: z.string(), why: z.string(), probe_hint: z.string() })
+  .strict();
+
+/**
+ * Mirror of Python DeepDiveAnchor(BaseModel).
+ * .strict() enforces no extra fields (§A11).
+ */
+export const DeepDiveAnchorSchema = z
+  .object({ anchor: z.string(), probe_chain: z.array(z.string()) })
+  .strict();
+
+/**
+ * Mirror of Python PaceSegment(BaseModel).
+ * rough_minutes ge=1 per Python Field constraint.
+ * .strict() enforces no extra fields (§A11).
+ */
+export const PaceSegmentSchema = z
+  .object({ name: z.string(), rough_minutes: z.number().int().min(1), goal: z.string() })
+  .strict();
+
+/**
+ * Mirror of Python PacePlan(BaseModel).
+ * total_minutes ge=1 per Python Field constraint.
+ * .strict() enforces no extra fields (§A11).
+ */
+export const PacePlanSchema = z
+  .object({
+    total_minutes: z.number().int().min(1),
+    segments: z.array(PaceSegmentSchema),
+  })
+  .strict();
+
+export type FocusCompetency = z.infer<typeof FocusCompetencySchema>;
+export type DeepDiveAnchor = z.infer<typeof DeepDiveAnchorSchema>;
+export type PaceSegment = z.infer<typeof PaceSegmentSchema>;
+export type PacePlan = z.infer<typeof PacePlanSchema>;
+
+/**
+ * Mirror of Python FrameworkAgentOutput(BaseModel).
+ * direction: 4-value enum lock (§L0 direction 4-value lock).
+ * predicted_questions: nullable/optional — null is legitimate "no bank" case.
+ * .strict() enforces no extra fields (§A11).
+ */
+export const FrameworkAgentOutputSchema = z
+  .object({
+    direction: z.enum(["project_deep_dive", "competency_probe", "culture_fit", "hybrid"]),
+    focus_competencies: z.array(FocusCompetencySchema),
+    opening_questions: z.array(z.string()),
+    deep_dive_anchors: z.array(DeepDiveAnchorSchema),
+    pace_plan: PacePlanSchema,
+    predicted_questions: PredictedQuestionBankSchema.nullable().optional(),
+  })
+  .strict();
+export type FrameworkAgentOutput = z.infer<typeof FrameworkAgentOutputSchema>;
