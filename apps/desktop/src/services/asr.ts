@@ -1,11 +1,11 @@
 import { z } from "zod";
 import { bridge } from "./nativeBridge";
+import { audio } from "./audio";
 
 // §B9 dual-end contract: ASRStartParams camelCase matches Swift struct ASRStartParams Codable.
 // §C3: accessToken / appId NEVER appear here — injected only in Swift ASRGateway (Keychain read).
 // §K #6 反模式: rejected — this file never touches volc-asr-credentials or X-Api-Access-Key.
-// Note: AsyncIterator (asr-partial/final/end event consumption) deferred to M2.8.dev.e.
-// M2.8.dev.c: asr.status wrapper + payload Zod schemas landed.
+// M2.8.dev.e: AsyncIterator asrStream + useASRStream coordinator landed.
 
 // MARK: - asr.start params schema (Bridge method params, camelCase)
 
@@ -113,4 +113,158 @@ export async function asrStatus(): Promise<ASRStatusResult> {
   return ASRStatusResultSchema.parse(raw);
 }
 
-// Note: AsyncIterator / useASRStream hook deferred to M2.8.dev.e.
+// MARK: - ASRStreamChunk discriminated union (M2.8.dev.e)
+
+/**
+ * Discriminated union yielded by asrStream:
+ * - {type: "partial", text}                     — interim transcript, will be revised
+ * - {type: "final", text, startTime?, endTime?} — committed segment
+ *
+ * §C3: text is user PII. Callers must not log chunk.text. Only log metadata
+ * (chunk.type, chunk.startTime, text.length) if diagnostic logging is needed.
+ */
+export type ASRStreamChunk =
+  | { type: "partial"; text: string }
+  | { type: "final"; text: string; startTime?: number; endTime?: number };
+
+// MARK: - asrStream AsyncIterator (M2.8.dev.e)
+
+/**
+ * Async generator yielding partial/final transcripts for the given streamId.
+ * Subscribes to bridge.on("asr-partial"/"asr-final"/"asr-end") filtered by streamId.
+ *
+ * Lifecycle:
+ *   - Caller MUST have already called asrStart(streamId) before iterating.
+ *   - Generator yields chunks until asr-end arrives (graceful) or asr-end with
+ *     reason="error" (throws Error containing "[errorCode] errorMessage").
+ *   - On iterator.return() / break from for-await-of: finally block unsubscribes handlers.
+ *
+ * §C3: text content is user PII — this generator never logs chunk.text.
+ * §K #4 / #6: PCM stays in Swift; this iterator only consumes already-transcribed text events.
+ */
+export async function* asrStream(
+  streamId: string
+): AsyncGenerator<ASRStreamChunk, void, unknown> {
+  type QueuedItem =
+    | { kind: "chunk"; value: ASRStreamChunk }
+    | { kind: "end" }
+    | { kind: "error"; error: Error };
+
+  const queue: QueuedItem[] = [];
+  let resolveNext: (() => void) | null = null;
+
+  const wakeUp = () => {
+    const r = resolveNext;
+    resolveNext = null;
+    r?.();
+  };
+
+  const offPartial = bridge.on("asr-partial", (e) => {
+    if (e.streamId !== streamId) return;
+    const payload = ASRPartialPayloadSchema.parse(e.payload);
+    queue.push({ kind: "chunk", value: { type: "partial", text: payload.text } });
+    wakeUp();
+  });
+
+  const offFinal = bridge.on("asr-final", (e) => {
+    if (e.streamId !== streamId) return;
+    const payload = ASRFinalPayloadSchema.parse(e.payload);
+    queue.push({
+      kind: "chunk",
+      value: {
+        type: "final",
+        text: payload.text,
+        startTime: payload.startTime,
+        endTime: payload.endTime,
+      },
+    });
+    wakeUp();
+  });
+
+  const offEnd = bridge.on("asr-end", (e) => {
+    if (e.streamId !== streamId) return;
+    const payload = ASREndPayloadSchema.parse(e.payload);
+    if (payload.reason === "error") {
+      const code = payload.errorCode ?? "asr.stream-failed";
+      const msg = payload.errorMessage ?? "asr stream errored";
+      queue.push({ kind: "error", error: new Error(`[${code}] ${msg}`) });
+    } else {
+      queue.push({ kind: "end" });
+    }
+    wakeUp();
+  });
+
+  const cleanup = () => {
+    offPartial();
+    offFinal();
+    offEnd();
+  };
+
+  try {
+    while (true) {
+      if (queue.length === 0) {
+        await new Promise<void>((r) => {
+          resolveNext = r;
+        });
+      }
+      const item = queue.shift()!;
+      switch (item.kind) {
+        case "chunk":
+          yield item.value;
+          break;
+        case "end":
+          return;
+        case "error":
+          throw item.error;
+      }
+    }
+  } finally {
+    cleanup();
+  }
+}
+
+// MARK: - useASRStream high-level coordinator (M2.8.dev.e)
+
+/**
+ * Combined start/iterate/stop coordinator per architect §6.1 sequence:
+ *   1. crypto.randomUUID() generates streamId
+ *   2. asrStart() opens WebSocket + sends first frame
+ *   3. audio.start() begins mic capture (after asr.start so PCM has a consumer)
+ *   4. Yields ASRStreamChunks via asrStream
+ *   5. On iterator.return() / break / throw (finally block):
+ *        a. audio.stop() FIRST (stop sending PCM)
+ *        b. asrStop() SECOND (sends last-flag frame + waits 1s drain + closes WS)
+ *
+ * §C3: no PCM/credential ever observed by JS; only transcript text is yielded.
+ * §6.1 ordering invariant: enforced at start (asr → audio) AND stop (audio → asr).
+ *
+ * Throws if asrStart fails (credentials missing / host not allowed / etc).
+ * audio.start failures roll back by calling asrStop before propagating.
+ */
+export async function* useASRStream(
+  params?: Omit<ASRStartParams, "streamId">
+): AsyncGenerator<ASRStreamChunk, void, unknown> {
+  const streamId = crypto.randomUUID();
+  const fullParams: ASRStartParams = { streamId, ...(params ?? {}) };
+
+  await asrStart(fullParams);
+
+  try {
+    await audio.start(streamId);
+  } catch (audioErr) {
+    // §6.1: audio.start failed after asrStart succeeded → rollback ASR
+    await asrStop(streamId).catch(() => undefined);
+    throw audioErr;
+  }
+
+  const inner = asrStream(streamId);
+  try {
+    for await (const chunk of inner) {
+      yield chunk;
+    }
+  } finally {
+    // §6.1 stop ordering: audio FIRST, asr SECOND
+    await audio.stop().catch(() => undefined);
+    await asrStop(streamId).catch(() => undefined);
+  }
+}

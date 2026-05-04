@@ -4,6 +4,8 @@ import {
   asrStart,
   asrStop,
   asrStatus,
+  asrStream,
+  useASRStream,
   ASRStartParamsSchema,
   ASRStartedSchema,
   ASRStoppedSchema,
@@ -11,6 +13,7 @@ import {
   ASRPartialPayloadSchema,
   ASRFinalPayloadSchema,
   ASREndPayloadSchema,
+  type ASRStreamChunk,
 } from "../asr";
 import { BridgeError } from "../nativeBridge";
 
@@ -302,5 +305,267 @@ describe("asr service", () => {
 
     const err = await asrStatus().catch((e) => e);
     expect(err).toBeInstanceOf(z.ZodError);
+  });
+});
+
+// MARK: - asrStream AsyncIterator (M2.8.dev.e)
+
+describe("asrStream", () => {
+  // Each test uses a unique streamId so bridge event handlers don't cross-contaminate.
+  // Pattern: call gen.next() first (registers handlers synchronously), then dispatch events.
+
+  beforeEach(() => {
+    (window as unknown as Record<string, unknown>).webkit = {
+      messageHandlers: {
+        eatit: { postMessage: vi.fn() },
+      },
+    };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("yields partial chunks then final chunk, then exits gracefully on asr-end", async () => {
+    const SID = "asr-stream-test-1";
+    const gen = asrStream(SID);
+
+    // Start the generator (registers bridge.on handlers synchronously, suspends at first await)
+    const p1 = gen.next();
+    // Dispatch 2 partials + 1 final + 1 end — handlers are now registered
+    window.eatitBridge!.dispatch!({ type: "asr-partial", streamId: SID, payload: { text: "hel", definite: false } });
+    window.eatitBridge!.dispatch!({ type: "asr-partial", streamId: SID, payload: { text: "hello", definite: false } });
+    window.eatitBridge!.dispatch!({ type: "asr-final", streamId: SID, payload: { text: "hello world", definite: true, startTime: 0, endTime: 1200 } });
+    window.eatitBridge!.dispatch!({ type: "asr-end", streamId: SID, payload: { reason: "client-stop" } });
+
+    const chunks: ASRStreamChunk[] = [];
+    const r1 = await p1;
+    if (!r1.done) chunks.push(r1.value);
+    for await (const chunk of gen) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toHaveLength(3);
+    expect(chunks[0]).toEqual({ type: "partial", text: "hel" });
+    expect(chunks[1]).toEqual({ type: "partial", text: "hello" });
+    expect(chunks[2]).toEqual({ type: "final", text: "hello world", startTime: 0, endTime: 1200 });
+  });
+
+  it("filters events for other streamIds — only yields chunks for the subscribed streamId", async () => {
+    const MINE = "asr-stream-mine";
+    const OTHER = "asr-stream-other";
+    const gen = asrStream(MINE);
+
+    // Start the generator to register handlers
+    const p1 = gen.next();
+
+    // Dispatch event for OTHER stream — should be ignored
+    window.eatitBridge!.dispatch!({ type: "asr-partial", streamId: OTHER, payload: { text: "leaked", definite: false } });
+    // Then dispatch for MINE + end
+    window.eatitBridge!.dispatch!({ type: "asr-partial", streamId: MINE, payload: { text: "mine-text", definite: false } });
+    window.eatitBridge!.dispatch!({ type: "asr-end", streamId: MINE, payload: { reason: "stop" } });
+
+    const chunks: ASRStreamChunk[] = [];
+    const r1 = await p1;
+    if (!r1.done) chunks.push(r1.value);
+    for await (const chunk of gen) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]).toEqual({ type: "partial", text: "mine-text" });
+  });
+
+  it("throws Error on asr-end with reason='error', message contains [errorCode] errorMessage", async () => {
+    const SID = "asr-stream-err";
+    const gen = asrStream(SID);
+
+    // Start the generator to register handlers
+    const p1 = gen.next();
+
+    window.eatitBridge!.dispatch!({
+      type: "asr-end",
+      streamId: SID,
+      payload: { reason: "error", errorCode: "asr.frame-unpack-failed", errorMessage: "header too short" },
+    });
+
+    const err = await p1.catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain("[asr.frame-unpack-failed]");
+    expect((err as Error).message).toContain("header too short");
+  });
+
+  it("uses default errorCode/errorMessage when asr-end reason='error' omits them", async () => {
+    const SID = "asr-stream-err-default";
+    const gen = asrStream(SID);
+
+    const p1 = gen.next();
+
+    window.eatitBridge!.dispatch!({
+      type: "asr-end",
+      streamId: SID,
+      payload: { reason: "error" },
+    });
+
+    const err = await p1.catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain("[asr.stream-failed]");
+    expect((err as Error).message).toContain("asr stream errored");
+  });
+
+  it("cleanup unsubscribes handlers on iterator.return() — generator is done after break", async () => {
+    const SID = "asr-stream-cleanup";
+    const gen = asrStream(SID);
+
+    // Start the generator to register handlers
+    const p1 = gen.next();
+    // Queue one chunk then trigger end
+    window.eatitBridge!.dispatch!({ type: "asr-partial", streamId: SID, payload: { text: "first", definite: false } });
+
+    const chunks: ASRStreamChunk[] = [];
+    const r1 = await p1;
+    if (!r1.done) {
+      chunks.push(r1.value);
+    }
+    // Break immediately after first item — triggers iterator.return() and finally cleanup
+    // (we already consumed it via p1, so we just verify the generator is done)
+    await gen.return(undefined); // explicit return to ensure cleanup
+
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]).toEqual({ type: "partial", text: "first" });
+
+    // Generator should be done — next() returns {done: true}
+    const next = await gen.next();
+    expect(next.done).toBe(true);
+  });
+});
+
+// MARK: - useASRStream coordinator (M2.8.dev.e)
+
+describe("useASRStream", () => {
+  const STREAM_UUID = "c2dddc99-1234-5678-ab12-9cc0ce491baa";
+
+  // Drain the microtask queue fully — needed because useASRStream awaits asrStart + audio.start
+  // (two bridge.call round-trips) before the inner asrStream generator registers its handlers.
+  const drainMicrotasks = () => new Promise<void>((r) => setTimeout(r, 0));
+
+  beforeEach(() => {
+    vi.spyOn(crypto, "randomUUID").mockReturnValue(STREAM_UUID as ReturnType<typeof crypto.randomUUID>);
+    (window as unknown as Record<string, unknown>).webkit = {
+      messageHandlers: {
+        eatit: { postMessage: vi.fn() },
+      },
+    };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("calls asr.start then audio.start in correct order (asr before audio)", async () => {
+    const mockPost = window.webkit!.messageHandlers!.eatit!.postMessage as ReturnType<typeof vi.fn>;
+    // asr.start resolves OK
+    mockPost.mockResolvedValueOnce({ id: STREAM_UUID, ok: true, data: { streamId: STREAM_UUID, started: true } });
+    // audio.start resolves OK
+    mockPost.mockResolvedValueOnce({ id: STREAM_UUID, ok: true, data: undefined });
+    // remaining calls (audio.stop, asr.stop cleanup)
+    mockPost.mockResolvedValue({ id: STREAM_UUID, ok: true, data: { stopped: true } });
+
+    const gen = useASRStream();
+
+    // Start the generator — it will execute asrStart → audio.start → register asrStream handlers
+    const p1 = gen.next();
+    // Drain macrotask to let asrStart + audio.start awaits complete and asrStream handlers register
+    await drainMicrotasks();
+
+    // Dispatch asr-end to let the generator exit gracefully (handlers are now registered)
+    window.eatitBridge!.dispatch!({ type: "asr-end", streamId: STREAM_UUID, payload: { reason: "client-stop" } });
+
+    await p1;
+    for await (const _ of gen) { /* drain remaining */ }
+    await drainMicrotasks(); // allow finally cleanup to settle
+
+    const callMethods = mockPost.mock.calls.map((c) => (c[0] as { method: string }).method);
+    const asrStartIdx = callMethods.indexOf("asr.start");
+    const audioStartIdx = callMethods.indexOf("audio.start");
+    expect(asrStartIdx).toBeGreaterThanOrEqual(0);
+    expect(audioStartIdx).toBeGreaterThan(asrStartIdx);
+  });
+
+  it("cleanup calls audio.stop then asr.stop in correct order (audio before asr)", async () => {
+    const mockPost = window.webkit!.messageHandlers!.eatit!.postMessage as ReturnType<typeof vi.fn>;
+    mockPost.mockResolvedValue({ id: STREAM_UUID, ok: true, data: { streamId: STREAM_UUID, started: true, stopped: true } });
+
+    const gen = useASRStream();
+
+    const p1 = gen.next();
+    await drainMicrotasks();
+
+    // Dispatch asr-end — triggers finally block with audio.stop → asr.stop
+    window.eatitBridge!.dispatch!({ type: "asr-end", streamId: STREAM_UUID, payload: { reason: "client-stop" } });
+    await p1;
+    for await (const _ of gen) { /* drain */ }
+    await drainMicrotasks(); // allow finally cleanup (audio.stop + asr.stop) to settle
+
+    const callMethods = mockPost.mock.calls.map((c) => (c[0] as { method: string }).method);
+    const audioStopIdx = callMethods.lastIndexOf("audio.stop");
+    const asrStopIdx = callMethods.lastIndexOf("asr.stop");
+    expect(audioStopIdx).toBeGreaterThanOrEqual(0);
+    expect(asrStopIdx).toBeGreaterThan(audioStopIdx);
+  });
+
+  it("audio.start failure rolls back: invokes asrStop, then propagates audio error", async () => {
+    const mockPost = window.webkit!.messageHandlers!.eatit!.postMessage as ReturnType<typeof vi.fn>;
+    // asr.start succeeds
+    mockPost.mockResolvedValueOnce({ id: STREAM_UUID, ok: true, data: { streamId: STREAM_UUID, started: true } });
+    // audio.start fails
+    mockPost.mockResolvedValueOnce({
+      id: STREAM_UUID,
+      ok: false,
+      error: { code: "audio.permission-denied", message: "mic denied" },
+    });
+    // asr.stop (rollback) succeeds
+    mockPost.mockResolvedValue({ id: STREAM_UUID, ok: true, data: { stopped: true } });
+
+    const gen = useASRStream();
+    const err = await gen.next().catch((e) => e);
+    await drainMicrotasks(); // allow rollback asrStop to settle
+
+    expect(err).toBeInstanceOf(BridgeError);
+    expect((err as BridgeError).code).toBe("audio.permission-denied");
+
+    const callMethods = mockPost.mock.calls.map((c) => (c[0] as { method: string }).method);
+    expect(callMethods).toContain("asr.start");
+    expect(callMethods).toContain("audio.start");
+    expect(callMethods).toContain("asr.stop");
+    // audio.stop should NOT be called (audio never started successfully)
+    expect(callMethods).not.toContain("audio.stop");
+  });
+
+  it("propagates partial/final chunks dispatched with the generated streamId", async () => {
+    const mockPost = window.webkit!.messageHandlers!.eatit!.postMessage as ReturnType<typeof vi.fn>;
+    mockPost.mockResolvedValue({ id: STREAM_UUID, ok: true, data: { streamId: STREAM_UUID, started: true, stopped: true } });
+
+    const gen = useASRStream();
+
+    const p1 = gen.next();
+    // Allow asrStart + audio.start to complete and inner asrStream handlers to register
+    await drainMicrotasks();
+
+    // Dispatch using the UUID that crypto.randomUUID() returns (deterministic via spy)
+    window.eatitBridge!.dispatch!({ type: "asr-partial", streamId: STREAM_UUID, payload: { text: "world", definite: false } });
+    window.eatitBridge!.dispatch!({ type: "asr-final", streamId: STREAM_UUID, payload: { text: "hello world", definite: true } });
+    window.eatitBridge!.dispatch!({ type: "asr-end", streamId: STREAM_UUID, payload: { reason: "client-stop" } });
+
+    const chunks: ASRStreamChunk[] = [];
+    const r1 = await p1;
+    if (!r1.done) chunks.push(r1.value);
+    for await (const chunk of gen) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toHaveLength(2);
+    expect(chunks[0]).toEqual({ type: "partial", text: "world" });
+    expect(chunks[1]).toMatchObject({ type: "final", text: "hello world" });
   });
 });
