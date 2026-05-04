@@ -138,3 +138,28 @@ export const CompressionAgentOutputSchema = z
   })
   .strict();
 export type CompressionAgentOutput = z.infer<typeof CompressionAgentOutputSchema>;
+
+// M3.2.4: Observer Agent contract (tone enum + agent input/output)
+// §A11 PII guard: .strict() rejects extra fields (resume_text / candidate_email / etc.)
+export const ObserverToneSchema = z.enum(["support", "alert", "pivot"]);
+export type ObserverTone = z.infer<typeof ObserverToneSchema>;
+
+export const ObserverAgentInputSchema = z
+  .object({
+    turn_index: z.number().int().nonnegative(),
+    question: z.string(),
+    answer: z.string(),
+    remaining_minutes: z.number().int().nullable().optional(),
+    long_term_summary: z.string().nullable().optional(),
+  })
+  .strict();
+export type ObserverAgentInput = z.infer<typeof ObserverAgentInputSchema>;
+
+export const ObserverAgentOutputSchema = z
+  .object({
+    observation: z.string().min(1).max(60),
+    tone: ObserverToneSchema,
+    actionable: z.boolean(),
+  })
+  .strict();
+export type ObserverAgentOutput = z.infer<typeof ObserverAgentOutputSchema>;
