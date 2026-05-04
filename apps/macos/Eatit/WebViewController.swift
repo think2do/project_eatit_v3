@@ -16,6 +16,8 @@ final class WebViewController: NSViewController {
     // lazy var avoids stored-property ordering issue: keychainService is init'd before this runs.
     // §A0.4: apiKey is read inside LLMGateway per-call; not cached here.
     private lazy var llmGateway: LLMGateway = LLMGateway(keychain: keychainService)
+    // §A0.4: volc-asr-credentials read per-call inside ASRGateway; not cached here.
+    private lazy var asrGateway: ASRGateway = ASRGateway(keychain: keychainService, router: bridgeRouter)
     // §6.3: active SSE stream tasks keyed by streamId. NSLock for thread-safe mutation.
     private var activeStreams: [String: Task<Void, Never>] = [:]
     private let activeStreamsLock = NSLock()
@@ -54,6 +56,7 @@ final class WebViewController: NSViewController {
         registerPDFParserHandlers()
         registerAudioCaptureHandlers()
         registerLLMHandlers()
+        registerASRHandlers()
     }
 
     private func registerEchoHandler() {
@@ -335,6 +338,37 @@ final class WebViewController: NSViewController {
             self.activeStreamsLock.unlock()
             task?.cancel()
             return StopResult(stopped: true)
+        }
+    }
+
+    /// Registers ASR Bridge methods: asr.start + asr.stop.
+    /// §C3: volc-asr-credentials read inside ASRGateway; never crosses Bridge.
+    /// §A0.4: Keychain read per-call, not stored in this controller.
+    /// §B9: dual-end contract — JS ASRStartParamsSchema + ASRStartedSchema + ASRStoppedSchema in same commit.
+    /// Note: asr.status deferred to M2.8.dev.c (depends on receive loop state machine).
+    private func registerASRHandlers() {
+        struct ASRStopParams: Codable { let streamId: String }
+
+        bridgeRouter.register(method: "asr.start") { [weak self] (p: ASRStartParams) -> ASRStartedResult in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            do {
+                try await self.asrGateway.connect(streamId: p.streamId, params: p)
+                return ASRStartedResult(streamId: p.streamId, started: true)
+            } catch let bridgeErr as BridgeError {
+                throw bridgeErr
+            } catch {
+                throw BridgeError(code: "asr.start-failed", message: "\(error)")
+            }
+        }
+
+        bridgeRouter.register(method: "asr.stop") { [weak self] (p: ASRStopParams) -> ASRStoppedResult in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            await self.asrGateway.disconnect()
+            return ASRStoppedResult(stopped: true)
         }
     }
 

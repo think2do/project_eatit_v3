@@ -19,6 +19,26 @@ if grep -rE "console\.(log|error|warn|info|debug).*[Aa]uthorization|console\.(lo
   echo "console.log leak"; fail=1
 fi
 
+# ASR ban patterns (M2.8.dev.b — §3.3 SOP)
+if grep -rE "os_log.*X-Api-Access-Key" apps/macos/ 2>/dev/null; then
+  echo "os_log X-Api-Access-Key leak"; fail=1
+fi
+if grep -rE "os_log.*accessToken" apps/macos/ 2>/dev/null; then
+  echo "os_log accessToken leak"; fail=1
+fi
+if grep -rE "print.*creds\." apps/macos/ 2>/dev/null; then
+  echo "print creds. leak"; fail=1
+fi
+if grep -rE "print.*VolcAsrCreds" apps/macos/ 2>/dev/null; then
+  echo "print VolcAsrCreds leak"; fail=1
+fi
+if grep -rE "console\.(log|error|warn).*accessToken" apps/desktop/src/ 2>/dev/null; then
+  echo "console accessToken leak"; fail=1
+fi
+if grep -rE "console\.(log|error|warn).*X-Api-" apps/desktop/src/ 2>/dev/null; then
+  echo "console X-Api- leak"; fail=1
+fi
+
 # Ban real key literals committed to repo (excluding Tests + fixtures dirs)
 if git ls-files apps/macos apps/desktop | xargs grep -lE "(sk-[A-Za-z0-9]{20,}|ark-[A-Za-z0-9]{20,}|Bearer\s+[A-Za-z0-9_-]{20,})" 2>/dev/null | grep -v Tests | grep -v fixtures; then
   echo "key literal in non-test file"; fail=1
