@@ -25,10 +25,12 @@
 		A124C35BA81F3FB27B49C690 /* WebViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C779B031475689C5A3249527 /* WebViewController.swift */; };
 		B111728351EC4034DC0075C4 /* KeychainServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78EA1BE62430794ECCF5180B /* KeychainServiceTests.swift */; };
 		C72BF0F75A83CC59AF604D5A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9C4F92E482943CF0EAFEC515 /* PrivacyInfo.xcprivacy */; };
+		D0931A2EBAC2396B6C57777B /* LLMTypesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC6E03864EC3C7AB2ECD3093 /* LLMTypesTests.swift */; };
 		D7B912071A26D6B1F55BB1CA /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = EB6C3281A76DF9FEC0ECC39C /* GRDB */; };
 		DB99DAD8206009767658D505 /* FilePickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 827D64E28B1441E3C1AFF23A /* FilePickerService.swift */; };
 		E65B6758081226158E022E42 /* BridgeMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DCBBE303E57BB0D2DBDC5C7 /* BridgeMessage.swift */; };
 		E8262C9FB5A4A6A6EB15D53A /* AudioCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2BDD48C47FA2C8804AC270C /* AudioCaptureService.swift */; };
+		F2608B5578A37B276C915E7A /* LLMTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 662B1731127C5013918D1DAF /* LLMTypes.swift */; };
 		F38861CD9B82CB95B3D49ADB /* PDFParserServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C28DBEEC58E17874061AF6 /* PDFParserServiceTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -52,6 +54,7 @@
 		47B0A1C75CC77F33B8806EAC /* FilePickerServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePickerServiceTests.swift; sourceTree = "<group>"; };
 		4DCBBE303E57BB0D2DBDC5C7 /* BridgeMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeMessage.swift; sourceTree = "<group>"; };
 		52966AFF5F89B7324625F160 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		662B1731127C5013918D1DAF /* LLMTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMTypes.swift; sourceTree = "<group>"; };
 		78EA1BE62430794ECCF5180B /* KeychainServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainServiceTests.swift; sourceTree = "<group>"; };
 		827D64E28B1441E3C1AFF23A /* FilePickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePickerService.swift; sourceTree = "<group>"; };
 		84234450F65D5CF7E0E02A2A /* EatitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EatitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -68,6 +71,7 @@
 		D1A7F87BEE0962BBA16ADAB3 /* PDFParserService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFParserService.swift; sourceTree = "<group>"; };
 		E4714382CFE28019C4559054 /* web */ = {isa = PBXFileReference; lastKnownFileType = folder; name = web; path = Eatit/Resources/web; sourceTree = SOURCE_ROOT; };
 		E57C7DE7F4C06D749B9EEAD6 /* BridgeError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeError.swift; sourceTree = "<group>"; };
+		FC6E03864EC3C7AB2ECD3093 /* LLMTypesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMTypesTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -110,6 +114,7 @@
 		3B271E85835D69FFF05CC653 /* EatitTests */ = {
 			isa = PBXGroup;
 			children = (
+				E4BFF142990BD0B24759F60B /* Bridge */,
 				CC00254BA0742E6AE2B81E90 /* AudioCaptureServiceTests.swift */,
 				45C767D9E819A827DDC9D2F4 /* BridgeRouterTests.swift */,
 				84A1C10BF214F3B9C20D9C99 /* DatabaseServiceTests.swift */,
@@ -120,9 +125,18 @@
 			path = EatitTests;
 			sourceTree = "<group>";
 		};
+		9422B5F55223C58E745A553C /* Methods */ = {
+			isa = PBXGroup;
+			children = (
+				662B1731127C5013918D1DAF /* LLMTypes.swift */,
+			);
+			path = Methods;
+			sourceTree = "<group>";
+		};
 		998BCC706D0C6280CE22B7A1 /* Bridge */ = {
 			isa = PBXGroup;
 			children = (
+				9422B5F55223C58E745A553C /* Methods */,
 				E57C7DE7F4C06D749B9EEAD6 /* BridgeError.swift */,
 				4DCBBE303E57BB0D2DBDC5C7 /* BridgeMessage.swift */,
 				A5EA76747759170E42A8C8E4 /* BridgeRouter.swift */,
@@ -162,6 +176,14 @@
 				C779B031475689C5A3249527 /* WebViewController.swift */,
 			);
 			path = Eatit;
+			sourceTree = "<group>";
+		};
+		E4BFF142990BD0B24759F60B /* Bridge */ = {
+			isa = PBXGroup;
+			children = (
+				FC6E03864EC3C7AB2ECD3093 /* LLMTypesTests.swift */,
+			);
+			path = Bridge;
 			sourceTree = "<group>";
 		};
 		E786947D98D2BE0B8D4CA42F /* Services */ = {
@@ -354,6 +376,7 @@
 				12877B5CFC5FA06436E473BE /* EatitURLSchemeHandler.swift in Sources */,
 				DB99DAD8206009767658D505 /* FilePickerService.swift in Sources */,
 				1621B4ADC84A30CD390A4007 /* KeychainService.swift in Sources */,
+				F2608B5578A37B276C915E7A /* LLMTypes.swift in Sources */,
 				234C778F7F573D0CE3905495 /* Migrations.swift in Sources */,
 				1763841EC90FE25B31E8589B /* PDFParserService.swift in Sources */,
 				A124C35BA81F3FB27B49C690 /* WebViewController.swift in Sources */,
@@ -369,6 +392,7 @@
 				46CFD08BFA28F55C008DA677 /* DatabaseServiceTests.swift in Sources */,
 				168D525C07E20BC8867C57F6 /* FilePickerServiceTests.swift in Sources */,
 				B111728351EC4034DC0075C4 /* KeychainServiceTests.swift in Sources */,
+				D0931A2EBAC2396B6C57777B /* LLMTypesTests.swift in Sources */,
 				F38861CD9B82CB95B3D49ADB /* PDFParserServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
