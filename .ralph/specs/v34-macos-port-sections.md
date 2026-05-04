@@ -1369,6 +1369,48 @@ corepack pnpm test src/core/schemas/__tests__/contracts.test.ts
 
 **Commit.** `feat(F-405): port pydantic schemas to zod`
 
+> ⚠️ **2026-05-04 拆分**:11 schema + 5 锁 + 12 禁止词 fuzz 一锅过重。已拆为 .a~d 4 子节点。Ralph 不再读本段。
+
+### M3.1.1.a — Zod schemas: common + assets
+**Lead Agent**: developer | **Deps**: M2.X
+**Goal.** 翻译 2 个最基础 schema(被其他文件 import)+ 建立目录骨架 + barrel。
+**Files (new):**
+- `apps/desktop/src/core/schemas/common.ts` + `assets.ts` + `index.ts`
+- `apps/desktop/src/core/schemas/__tests__/common.test.ts`(`.strict()` reject extra)
+**Acceptance.** `corepack pnpm exec tsc --noEmit && corepack pnpm test src/core/schemas/__tests__/common.test.ts`
+**Commit.** `feat(F-405): port common + assets schemas to zod`
+
+### M3.1.1.b — Zod schemas: parse + frameworks
+**Lead Agent**: developer | **Deps**: M3.1.1.a
+**Goal.** parse(jd_company_name / jd_role_title / jd_industry_hints L0 隐私护栏)+ frameworks(predicted_questions 8-15 锁)。
+**Files (new):**
+- `apps/desktop/src/core/schemas/parse.ts` + `frameworks.ts`
+- `apps/desktop/src/core/schemas/__tests__/{parse,frameworks}.test.ts`
+- modify `index.ts` barrel
+**Acceptance.** `corepack pnpm test src/core/schemas/__tests__/{parse,frameworks}.test.ts`
+**Commit.** `feat(F-405): port parse + frameworks schemas to zod`
+
+### M3.1.1.c — Zod schemas: reports + sessions + turns(L0 锁断言重灾区)
+**Lead Agent**: developer | **Deps**: M3.1.1.b
+**Goal.** 3 个核心 + L0 锁:5 维度 name + 3 档 pass_likelihood + 12 禁止词 fuzz + InterviewConfig 4+6+3 锁。
+**Files (new):**
+- `apps/desktop/src/core/schemas/reports.ts` + `sessions.ts` + `turns.ts`
+- `apps/desktop/src/core/schemas/__tests__/contracts-locks.test.ts`(★ 5 维度 / 3 档 / 12 禁止词 fuzz)
+- modify `index.ts` barrel
+**Key.** `z.enum(["专业深度","结构化表达","批判性思考","业务直觉","沟通节奏"])` + `z.enum(["中上","中","中下"])`
+**Acceptance.** `corepack pnpm test src/core/schemas/__tests__/contracts-locks.test.ts`
+**Commit.** `feat(F-405): port reports/sessions/turns with L0 locks`
+
+### M3.1.1.d — Zod schemas: coach + reflection + research + meta_reports
+**Lead Agent**: developer | **Deps**: M3.1.1.c
+**Goal.** 剩 4 schema + Research strict() 隐私 fuzz + 收尾 barrel + tsc 干净。
+**Files (new):**
+- `apps/desktop/src/core/schemas/{coach,reflection,research,meta_reports}.ts`
+- `apps/desktop/src/core/schemas/__tests__/research-privacy.fuzz.test.ts`(★ N=300 fuzz)
+- modify `index.ts` barrel(全 11 export)
+**Acceptance.** `corepack pnpm test src/core/schemas/ && corepack pnpm exec tsc --noEmit`
+**Commit.** `feat(F-405): port coach/reflection/research/meta_reports schemas`
+
 ---
 
 ## M3.1.2 — LLM provider 抽象 + ARK provider TS
