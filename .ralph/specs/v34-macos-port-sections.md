@@ -1118,6 +1118,56 @@ corepack pnpm test src/__tests__/llmGateway.contract.test.ts
 
 **Commit.** `feat(F-402,F-404): implement llm gateway with volcengine ark`
 
+> ⚠️ **2026-05-04 拆分**:本节点过重(Codable + chat sync + chatStream SSE + JS provider 四件)已拆 .a~d 4 子节点。Ralph 不再读本段。
+
+### M2.7.dev.a — LLMGateway Codable 类型 + JSON 编解码
+**Lead Agent**: developer | **Deps**: M2.7.arch
+**Goal.** ARK Chat Completions 的 request / response / streaming chunk 三类 Codable struct 落地 + JSON encode/decode round-trip 测试。本节点不调网络。
+**Files (new):**
+- `apps/macos/Eatit/Bridge/Models/LLMMessages.swift`(ChatCompletionRequest/Response, ChatMessage, ChatChoice, Usage, ToolCall)
+- `apps/macos/Eatit/Bridge/Models/LLMStreamChunk.swift`(ChatChunk / Delta / `[DONE]` 哨兵)
+- `apps/macos/EatitTests/LLMMessagesTests.swift`(round-trip ≥ 6 case)
+**Acceptance.** `xcodebuild test -only-testing:EatitTests/LLMMessagesTests`
+**Commit.** `feat(F-402): codable types for ark chat completions`
+
+### M2.7.dev.b — chat 同步 + 错误重试 + Bearer header
+**Lead Agent**: developer | **Deps**: M2.7.dev.a, M2.2
+**Goal.** Swift `LLMGateway.chat` 同步 + Keychain 取 ark-api-key 注入 Bearer + 429/500/503 指数退避 3 次 + XCTest mock URLProtocol。
+**Files (new + modify):**
+- `apps/macos/Eatit/Services/LLMGateway.swift`(new — 仅 chat)
+- `apps/macos/EatitTests/LLMGatewayChatTests.swift`(new)
+- `apps/macos/EatitTests/Helpers/MockURLProtocol.swift`(new — 复用)
+- `apps/macos/Eatit/WebViewController.swift`(modify — 注册 llm.chat)
+- `apps/desktop/src/services/llm.ts`(new — 仅 chat wrapper)
+- `apps/desktop/src/__tests__/llmGateway.chat.test.ts`(new)
+**Acceptance.** `xcodebuild test -only-testing:EatitTests/LLMGatewayChatTests && cd ../desktop && corepack pnpm test src/__tests__/llmGateway.chat.test.ts`
+**Commit.** `feat(F-402,F-404): llm gateway chat (sync) with retry`
+
+### M2.7.dev.c — chatStream SSE + Bridge events
+**Lead Agent**: developer | **Deps**: M2.7.dev.b
+**Goal.** Swift `chatStream` 用 `URLSession.bytes(for:)` 行读 SSE,逐行解析 `data: ...` → ChatChunk,通过 `dispatchEvent("stream-chunk", ...)` 推 JS;`[DONE]` 触发 `stream-end`。
+**Files (modify + new):**
+- `apps/macos/Eatit/Services/LLMGateway.swift`(modify — 加 chatStream)
+- `apps/macos/Eatit/WebViewController.swift`(modify — 注册 llm.chatStream)
+- `apps/macos/EatitTests/LLMGatewayStreamTests.swift`(new — mock SSE bytes)
+- `apps/desktop/src/services/llm.ts`(modify — 加 `chatStream(): AsyncIterableIterator<ChatChunk>`)
+- `apps/desktop/src/__tests__/llmGateway.stream.test.ts`(new — 5 chunk + 1 DONE)
+**Acceptance.** `xcodebuild test -only-testing:EatitTests/LLMGatewayStreamTests && corepack pnpm test src/__tests__/llmGateway.stream.test.ts`
+**Commit.** `feat(F-402,F-404): llm gateway sse streaming via bridge events`
+
+### M2.7.dev.d — JS Ark provider + Vercel AI SDK + 真调冒烟
+**Lead Agent**: developer | **Deps**: M2.7.dev.c
+**Goal.** JS `ArkProvider` 实现 `LLMProvider` interface(chat / chatStream / generateObject)+ generateObject Zod + 自写 retry-on-validation-fail。本节点末**真调一次**火山 ARK 冒烟。
+**Files (new):**
+- `apps/desktop/src/core/llm/types.ts`(LLMProvider interface)
+- `apps/desktop/src/core/llm/arkProvider.ts`
+- `apps/desktop/src/core/llm/instructor.ts`(generateObject 包装)
+- `apps/desktop/src/core/llm/index.ts`(barrel)
+- `apps/desktop/src/core/llm/__tests__/arkProvider.test.ts`(happy + 1 次 retry 成功)
+- `apps/macos/scripts/smoke-test-ark.sh`(手工冒烟)
+**Acceptance.** `cd apps/desktop && corepack pnpm test src/core/llm/__tests__/arkProvider.test.ts`
+**Commit.** `feat(F-402,F-405): ark llm provider + generateObject retry`
+
 ---
 
 ## M2.8.arch — ASRGateway WS 设计
