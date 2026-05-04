@@ -9,14 +9,27 @@ final class MockWebSocketSendable: WebSocketSendable {
     var sendError: Error?
     var resumed: Bool = false
     var state: URLSessionTask.State = .running
+    // M2.8.dev.c: new protocol members — receive() + closeCode
+    var closeCode: URLSessionWebSocketTask.CloseCode = .invalid
+    var receiveError: Error?
 
     func send(_ message: URLSessionWebSocketTask.Message) async throws {
         if let err = sendError { throw err }
         if case .data(let d) = message { sentFrames.append(d) }
     }
 
+    /// Default receive() implementation: suspends indefinitely (connect tests never await it).
+    /// Tests that need receive() to return frames use MockWebSocketSendableQueued in ASRGatewayReceiveTests.
+    func receive() async throws -> URLSessionWebSocketTask.Message {
+        if let err = receiveError { throw err }
+        // Park forever — connect tests do not await receive(); task will be cancelled externally.
+        try await Task.sleep(nanoseconds: .max)
+        throw URLError(.cancelled)
+    }
+
     func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
         cancelCalled = true
+        state = .canceling
     }
 
     func resume() {

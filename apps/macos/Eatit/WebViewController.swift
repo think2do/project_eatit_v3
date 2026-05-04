@@ -341,13 +341,14 @@ final class WebViewController: NSViewController {
         }
     }
 
-    /// Registers ASR Bridge methods: asr.start + asr.stop.
+    /// Registers ASR Bridge methods: asr.start + asr.stop + asr.status.
     /// §C3: volc-asr-credentials read inside ASRGateway; never crosses Bridge.
     /// §A0.4: Keychain read per-call, not stored in this controller.
-    /// §B9: dual-end contract — JS ASRStartParamsSchema + ASRStartedSchema + ASRStoppedSchema in same commit.
-    /// Note: asr.status deferred to M2.8.dev.c (depends on receive loop state machine).
+    /// §B9: dual-end contract — JS ASRStartParamsSchema + ASRStartedSchema + ASRStoppedSchema + ASRStatusResultSchema in same commit.
+    /// M2.8.dev.c: asr.status added (§9 row 24).
     private func registerASRHandlers() {
         struct ASRStopParams: Codable { let streamId: String }
+        struct EmptyParams: Codable {}
 
         bridgeRouter.register(method: "asr.start") { [weak self] (p: ASRStartParams) -> ASRStartedResult in
             guard let self = self else {
@@ -369,6 +370,13 @@ final class WebViewController: NSViewController {
             }
             await self.asrGateway.disconnect()
             return ASRStoppedResult(stopped: true)
+        }
+
+        bridgeRouter.register(method: "asr.status") { [weak self] (_: EmptyParams) -> ASRStatusResult in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            return self.asrGateway.statusSnapshot()
         }
     }
 

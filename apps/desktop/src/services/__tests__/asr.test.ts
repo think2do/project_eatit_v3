@@ -3,9 +3,14 @@ import { z } from "zod";
 import {
   asrStart,
   asrStop,
+  asrStatus,
   ASRStartParamsSchema,
   ASRStartedSchema,
   ASRStoppedSchema,
+  ASRStatusResultSchema,
+  ASRPartialPayloadSchema,
+  ASRFinalPayloadSchema,
+  ASREndPayloadSchema,
 } from "../asr";
 import { BridgeError } from "../nativeBridge";
 
@@ -105,14 +110,14 @@ describe("asr service", () => {
     expect(result.stopped).toBe(true);
   });
 
-  // MARK: - Scope check: asr module exports only start / stop (no status / read / internal)
+  // MARK: - Scope check: asr module exports start / stop / status (no internal)
 
-  it("asr module exports only asrStart and asrStop — no asrStatus, no read, no internal", async () => {
+  it("asr module exports asrStart, asrStop, and asrStatus — no internal helpers", async () => {
     const mod = await import("../asr");
     expect(typeof mod.asrStart).toBe("function");
     expect(typeof mod.asrStop).toBe("function");
-    // asrStatus is deferred to M2.8.dev.c — must NOT be exported yet
-    expect((mod as Record<string, unknown>).asrStatus).toBeUndefined();
+    // asrStatus now exported in M2.8.dev.c
+    expect(typeof mod.asrStatus).toBe("function");
     // No internal helpers or read functions exported
     expect((mod as Record<string, unknown>).asrRead).toBeUndefined();
     expect((mod as Record<string, unknown>).asrInternal).toBeUndefined();
@@ -155,5 +160,147 @@ describe("asr service", () => {
 
   it("ASRStoppedSchema rejects missing stopped", () => {
     expect(() => ASRStoppedSchema.parse({})).toThrow(z.ZodError);
+  });
+
+  // MARK: - ASRPartialPayloadSchema (M2.8.dev.c)
+
+  it("ASRPartialPayloadSchema parses {text, definite: false}", () => {
+    const parsed = ASRPartialPayloadSchema.parse({ text: "hello", definite: false });
+    expect(parsed.text).toBe("hello");
+    expect(parsed.definite).toBe(false);
+  });
+
+  it("ASRPartialPayloadSchema rejects definite: true", () => {
+    expect(() => ASRPartialPayloadSchema.parse({ text: "hello", definite: true })).toThrow(z.ZodError);
+  });
+
+  it("ASRPartialPayloadSchema rejects missing text", () => {
+    expect(() => ASRPartialPayloadSchema.parse({ definite: false })).toThrow(z.ZodError);
+  });
+
+  // MARK: - ASRFinalPayloadSchema (M2.8.dev.c)
+
+  it("ASRFinalPayloadSchema parses with optional startTime/endTime", () => {
+    const parsed = ASRFinalPayloadSchema.parse({
+      text: "hello world",
+      definite: true,
+      startTime: 0,
+      endTime: 1500,
+    });
+    expect(parsed.text).toBe("hello world");
+    expect(parsed.definite).toBe(true);
+    expect(parsed.startTime).toBe(0);
+    expect(parsed.endTime).toBe(1500);
+  });
+
+  it("ASRFinalPayloadSchema parses without optional timing fields", () => {
+    const parsed = ASRFinalPayloadSchema.parse({ text: "hello", definite: true });
+    expect(parsed.startTime).toBeUndefined();
+    expect(parsed.endTime).toBeUndefined();
+  });
+
+  it("ASRFinalPayloadSchema rejects definite: false", () => {
+    expect(() => ASRFinalPayloadSchema.parse({ text: "hello", definite: false })).toThrow(z.ZodError);
+  });
+
+  it("ASRFinalPayloadSchema rejects missing text", () => {
+    expect(() => ASRFinalPayloadSchema.parse({ definite: true })).toThrow(z.ZodError);
+  });
+
+  // MARK: - ASREndPayloadSchema (M2.8.dev.c)
+
+  it("ASREndPayloadSchema accepts all 6 reason values", () => {
+    const reasons = ["stop", "client-stop", "eof", "1011", "1006", "error"] as const;
+    for (const reason of reasons) {
+      const parsed = ASREndPayloadSchema.parse({ reason });
+      expect(parsed.reason).toBe(reason);
+    }
+  });
+
+  it("ASREndPayloadSchema rejects unknown reason", () => {
+    expect(() => ASREndPayloadSchema.parse({ reason: "unknown" })).toThrow(z.ZodError);
+  });
+
+  it("ASREndPayloadSchema reason='error' with errorCode + errorMessage parses correctly", () => {
+    const parsed = ASREndPayloadSchema.parse({
+      reason: "error",
+      errorCode: "asr.frame-unpack-failed",
+      errorMessage: "header too short",
+    });
+    expect(parsed.reason).toBe("error");
+    expect(parsed.errorCode).toBe("asr.frame-unpack-failed");
+    expect(parsed.errorMessage).toBe("header too short");
+  });
+
+  it("ASREndPayloadSchema errorCode and errorMessage are optional", () => {
+    const parsed = ASREndPayloadSchema.parse({ reason: "stop" });
+    expect(parsed.errorCode).toBeUndefined();
+    expect(parsed.errorMessage).toBeUndefined();
+  });
+
+  // MARK: - ASRStatusResultSchema (M2.8.dev.c)
+
+  it("ASRStatusResultSchema round-trip {connected: true, streamId, retryCount}", () => {
+    const parsed = ASRStatusResultSchema.parse({
+      connected: true,
+      streamId: "stream-x",
+      retryCount: 0,
+    });
+    expect(parsed.connected).toBe(true);
+    expect(parsed.streamId).toBe("stream-x");
+    expect(parsed.retryCount).toBe(0);
+  });
+
+  it("ASRStatusResultSchema accepts connected=false without streamId", () => {
+    const parsed = ASRStatusResultSchema.parse({ connected: false, retryCount: 0 });
+    expect(parsed.connected).toBe(false);
+    expect(parsed.streamId).toBeUndefined();
+  });
+
+  it("ASRStatusResultSchema rejects missing connected", () => {
+    expect(() => ASRStatusResultSchema.parse({ retryCount: 0 })).toThrow(z.ZodError);
+  });
+
+  it("ASRStatusResultSchema rejects negative retryCount", () => {
+    expect(() => ASRStatusResultSchema.parse({ connected: false, retryCount: -1 })).toThrow(z.ZodError);
+  });
+
+  // MARK: - asrStatus round-trip bridge.call (M2.8.dev.c)
+
+  it("asrStatus() round-trips bridge.call('asr.status', {}); returns ASRStatusResult", async () => {
+    const postMessage = (
+      window.webkit!.messageHandlers!.eatit!.postMessage as ReturnType<typeof vi.fn>
+    );
+    postMessage.mockResolvedValue({
+      id: UUID,
+      ok: true,
+      data: { connected: true, streamId: "stream-status-1", retryCount: 0 },
+    });
+
+    const result = await asrStatus();
+
+    expect(postMessage).toHaveBeenCalledOnce();
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "asr.status",
+        params: {},
+      })
+    );
+    expect(result.connected).toBe(true);
+    expect(result.streamId).toBe("stream-status-1");
+    expect(result.retryCount).toBe(0);
+  });
+
+  it("asrStatus() Zod rejects malformed response — missing connected field", async () => {
+    (
+      window.webkit!.messageHandlers!.eatit!.postMessage as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({
+      id: UUID,
+      ok: true,
+      data: { retryCount: 0 },  // missing `connected`
+    });
+
+    const err = await asrStatus().catch((e) => e);
+    expect(err).toBeInstanceOf(z.ZodError);
   });
 });

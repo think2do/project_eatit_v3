@@ -5,7 +5,7 @@ import { bridge } from "./nativeBridge";
 // §C3: accessToken / appId NEVER appear here — injected only in Swift ASRGateway (Keychain read).
 // §K #6 反模式: rejected — this file never touches volc-asr-credentials or X-Api-Access-Key.
 // Note: AsyncIterator (asr-partial/final/end event consumption) deferred to M2.8.dev.e.
-// Note: asr.status Bridge method deferred to M2.8.dev.c.
+// M2.8.dev.c: asr.status wrapper + payload Zod schemas landed.
 
 // MARK: - asr.start params schema (Bridge method params, camelCase)
 
@@ -31,6 +31,40 @@ export const ASRStoppedSchema = z.object({
 });
 export type ASRStopped = z.infer<typeof ASRStoppedSchema>;
 
+// MARK: - asr.status response schema (Bridge result — §9 row 24)
+
+export const ASRStatusResultSchema = z.object({
+  connected: z.boolean(),
+  streamId: z.string().optional(),
+  retryCount: z.number().int().nonnegative(),
+});
+export type ASRStatusResult = z.infer<typeof ASRStatusResultSchema>;
+
+// MARK: - BridgeEvent payload schemas (§7.3 + §7.4 — M2.8.dev.c)
+// §9.2: BridgeEventSchema enum is NOT extended; only payload schemas added here.
+// §7.4 decision: asr-error is NOT a new enum case; errors ride asr-end with reason="error".
+
+export const ASRPartialPayloadSchema = z.object({
+  text: z.string(),
+  definite: z.literal(false),
+});
+export type ASRPartialPayload = z.infer<typeof ASRPartialPayloadSchema>;
+
+export const ASRFinalPayloadSchema = z.object({
+  text: z.string(),
+  definite: z.literal(true),
+  startTime: z.number().int().nonnegative().optional(),
+  endTime: z.number().int().nonnegative().optional(),
+});
+export type ASRFinalPayload = z.infer<typeof ASRFinalPayloadSchema>;
+
+export const ASREndPayloadSchema = z.object({
+  reason: z.enum(["stop", "client-stop", "eof", "1011", "1006", "error"]),
+  errorCode: z.string().optional(),
+  errorMessage: z.string().optional(),
+});
+export type ASREndPayload = z.infer<typeof ASREndPayloadSchema>;
+
 // MARK: - asr.start (Bridge method wrapper)
 
 /**
@@ -55,7 +89,7 @@ export async function asrStart(
 
 /**
  * Stop ASR streaming for the given streamId. Calls `asr.stop` Bridge method.
- * Swift side cancels the WebSocket task and clears state.
+ * Swift side sends last-flag frame, waits 1s drain, closes WebSocket, emits asr-end.
  *
  * §C3: only streamId is passed; no credential material crosses the Bridge.
  */
@@ -66,7 +100,17 @@ export async function asrStop(
   return ASRStoppedSchema.parse(raw);
 }
 
-// Note: asrStatus deferred to M2.8.dev.c (depends on receive loop + state machine).
-// Note: event payload schemas (ASRPartialPayloadSchema / ASRFinalPayloadSchema / ASREndPayloadSchema)
-// deferred to M2.8.dev.c when partial/final dispatch lands.
+// MARK: - asr.status (Bridge method wrapper — §9 row 24, M2.8.dev.c)
+
+/**
+ * Query current ASR gateway connection state.
+ * Returns { connected, streamId?, retryCount }.
+ *
+ * §C3: no credential material in params or result.
+ */
+export async function asrStatus(): Promise<ASRStatusResult> {
+  const raw = await bridge.call<ASRStatusResult>("asr.status", {});
+  return ASRStatusResultSchema.parse(raw);
+}
+
 // Note: AsyncIterator / useASRStream hook deferred to M2.8.dev.e.

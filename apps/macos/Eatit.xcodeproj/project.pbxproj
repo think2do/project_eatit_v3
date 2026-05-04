@@ -24,6 +24,7 @@
 		7205227BADFE108CC3604734 /* ASRGatewayConnectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13A077803E15BA59D01784C2 /* ASRGatewayConnectTests.swift */; };
 		72DD76D89A2E681BDF370A65 /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29BA4CD12763DB886C67A4C9 /* DatabaseService.swift */; };
 		7C9CFAA95FE6109226165496 /* web in Resources */ = {isa = PBXBuildFile; fileRef = E4714382CFE28019C4559054 /* web */; };
+		8AA3E4BFD342B6873490F1D0 /* ASRGatewayReceiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCC0E4638863D2531448097E /* ASRGatewayReceiveTests.swift */; };
 		990D042CC8641ACD609EB151 /* BridgeRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5EA76747759170E42A8C8E4 /* BridgeRouter.swift */; };
 		9A30ADC9DCBE4E3B830B240E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7B8AE0D949E13AD6E0C220D /* AppDelegate.swift */; };
 		A124C35BA81F3FB27B49C690 /* WebViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C779B031475689C5A3249527 /* WebViewController.swift */; };
@@ -81,6 +82,7 @@
 		C7B8AE0D949E13AD6E0C220D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		CC00254BA0742E6AE2B81E90 /* AudioCaptureServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureServiceTests.swift; sourceTree = "<group>"; };
 		D1A7F87BEE0962BBA16ADAB3 /* PDFParserService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFParserService.swift; sourceTree = "<group>"; };
+		DCC0E4638863D2531448097E /* ASRGatewayReceiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRGatewayReceiveTests.swift; sourceTree = "<group>"; };
 		E0680DBA614BAEAAF72CF6B5 /* ASRGateway.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRGateway.swift; sourceTree = "<group>"; };
 		E4714382CFE28019C4559054 /* web */ = {isa = PBXFileReference; lastKnownFileType = folder; name = web; path = Eatit/Resources/web; sourceTree = SOURCE_ROOT; };
 		E57C7DE7F4C06D749B9EEAD6 /* BridgeError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeError.swift; sourceTree = "<group>"; };
@@ -173,6 +175,7 @@
 			children = (
 				13A077803E15BA59D01784C2 /* ASRGatewayConnectTests.swift */,
 				5674783458C04C808F3AF706 /* ASRGatewayFrameTests.swift */,
+				DCC0E4638863D2531448097E /* ASRGatewayReceiveTests.swift */,
 				32BAC8BAAED38EB71FFA21EE /* LLMGatewayTests.swift */,
 			);
 			path = Services;
@@ -430,6 +433,7 @@
 			files = (
 				7205227BADFE108CC3604734 /* ASRGatewayConnectTests.swift in Sources */,
 				B92FCBC07EA92ED8244601F2 /* ASRGatewayFrameTests.swift in Sources */,
+				8AA3E4BFD342B6873490F1D0 /* ASRGatewayReceiveTests.swift in Sources */,
 				62368A2C9618C8F5EA99C5AD /* AudioCaptureServiceTests.swift in Sources */,
 				1A5207CBA5AED8FA837F5CF9 /* BridgeRouterTests.swift in Sources */,
 				46CFD08BFA28F55C008DA677 /* DatabaseServiceTests.swift in Sources */,
