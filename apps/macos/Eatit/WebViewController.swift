@@ -232,9 +232,12 @@ final class WebViewController: NSViewController {
                 throw BridgeError(code: "bridge.internal-error", message: "service released")
             }
             do {
-                // M2.6 baseline: no real callback yet (M2.8 will replace this no-op).
-                try await self.audioCaptureService.start(streamId: p.streamId, onPCMChunk: { _ in
-                    // §C3: no-op. M2.8 ASRGateway will install the real consumer.
+                // M2.8.dev.d: PCM flows Swift→Swift in-process; zero JS hop (§C3 / §6.1).
+                // If ASRGateway is not yet connected, handlePCMChunk silent-drops the chunk.
+                try await self.audioCaptureService.start(streamId: p.streamId, onPCMChunk: { [weak self] pcmChunk in
+                    // §C3: PCM bytes 直注入 ASRGateway,零 JS 经手。
+                    // §6.1: in-process Swift→Swift callback; if ASR not connected, handlePCMChunk silent drop.
+                    self?.asrGateway.handlePCMChunk(pcmChunk)
                 })
                 return EmptyResponse()
             } catch AudioCaptureService.AudioError.permissionDenied {
