@@ -40,7 +40,7 @@ Match the section prefix(`V34.M*.*`)to 当前 spec 文件即可。
 ### M2 — Swift Native Services(1.5 周,12 节点 + 1 audit)
 
 - [x] M2.1.arch Bridge 协议设计(architect)— 产 `.ralph/docs/v34-design/M2.1-bridge-protocol.md`(472 行 / 12 H2 + 23 H3;18 method PRD §4.4.3 锁;§C3 keychain.get 仅返 `{exists}` 不返 secret;§K #6 反模式显式拒绝;手写 Codable+Zod 双端 schema 策略 + §B9 SOP;starter 错误码 codebook 22 行;in-process bridge 零 entitlement 增量)。(e02396b, 2026-05-04)
-- [ ] M2.1.dev BridgeRouter + Codable + Zod 双端契约(developer)— 产 Swift Bridge 三件套 + JS nativeBridge.ts
+- [x] M2.1.dev BridgeRouter + Codable + Zod 双端契约(developer)— 产 Swift Bridge 三件套(BridgeRouter 132 行 / BridgeMessage 109 行 含 AnyCodable + Request/Response/Event / BridgeError 8 行)+ JS nativeBridge.ts(103 行,Zod discriminated-union)+ 双端测试(vitest 8/8 pass + XCTest 7 case 已写但 runner env-blocked)+ WebViewController 注册 messageHandler "eatit" + bridge.echo end-to-end smoke + zod ^4.4.2 + vitest include 扩展到 `src/**/*`。**🟡 XCTest 在本地 env 受 signing/provisioning 阻断**(同 M1.4 keychain-access-groups gate),M2.X audit 时再 re-verify。(458a24e, 2026-05-04)
 - [ ] M2.2 KeychainService(developer,**Parallel-safe**)— 产 KeychainService.swift + keychain.ts
 - [ ] M2.3 DatabaseService(GRDB.swift)(developer,**Parallel-safe**)— 产 DatabaseService.swift + db.ts + Migrations 框架
 - [ ] M2.4 FilePickerService(developer,**Parallel-safe**)— 产 FilePickerService.swift + file.ts
