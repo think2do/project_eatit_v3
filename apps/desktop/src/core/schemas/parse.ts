@@ -237,3 +237,16 @@ export const ParseResultPreviewSchema = z
   .strict();
 
 export type ParseResultPreview = z.infer<typeof ParseResultPreviewSchema>;
+
+// M3.2.1: Parse Agent contract input
+export const ParseAgentInputSchema = z
+  .object({
+    resume_text: z.string().min(1),
+    jd_text: z.string().min(1),
+  })
+  .strict();
+export type ParseAgentInput = z.infer<typeof ParseAgentInputSchema>;
+
+// M3.2.1: spec-compatible aliases for ParseAgentOutput naming convention
+export const ParseOutputSchema = ParseResultPayloadSchema;
+export type ParseOutput = ParseResultPayload;
