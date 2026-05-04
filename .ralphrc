@@ -5,7 +5,11 @@ PROJECT_TYPE="typescript"    # monorepo; desktop side is TS, backend is Python
 
 # Loop settings
 MAX_CALLS_PER_HOUR=100
-CLAUDE_TIMEOUT_MINUTES=20
+# v3.4 调整(2026-05-04):20→40min。M2.3 GRDB SPM 解析 + xcodegen 重生 +
+# xcodebuild test 在 20min 内会触发 productive timeout,叠加 ralph
+# response_analyzer.sh:619 div/0 bug 会让整个 loop 死。40min 给重节点(M3.3.dev /
+# M5.4 等)足够余量。M3.3.dev 等超大节点若仍 timeout,可单独再调到 60。
+CLAUDE_TIMEOUT_MINUTES=40
 CLAUDE_OUTPUT_FORMAT="json"
 
 # Tool permissions — Claude needs to run compound commands (cd X && git ...),
