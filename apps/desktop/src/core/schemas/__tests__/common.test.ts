@@ -216,14 +216,19 @@ describe("assets.ts schemas", () => {
       expect(result.parse_preview).toBeNull();
     });
 
-    it("accepts parse_preview as object (unknown shape)", () => {
+    it("accepts parse_preview as valid ParseResultPreview object (M3.1.1.b: z.unknown → ParseResultPreviewSchema)", () => {
       const result = CandidateAssetResponseSchema.parse({
         ...validCandidate,
-        parse_preview: { score: 0.9, summary: "Acme Corp role match" },
+        parse_preview: {
+          match_summary: "Acme Corp role match",
+          candidate_risk_count: 1,
+          project_hook_count: 2,
+        },
       });
       expect(result.parse_preview).toEqual({
-        score: 0.9,
-        summary: "Acme Corp role match",
+        match_summary: "Acme Corp role match",
+        candidate_risk_count: 1,
+        project_hook_count: 2,
       });
     });
 

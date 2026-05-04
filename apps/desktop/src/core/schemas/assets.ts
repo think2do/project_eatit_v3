@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TimestampedResponseSchema } from "./common";
+import { ParseResultPreviewSchema } from "./parse";
 
 /**
  * Mirror of Python CandidateAssetStatus (StrEnum).
@@ -42,8 +43,7 @@ export type AssetUploadRequest = z.infer<typeof AssetUploadRequestSchema>;
 
 /**
  * Mirror of Python CandidateAssetResponse(TimestampedResponse).
- * parse_preview: z.unknown().nullable().optional() is a forward-reference placeholder.
- * TODO M3.1.1.b: replace z.unknown() with ParseResultPreviewSchema once parse.ts lands.
+ * parse_preview: ParseResultPreviewSchema — forward-ref resolved in M3.1.1.b via direct import from "./parse".
  * .strict() enforces no extra fields (v3.4 spec line 1417).
  */
 export const CandidateAssetResponseSchema = TimestampedResponseSchema.extend({
@@ -51,8 +51,7 @@ export const CandidateAssetResponseSchema = TimestampedResponseSchema.extend({
   status: CandidateAssetStatusSchema,
   resume_filename: z.string().nullable().optional(),
   jd_filename: z.string().nullable().optional(),
-  // TODO M3.1.1.b: replace z.unknown() with ParseResultPreviewSchema once parse.ts lands
-  parse_preview: z.unknown().nullable().optional(),
+  parse_preview: ParseResultPreviewSchema.nullable().optional(),
 }).strict();
 
 export type CandidateAssetResponse = z.infer<
