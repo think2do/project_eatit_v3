@@ -47,16 +47,26 @@ Match the section prefix(`V34.M*.*`)to 当前 spec 文件即可。
 - [x] M2.5 PDFParserService(PDFKit)(developer,**Parallel-safe**)— 产 PDFParserService.swift(`PDFExtractResult: Codable {text, pageCount}` + `PDFParseError {invalidBase64, invalidPDF}` typed errors + `extractText(base64:) throws` PDFKit `PDFDocument(data:)` 多页拼接)+ 1 bridge method `pdf.extractText` 注册在 WebViewController.registerPDFParserHandlers()(handler 区分 invalidBase64/invalidPDF 映射 BridgeError `pdf.invalid-base64` / `pdf.invalid-pdf`)+ pdf.ts(Zod PDFExtractResultSchema + `pdf.extractText` wrapper)+ XCTest 5 case **CGContext 程序化 PDF 生成**(无 binary 入 git,单/多页/invalidBase64/非PDF/空 string 全覆盖)+ vitest 7/7 + 全套 37/37 无回归。**spec 偏差**:① extractText Optional → throws typed error(信息更完整);② sample.pdf binary fixture → 程序化 CGContext 生成(deterministic + 无 git binary)。PDFKit 系统框架,无 SPM 增量,无 entitlement 增量。XCTest 同 M2.1.dev~M2.4 env-blocked。(53589c6, 2026-05-04)
 - [x] M2.6 AudioCaptureService(AVAudioEngine)(developer)— 产 AudioCaptureService.swift(AVAudioEngine 麦克风录音 + AVAudioConverter 重采样到 16kHz mono Int16 LE + NSLock 保护 Data accumulator + `appendAndDrain` 切包到精确 6400 bytes / 200ms + 余数保留;`AudioError.{permissionDenied, engineStartFailed, converterInitFailed}` typed errors;`skipPermissionForTesting` + `setTestCallback` 测试缝)+ 2 bridge methods (audio.start/audio.stop) **仅控制开关**(§C3 PCM bytes **不出 Swift 边界**,M2.8 ASRGateway 在 Swift 内部注册 pcmCallback 直接消费)+ JS audio.ts 控制 wrapper(start/stop only,无 PCM 相关 method)+ XCTest 6 case(常量锁 6400/16000 + 4 个 accumulator drain 边界 6400/12800/余数/sub-threshold + stop 清空)+ vitest 6/6 + 全套 43/43 无回归。`device.audio-input` entitlement 与 `NSMicrophoneUsageDescription` Info.plist 在 M1.4 已就位,**无新 entitlement**。xcodebuild build SUCCEEDED + tsc clean + 0 banned + 0 secret/PCM leak。XCTest 同 M2.1.dev~M2.5 env-blocked。**🟡 protected path slip**:developer subagent 曾在工作树编辑 `.ralph/specs/v34-macos-port-sections.md`(M2.7.dev 拆分提议,未进 commit),Ralph 主进程已 `git checkout` 撤销 — §B6 违规但已无残留。(283f1f5, 2026-05-04)
 - [x] M2.7.arch LLMGateway SSE 设计(architect)— 产 `.ralph/docs/v34-design/M2.7-llm-gateway.md`(986 行 / 11 H2 + 42 H3,远超 spec ≥ 5 H3 阈值)。覆盖 §1 节点边界 + L0 红线回引 / §2 endpoint(`https://ark.cn-beijing.volces.com/api/v3/chat/completions`)+ ATS 白名单 + URLSession 代码层**冗余 hostname check 决策(已采纳)**/ §3 Authorization Bearer 注入 + Keychain `ark-api-key` → Swift stack → header → ARC 释放序列图 + 禁日志 redact 规则 / §4 Codable + Zod 双端 schema 表(ChatCompletionRequest / Response / Message / Choice / Usage / ToolCall / ChatChunk / ChatChunkDelta;snake_case body 字段透传保留 OpenAI compat)/ §5 sync chat 重试策略(429/500/502/503/504 → 0.5s/1s/2s 指数退避 ×3)+ 11 个 `llm.*` BridgeError codes / §6 chatStream URLSession.bytes(for:) 行迭代 + `data: ` prefix + `[DONE]` 终止符 + `bridgeRouter.dispatchEvent("stream-chunk"/"stream-end"/"stream-error", streamId, payload)` / §7 **新 Bridge method `llm.stopStream({streamId})` + `[String: Task]` 字典 + `task.cancel()`(取消语义重做,放弃 JS AbortController)** + BridgeEventSchema enum 必扩 `stream-end`+`stream-error` / §8 Vercel AI SDK ai@^4 `createDataStream` adapter(BridgeEvent → ReadableStream<Uint8Array> SSE-formatted)+ `useChat` / `streamText` 调用样例 + ToolCall 穿透链 / §9 §K 反模式拒绝 5 条(messageHandler 传 Key / OpenAI proxy 绕 BYOK / 只 chat 不 chatStream / 临时关 ATS / 临时加 disable-library-validation)/ §10 测试矩阵(URLProtocol mock 7 case + Vitest contract test)/ §11 M2.7.dev 实施 5-phase roadmap + 21 项 checklist + **建议 .dev 拆 a/b/c 三子节点(架构师提议,留 Ralph 主进程裁决,**未直接编辑 spec 文件**§B6)**。0 真 key leak。**🟡 §B6 protected-path slip(已撤销)**:本 loop 开始时工作树有未授权 `.ralph/fix_plan.md`(28 行 diff,把 M2.7.dev/M2.8.dev/M3.1.1/M3.3.x 多节点拆子节点)+ `.ralph/specs/v34-macos-port-sections.md`(554 行 diff)修改,**非 architect subagent 引入**(architect 只 stage 了 design doc,正确遵守 §B6)。Ralph 主进程已 `git checkout` 撤销两文件。下一 loop 跑 M2.7.dev 时,Ralph 主进程基于 design doc §11.3 提议判断是否拆 .dev.a/b/c。(73f7f65, 2026-05-04)
-- [ ] M2.7.dev LLMGateway + ARK 接通(developer)— 产 LLMGateway.swift + llm.ts,真调火山 ARK 一次成功
+- [ ] M2.7.dev.a LLMGateway Codable 类型 + JSON 编解码(developer)— 不调网络
+- [ ] M2.7.dev.b LLMGateway.chat 同步 + 重试 + Bearer header(developer)
+- [ ] M2.7.dev.c LLMGateway.chatStream SSE + Bridge events(developer)
+- [ ] M2.7.dev.d JS Ark provider + Vercel AI SDK + 真调火山 ARK 冒烟(developer)
 - [ ] M2.8.arch ASRGateway WS 设计(architect)— 产 `.ralph/docs/v34-design/M2.8-asr-gateway.md`
-- [ ] M2.8.dev ASRGateway + 火山 SAUC 接通(developer)— 产 ASRGateway.swift + asr.ts,真调火山 SAUC 一次冒烟
+- [ ] M2.8.dev.a ASR 二进制帧 packing/unpacking(developer)— ASRFrame.swift + Codable + 边界单测
+- [ ] M2.8.dev.b ASRGateway WS connect + 4 header 鉴权 + 首帧(developer)
+- [ ] M2.8.dev.c feedPCM + receive loop + partial/final dispatch(developer)
+- [ ] M2.8.dev.d AudioCaptureService → ASRGateway 直连(developer)— 不经 JS,减延迟
+- [ ] M2.8.dev.e JS asr.ts AsyncIterator + 真调 SAUC 冒烟(developer)
 - [ ] M2.X tester audit M2 全段(tester)— 产 `.ralph/logs/M2.X-audit.md`,评分 ≥ 7/10 才能进 M3
 
 ### M3 — 后端逻辑迁 TS(3-4 周,21 节点 + 2 audit)
 
 #### M3.1 — 基础设施(3-5 天)
 
-- [ ] M3.1.1 Zod schemas × 11(developer)— 产 11 个 .ts schema + contract test(5 维度/4 人格/7 填充词/3 档/12 禁止词锁)
+- [ ] M3.1.1.a Zod schemas: common + assets(developer)
+- [ ] M3.1.1.b Zod schemas: parse + frameworks(developer)
+- [ ] M3.1.1.c Zod schemas: reports + sessions + turns(developer)— L0 锁:5 维度 / 3 档 / 12 禁止词 fuzz
+- [ ] M3.1.1.d Zod schemas: coach + reflection + research + meta_reports(developer)— strict() 隐私 fuzz N=300
 - [ ] M3.1.2 LLM provider 抽象 + ARK provider TS(developer)— 产 `core/llm/` + Vercel AI SDK retry 包装
 - [ ] M3.1.3 LangGraph.js 接入 + Hello World graph(developer)— 验证 LangGraph.js v0.2 可用
 
@@ -70,11 +80,17 @@ Match the section prefix(`V34.M*.*`)to 当前 spec 文件即可。
 #### M3.3 — 核心 Agent + LangGraph.js 三图(5-7 天,节点名锁 L0)
 
 - [ ] M3.3.1.arch turn_graph 设计(architect)— 产 `.ralph/docs/v34-design/M3.3.1-turn-graph.md`
-- [ ] M3.3.1.dev turn_graph + Interviewer Agent(developer)— 产 turnGraph.ts + interviewer/ + 节点名锁 contract test + 4 Persona 名锁
+- [ ] M3.3.1.dev.a Interviewer Agent + Persona 4 名锁(developer)— 不动 graph
+- [ ] M3.3.1.dev.b turn_graph 三节点接通 + 节点名锁(developer)— turnGraph.ts
 - [ ] M3.3.2.arch intake_graph 设计(architect)— 产 `.ralph/docs/v34-design/M3.3.2-intake-graph.md`
-- [ ] M3.3.2.dev intake_graph + Framework + Research(developer)— 产 intakeGraph.ts + framework/ + research/(Research strict() 隐私护栏)
+- [ ] M3.3.2.dev.a Framework Agent(developer,**Parallel-safe with .b**)— predicted_questions 8-15 锁
+- [ ] M3.3.2.dev.b Research Agent(developer,**Parallel-safe with .a**)— strict() 隐私 fuzz N=300
+- [ ] M3.3.2.dev.c intake_graph 接通(developer)— parse → research → predict + 节点名锁
 - [ ] M3.3.3.arch post_report_graph 设计(architect)— 产 `.ralph/docs/v34-design/M3.3.3-post-report-graph.md`
-- [ ] M3.3.3.dev post_report_graph + Coach + Reflection + Report(developer)— 产 postReportGraph.ts + coach/ + reflection/ + report/(12 禁止词 + 3 档 + 教学护栏)
+- [ ] M3.3.3.dev.a Report Agent 主报告(developer)— 5 维度 + 3 档 + 12 禁止词 sanitize
+- [ ] M3.3.3.dev.b Coach Agent(developer,**Parallel-safe with .c**)— 跨 session 异步 + 教学护栏
+- [ ] M3.3.3.dev.c Reflection Agent(developer,**Parallel-safe with .b**)— 单场教学复盘 + 句式护栏
+- [ ] M3.3.3.dev.d post_report_graph 接通(developer)— coach ‖ reflection 并行 + 节点名锁
 - [ ] **M3.3.X tester re-audit 三图(必须)**(tester)— 产 `.ralph/logs/M3.3.X-audit.md`,评分 ≥ 8/10 才能进 M3.4
 
 #### M3.4 — 流式 ASR 接入(2-3 天,端到端关键)
@@ -93,7 +109,10 @@ Match the section prefix(`V34.M*.*`)to 当前 spec 文件即可。
 ### M5 — 测试迁移 + 后端删除(1-2 周,5 节点)
 
 - [ ] M5.1 后端 471 pytest 分类(tester)— 产 `.ralph/docs/v34-design/M5.1-pytest-migration-triage.md`,目标 KEEP ~300 / REWRITE ~50 / DELETE ~120
-- [ ] M5.2 Vitest 扩充至 ≥ 400(developer)— 翻译 ~350 个 pytest 到 Vitest
+- [ ] M5.2.a Vitest port: agents/* (developer)— ≥ 100 tests
+- [ ] M5.2.b Vitest port: orchestrator graphs contract (developer)— ≥ 30 tests
+- [ ] M5.2.c Vitest port: domain / repositories / infra (developer)— ≥ 100 tests
+- [ ] M5.2.d Vitest port: schemas + ethics fuzzers + 收尾 (developer)— 总数 ≥ 400 + tsc 干净
 - [ ] M5.3 Playwright E2E 改造为启 Eatit.app(developer)— 5 个金标 E2E 在 .app 内跑通
 - [ ] M5.4.arch apps/api 删除决策(architect)— 产 `.ralph/docs/v34-design/M5.4-python-retirement-decision.md`
 - [ ] M5.4.dev 删除 apps/api + 残余清理(developer)— `apps/api/` 整目录删,grep Python 库引用应为 0
