@@ -280,3 +280,53 @@ export const ReportStatusResponseSchema = z
   .strict();
 
 export type ReportStatusResponse = z.infer<typeof ReportStatusResponseSchema>;
+
+// ===== ReportAgent I/O — added in M3.3.3.dev.a (mirrors Python apps/api/app/agents/report/schemas.py) =====
+
+// ReportTurnAssessmentSnippet — Python schemas.py line 8-9
+export const ReportTurnAssessmentSnippetSchema = z
+  .object({ summary: z.string() })
+  .strict();
+export type ReportTurnAssessmentSnippet = z.infer<typeof ReportTurnAssessmentSnippetSchema>;
+
+// ReportTurnRecord — Python schemas.py line 12-15
+export const ReportTurnRecordSchema = z
+  .object({
+    question: z.string(),
+    answer: z.string(),
+    assessment: ReportTurnAssessmentSnippetSchema.nullable().optional(),
+  })
+  .strict();
+export type ReportTurnRecord = z.infer<typeof ReportTurnRecordSchema>;
+
+// ReportAgentInput — Python schemas.py line 18-22
+// ★ L0 §A11 ★: .strict() rejects ANY unknown field including PII (resume_text / candidate_email / etc.)
+export const ReportAgentInputSchema = z
+  .object({
+    parse_payload_json: z.string(),
+    framework_json: z.string(),
+    turns: z.array(ReportTurnRecordSchema),
+    long_term_summary: z.string().nullable().optional(),
+  })
+  .strict();
+export type ReportAgentInput = z.infer<typeof ReportAgentInputSchema>;
+
+// ReportAgentOutput — Python schemas.py line 35-63
+// pass_likelihood: z.string() (lenient at LLM boundary; coercePassLikelihood maps to PassLikelihoodSchema 3 档 post-LLM)
+// dimensions: array of DimensionScoreSchema (name locked per L0-1); normalize_dimensions pads to 5 post-LLM
+// ai_verdict: nullable string; sanitizeTone + regex applied post-LLM
+export const ReportAgentOutputSchema = z
+  .object({
+    pass_probability: z.number().int().min(0).max(100),
+    summary: z.string(),
+    reasons: z.array(ReportReasonSchema),
+    next_actions: z.array(z.string()),
+    pass_likelihood: z.string().nullable().optional(), // ★ lenient; coerced post-LLM ★
+    overall_score: z.number().int().min(0).max(100).nullable().optional(),
+    ai_verdict: z.string().nullable().optional(), // ★ sanitizeTone + regex post-LLM ★
+    dimensions: z.array(DimensionScoreSchema).default([]), // ★ L0-1 name lock; normalize_dimensions post-LLM ★
+    round_reviews_v2: z.array(RoundReviewV2Schema).default([]),
+    next_actions_v2: NextActionsSchema.nullable().optional(),
+  })
+  .strict();
+export type ReportAgentOutput = z.infer<typeof ReportAgentOutputSchema>;
