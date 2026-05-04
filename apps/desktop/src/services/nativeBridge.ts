@@ -23,7 +23,15 @@ export type BridgeResponse = z.infer<typeof BridgeResponseSchema>;
 // MARK: - BridgeEvent schema
 
 export const BridgeEventSchema = z.object({
-  type: z.enum(["stream-chunk", "asr-partial", "asr-final", "asr-end", "file-dropped"]),
+  type: z.enum([
+    "stream-chunk",   // existing — LLM SSE content delta
+    "stream-end",     // NEW (M2.7.dev.c) — LLM stream completed or saw [DONE]
+    "stream-error",   // NEW (M2.7.dev.c) — cancellation or transport/decode failure
+    "asr-partial",
+    "asr-final",
+    "asr-end",
+    "file-dropped",
+  ]),
   streamId: z.string(),
   payload: z.unknown(),
 });

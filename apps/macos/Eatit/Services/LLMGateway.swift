@@ -5,6 +5,17 @@ import Foundation
 // §C3: apiKey NEVER crosses Bridge boundary; Authorization only injected here in Swift.
 // §K #6 反模式: rejected — JS layer never receives apiKey.
 
+// MARK: - BridgeEventDispatching (Option C protocol seam for testability — §B9)
+
+/// Protocol seam so tests can inject a mock without subclassing final BridgeRouter.
+/// Production path: BridgeRouter conforms via extension.
+/// §K #6: payload must only be {content}, {finishReason}, or {code, message} — no PCM/PII/key.
+protocol BridgeEventDispatching {
+    func dispatchEvent(type: String, streamId: String, payload: Any)
+}
+
+extension BridgeRouter: BridgeEventDispatching {}
+
 // MARK: - KeychainReading (testability seam for final KeychainService)
 
 /// Protocol seam so tests can inject a mock without subclassing final KeychainService.
@@ -168,5 +179,91 @@ final class LLMGateway {
         default:
             throw BridgeError(code: "llm.http-4xx", message: detail)
         }
+    }
+}
+
+// MARK: - chatStream SSE (§6.2 + §6.3)
+
+extension LLMGateway {
+    /// Streaming chat. Pushes each chunk via BridgeEventDispatching.dispatchEvent.
+    /// On Task.cancel(): emits stream-error with code llm.stream-cancelled.
+    /// On HTTP error / network drop / decode failure: emits stream-error with mapped code.
+    /// On graceful end (sees [DONE] OR finish_reason): emits stream-end with finishReason.
+    /// §C3: raw SSE payload never logged — lines may contain resume PII.
+    /// §K #6: payload shapes only {content}, {finishReason}, or {code, message}.
+    func chatStream(
+        _ params: ChatCompletionRequest,
+        streamId: String,
+        dispatcher: BridgeEventDispatching
+    ) async {
+        do {
+            let body = try JSONEncoder().encode(streamRequest(params))
+            let req = try makeRequest(body: body, accept: "text/event-stream")
+
+            let (bytes, resp) = try await session.bytes(for: req)
+            let http = resp as! HTTPURLResponse
+            if !(200..<300).contains(http.statusCode) {
+                var data = Data()
+                for try await b in bytes { data.append(b) }
+                try mapHTTPError(status: http.statusCode, data: data)
+                return  // mapHTTPError throws; this line unreachable on error
+            }
+
+            for try await line in bytes.lines {
+                try Task.checkCancellation()
+                guard line.hasPrefix("data: ") else { continue }
+                let payload = String(line.dropFirst(6))
+                if payload == "[DONE]" {
+                    dispatcher.dispatchEvent(type: "stream-end",
+                                             streamId: streamId,
+                                             payload: ["finishReason": "stop"])
+                    return
+                }
+                guard let chunkData = payload.data(using: .utf8),
+                      let chunk = try? JSONDecoder().decode(ChatChunk.self, from: chunkData)
+                else { continue }   // skip malformed; never log raw payload
+                let choice = chunk.choices.first
+                let delta = choice?.delta.content ?? ""
+                dispatcher.dispatchEvent(type: "stream-chunk",
+                                         streamId: streamId,
+                                         payload: ["content": delta])
+                if let reason = choice?.finishReason, !reason.isEmpty {
+                    dispatcher.dispatchEvent(type: "stream-end",
+                                             streamId: streamId,
+                                             payload: ["finishReason": reason])
+                    return
+                }
+            }
+            // EOF without [DONE] — emit stream-end eof
+            dispatcher.dispatchEvent(type: "stream-end",
+                                     streamId: streamId,
+                                     payload: ["finishReason": "eof"])
+        } catch is CancellationError {
+            dispatcher.dispatchEvent(type: "stream-error",
+                                     streamId: streamId,
+                                     payload: ["code": "llm.stream-cancelled",
+                                               "message": "task cancelled"])
+        } catch let bridgeErr as BridgeError {
+            dispatcher.dispatchEvent(type: "stream-error",
+                                     streamId: streamId,
+                                     payload: ["code": bridgeErr.code,
+                                               "message": bridgeErr.message])
+        } catch {
+            dispatcher.dispatchEvent(type: "stream-error",
+                                     streamId: streamId,
+                                     payload: ["code": "llm.stream-failed",
+                                               "message": "\(error)"])
+        }
+    }
+
+    /// Rebuild ChatCompletionRequest with stream forced to true.
+    /// (Fields are `let`; must reconstruct rather than mutate.)
+    private func streamRequest(_ p: ChatCompletionRequest) -> ChatCompletionRequest {
+        ChatCompletionRequest(
+            model: p.model, messages: p.messages, stream: true,
+            temperature: p.temperature, topP: p.topP, maxTokens: p.maxTokens,
+            stop: p.stop, tools: p.tools, toolChoice: p.toolChoice,
+            responseFormat: p.responseFormat
+        )
     }
 }

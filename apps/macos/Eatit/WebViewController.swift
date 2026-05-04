@@ -16,6 +16,9 @@ final class WebViewController: NSViewController {
     // lazy var avoids stored-property ordering issue: keychainService is init'd before this runs.
     // §A0.4: apiKey is read inside LLMGateway per-call; not cached here.
     private lazy var llmGateway: LLMGateway = LLMGateway(keychain: keychainService)
+    // §6.3: active SSE stream tasks keyed by streamId. NSLock for thread-safe mutation.
+    private var activeStreams: [String: Task<Void, Never>] = [:]
+    private let activeStreamsLock = NSLock()
 
     override func loadView() {
         let config = WKWebViewConfiguration()
@@ -251,10 +254,10 @@ final class WebViewController: NSViewController {
         }
     }
 
-    /// Registers LLM Bridge methods. Only llm.chat (sync) for M2.7.dev.b.
-    /// chatStream / stopStream are M2.7.dev.c.
+    /// Registers LLM Bridge methods: llm.chat (sync) + llm.chatStream + llm.stopStream.
     /// §C3: Authorization injected in LLMGateway.makeRequest; never crosses Bridge.
     /// §A0.4: apiKey read per-call in LLMGateway, not stored in this controller.
+    /// §B9: dual-end contract — BridgeEventSchema enum stream-end / stream-error updated same commit.
     private func registerLLMHandlers() {
         bridgeRouter.register(method: "llm.chat") { [weak self] (p: ChatCompletionRequest) -> LLMChatResult in
             guard let self = self else {
@@ -268,6 +271,70 @@ final class WebViewController: NSViewController {
                 finishReason: first?.finishReason ?? "stop",
                 usage: resp.usage
             )
+        }
+
+        struct LLMChatStreamParams: Codable {
+            let streamId: String
+            let model: String
+            let messages: [ChatMessage]
+            let stream: Bool?  // ignored, forced true by chatStream
+            let temperature: Double?
+            let topP: Double?
+            let maxTokens: Int?
+            let stop: [String]?
+            let tools: [ToolDef]?
+            let toolChoice: ToolChoiceCodable?
+            let responseFormat: ResponseFormat?
+
+            enum CodingKeys: String, CodingKey {
+                case streamId  // camelCase per Bridge protocol §4.3 footer
+                case model, messages, stream, temperature, stop, tools
+                case topP = "top_p"
+                case maxTokens = "max_tokens"
+                case toolChoice = "tool_choice"
+                case responseFormat = "response_format"
+            }
+
+            func asRequest() -> ChatCompletionRequest {
+                ChatCompletionRequest(
+                    model: model, messages: messages, stream: true,
+                    temperature: temperature, topP: topP, maxTokens: maxTokens,
+                    stop: stop, tools: tools, toolChoice: toolChoice,
+                    responseFormat: responseFormat
+                )
+            }
+        }
+        struct LLMChatStreamStarted: Codable { let streamId: String; let started: Bool }
+        struct StreamIdParams: Codable { let streamId: String }
+        struct StopResult: Codable { let stopped: Bool }
+
+        bridgeRouter.register(method: "llm.chatStream") { [weak self] (p: LLMChatStreamParams) -> LLMChatStreamStarted in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            let task = Task<Void, Never> { [weak self] in
+                guard let self = self else { return }
+                await self.llmGateway.chatStream(p.asRequest(), streamId: p.streamId, dispatcher: self.bridgeRouter)
+                self.activeStreamsLock.lock()
+                self.activeStreams[p.streamId] = nil
+                self.activeStreamsLock.unlock()
+            }
+            self.activeStreamsLock.lock()
+            self.activeStreams[p.streamId] = task
+            self.activeStreamsLock.unlock()
+            return LLMChatStreamStarted(streamId: p.streamId, started: true)
+        }
+
+        bridgeRouter.register(method: "llm.stopStream") { [weak self] (p: StreamIdParams) -> StopResult in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            self.activeStreamsLock.lock()
+            let task = self.activeStreams[p.streamId]
+            self.activeStreams[p.streamId] = nil
+            self.activeStreamsLock.unlock()
+            task?.cancel()
+            return StopResult(stopped: true)
         }
     }
 

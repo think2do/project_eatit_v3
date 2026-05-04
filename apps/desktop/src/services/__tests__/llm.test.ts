@@ -1,7 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { z } from "zod";
-import { llmChat, LLMChatResultSchema } from "../llm";
-import { BridgeError } from "../nativeBridge";
+import {
+  llmChat,
+  llmChatStream,
+  llmStopStream,
+  LLMChatResultSchema,
+  StreamChunkPayloadSchema,
+  StreamEndPayloadSchema,
+  StreamErrorPayloadSchema,
+} from "../llm";
+import { BridgeError, BridgeEventSchema } from "../nativeBridge";
 
 const UUID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
 
@@ -105,12 +113,12 @@ describe("llm service", () => {
     expect(() => LLMChatResultSchema.parse(data)).toThrow(z.ZodError);
   });
 
-  it("§C scope check: llmChat is exported, chatStream and stopStream are NOT exported from llm.ts", async () => {
+  it("§C scope check (M2.7.dev.c): llmChat + llmChatStream + llmStopStream are exported from llm.ts", async () => {
     const mod = await import("../llm");
     expect(typeof mod.llmChat).toBe("function");
-    // chatStream belongs to M2.7.dev.c — must not be present yet
-    expect((mod as Record<string, unknown>).llmChatStream).toBeUndefined();
-    expect((mod as Record<string, unknown>).llmStopStream).toBeUndefined();
+    // chatStream and stopStream implemented in M2.7.dev.c
+    expect(typeof mod.llmChatStream).toBe("function");
+    expect(typeof mod.llmStopStream).toBe("function");
   });
 
   it("llmChat propagates BridgeError for llm.api-key-invalid (401 upstream)", async () => {
@@ -141,5 +149,106 @@ describe("llm service", () => {
     const err = await llmChat(MINIMAL_PARAMS).catch((e) => e);
     expect(err).toBeInstanceOf(BridgeError);
     expect((err as BridgeError).code).toBe("llm.http-5xx-retry-exhausted");
+  });
+
+  // MARK: - M2.7.dev.c chatStream contract cases
+
+  it("llmChatStream returns {streamId, started} after bridge.call('llm.chatStream') happy path", async () => {
+    const streamId = "stream-abc-123";
+    vi.spyOn(crypto, "randomUUID").mockReturnValue(UUID);
+    const postMessageMock = (
+      window.webkit!.messageHandlers!.eatit!.postMessage as ReturnType<typeof vi.fn>
+    );
+    postMessageMock.mockResolvedValue({
+      id: UUID,
+      ok: true,
+      data: { streamId, started: true },
+    });
+
+    const result = await llmChatStream({ ...MINIMAL_PARAMS, streamId });
+
+    expect(postMessageMock).toHaveBeenCalledOnce();
+    expect(postMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "llm.chatStream",
+        params: expect.objectContaining({ streamId, stream: true }),
+      })
+    );
+    expect(result.streamId).toBe(streamId);
+    expect(result.started).toBe(true);
+  });
+
+  it("llmChatStream generates streamId via crypto.randomUUID when none provided", async () => {
+    vi.spyOn(crypto, "randomUUID").mockReturnValue(UUID);
+    const postMessageMock = (
+      window.webkit!.messageHandlers!.eatit!.postMessage as ReturnType<typeof vi.fn>
+    );
+    postMessageMock.mockResolvedValue({
+      id: UUID,
+      ok: true,
+      data: { streamId: UUID, started: true },
+    });
+
+    const result = await llmChatStream(MINIMAL_PARAMS);
+
+    expect(postMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({ streamId: UUID }),
+      })
+    );
+    expect(result.streamId).toBe(UUID);
+  });
+
+  it("llmStopStream calls bridge.call('llm.stopStream', {streamId})", async () => {
+    const streamId = "stream-to-stop";
+    vi.spyOn(crypto, "randomUUID").mockReturnValue(UUID);
+    const postMessageMock = (
+      window.webkit!.messageHandlers!.eatit!.postMessage as ReturnType<typeof vi.fn>
+    );
+    postMessageMock.mockResolvedValue({
+      id: UUID,
+      ok: true,
+      data: { stopped: true },
+    });
+
+    const result = await llmStopStream(streamId);
+
+    expect(postMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "llm.stopStream",
+        params: { streamId },
+      })
+    );
+    expect(result.stopped).toBe(true);
+  });
+
+  it("StreamChunkPayloadSchema validates {content: string}; rejects missing content", () => {
+    expect(StreamChunkPayloadSchema.parse({ content: "hello" })).toEqual({ content: "hello" });
+    expect(() => StreamChunkPayloadSchema.parse({})).toThrow(z.ZodError);
+    expect(() => StreamChunkPayloadSchema.parse({ content: 42 })).toThrow(z.ZodError);
+  });
+
+  it("StreamEndPayloadSchema validates finishReason enum; rejects unknown reason", () => {
+    expect(StreamEndPayloadSchema.parse({ finishReason: "stop" })).toMatchObject({ finishReason: "stop" });
+    expect(StreamEndPayloadSchema.parse({ finishReason: "eof" })).toMatchObject({ finishReason: "eof" });
+    expect(StreamEndPayloadSchema.parse({ finishReason: "length" })).toMatchObject({ finishReason: "length" });
+    expect(() => StreamEndPayloadSchema.parse({ finishReason: "unknown-reason" })).toThrow(z.ZodError);
+    expect(() => StreamEndPayloadSchema.parse({})).toThrow(z.ZodError);
+  });
+
+  it("StreamErrorPayloadSchema validates {code, message}; rejects malformed", () => {
+    expect(StreamErrorPayloadSchema.parse({ code: "llm.stream-cancelled", message: "task cancelled" }))
+      .toEqual({ code: "llm.stream-cancelled", message: "task cancelled" });
+    expect(() => StreamErrorPayloadSchema.parse({ code: "llm.stream-cancelled" })).toThrow(z.ZodError);
+    expect(() => StreamErrorPayloadSchema.parse({ message: "no code" })).toThrow(z.ZodError);
+  });
+
+  it("BridgeEventSchema enum accepts stream-chunk / stream-end / stream-error; rejects unknown", () => {
+    const makeEvent = (type: string) => ({ type, streamId: "s1", payload: {} });
+    expect(BridgeEventSchema.parse(makeEvent("stream-chunk"))).toMatchObject({ type: "stream-chunk" });
+    expect(BridgeEventSchema.parse(makeEvent("stream-end"))).toMatchObject({ type: "stream-end" });
+    expect(BridgeEventSchema.parse(makeEvent("stream-error"))).toMatchObject({ type: "stream-error" });
+    expect(() => BridgeEventSchema.parse(makeEvent("stream-unknown"))).toThrow(z.ZodError);
+    expect(() => BridgeEventSchema.parse(makeEvent("unknown-type"))).toThrow(z.ZodError);
   });
 });

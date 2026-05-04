@@ -43,6 +43,40 @@ final class MockKeychainReading: KeychainReading {
     }
 }
 
+// MARK: - MockBridgeEventDispatching (Option C protocol seam — §B9)
+
+/// Captures dispatchEvent calls for assertion in chatStream tests.
+/// Uses NSLock for thread safety (dispatchEvent may be called from arbitrary Tasks).
+final class MockBridgeEventDispatching: BridgeEventDispatching {
+    struct CapturedEvent {
+        let type: String
+        let streamId: String
+        let payload: Any
+    }
+    private let lock = NSLock()
+    private var _events: [CapturedEvent] = []
+
+    var events: [CapturedEvent] {
+        lock.lock(); defer { lock.unlock() }
+        return _events
+    }
+
+    func dispatchEvent(type: String, streamId: String, payload: Any) {
+        lock.lock()
+        _events.append(CapturedEvent(type: type, streamId: streamId, payload: payload))
+        lock.unlock()
+    }
+
+    /// Wait (polling with short sleeps) until eventCount events are captured or timeout expires.
+    func waitForEvents(count: Int, timeout: TimeInterval = 2.0) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if events.count >= count { return }
+            try? await Task.sleep(nanoseconds: 10_000_000)  // 10ms
+        }
+    }
+}
+
 // MARK: - File-scope helpers
 
 private func makeMockSession() -> URLSession {
@@ -232,6 +266,140 @@ final class LLMGatewayTests: XCTestCase {
             XCTFail("expected decode-failed error")
         } catch let err as BridgeError {
             XCTAssertEqual(err.code, "llm.decode-failed")
+        }
+    }
+
+    // MARK: - §10.1 Case 8: chatStream happy path — 5 chunks + [DONE]
+
+    func testChatStream_HappyPath_5Chunks() async throws {
+        let url = testURL
+        // Build SSE body with 5 content chunks + [DONE].
+        // Each ARK SSE frame: "data: <json>\n\n"
+        let words = ["Hello", " ", "world", "!", " Done"]
+        var sseBody = ""
+        for (i, word) in words.enumerated() {
+            let json = """
+            {"id":"chunk-\(i)","choices":[{"index":0,"delta":{"content":"\(word)"},"finish_reason":null}]}
+            """
+            sseBody += "data: \(json)\n\n"
+        }
+        sseBody += "data: [DONE]\n\n"
+
+        MockURLProtocol.requestHandler = { _ in
+            (makeHTTPResponse(status: 200, url: url), Data(sseBody.utf8))
+        }
+        let sut = LLMGateway(keychain: mockKeychain, session: makeMockSession(), endpoint: testURL)
+        let dispatcher = MockBridgeEventDispatching()
+        let streamId = "test-stream-happy"
+
+        await sut.chatStream(minimalRequest(), streamId: streamId, dispatcher: dispatcher)
+
+        // Expect 5 stream-chunk events + 1 stream-end
+        let events = dispatcher.events
+        XCTAssertEqual(events.count, 6, "expected 5 stream-chunk + 1 stream-end, got \(events.count)")
+        let chunks = events.filter { $0.type == "stream-chunk" }
+        XCTAssertEqual(chunks.count, 5)
+        let ends = events.filter { $0.type == "stream-end" }
+        XCTAssertEqual(ends.count, 1)
+        if let endPayload = ends.first?.payload as? [String: String] {
+            XCTAssertEqual(endPayload["finishReason"], "stop")
+        } else {
+            XCTFail("stream-end payload not a [String:String]")
+        }
+        // Verify chunk contents in order
+        let contents = chunks.compactMap { ($0.payload as? [String: String])?["content"] }
+        XCTAssertEqual(contents, words)
+        // All events on our streamId
+        XCTAssertTrue(events.allSatisfy { $0.streamId == streamId })
+    }
+
+    // MARK: - §10.1 Case 9: chatStream network interrupt → stream-end eof
+    // Judgment call (architect §10.1 row 9 "OR"): stream-end with finishReason "eof" chosen,
+    // consistent with §6.2 EOF-without-[DONE] code path.
+
+    func testChatStream_NetworkInterrupt() async throws {
+        let url = testURL
+        // 2 valid chunks; body ends abruptly (no [DONE]).
+        let sseBody = """
+        data: {"id":"c0","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}\n\n\
+        data: {"id":"c1","choices":[{"index":0,"delta":{"content":" world"},"finish_reason":null}]}\n\n
+        """
+        MockURLProtocol.requestHandler = { _ in
+            (makeHTTPResponse(status: 200, url: url), Data(sseBody.utf8))
+        }
+        let sut = LLMGateway(keychain: mockKeychain, session: makeMockSession(), endpoint: testURL)
+        let dispatcher = MockBridgeEventDispatching()
+        let streamId = "test-stream-interrupt"
+
+        await sut.chatStream(minimalRequest(), streamId: streamId, dispatcher: dispatcher)
+
+        let events = dispatcher.events
+        let chunks = events.filter { $0.type == "stream-chunk" }
+        let ends = events.filter { $0.type == "stream-end" }
+        XCTAssertEqual(chunks.count, 2, "expected 2 stream-chunk events")
+        XCTAssertEqual(ends.count, 1, "expected 1 stream-end event (eof)")
+        if let endPayload = ends.first?.payload as? [String: String] {
+            XCTAssertEqual(endPayload["finishReason"], "eof")
+        } else {
+            XCTFail("stream-end payload not a [String:String]")
+        }
+    }
+
+    // MARK: - §10.1 Case 10: chatStream cancel → stream-error llm.stream-cancelled
+
+    func testChatStream_Cancel() async throws {
+        let url = testURL
+        // Return a minimal SSE body; the task is cancelled before reading starts.
+        let sseBody = "data: [DONE]\n\n"
+        MockURLProtocol.requestHandler = { _ in
+            (makeHTTPResponse(status: 200, url: url), Data(sseBody.utf8))
+        }
+        let sut = LLMGateway(keychain: mockKeychain, session: makeMockSession(), endpoint: testURL)
+        let dispatcher = MockBridgeEventDispatching()
+        let streamId = "test-stream-cancel"
+
+        // Start task then immediately cancel it.
+        let task = Task {
+            await sut.chatStream(minimalRequest(), streamId: streamId, dispatcher: dispatcher)
+        }
+        task.cancel()
+        await task.value
+
+        // After cancellation, exactly 1 stream-error with llm.stream-cancelled.
+        let events = dispatcher.events
+        let errors = events.filter { $0.type == "stream-error" }
+        XCTAssertEqual(errors.count, 1, "expected 1 stream-error event after cancel")
+        if let errPayload = errors.first?.payload as? [String: String] {
+            XCTAssertEqual(errPayload["code"], "llm.stream-cancelled")
+        } else {
+            XCTFail("stream-error payload not a [String:String]")
+        }
+        // No stream-end or stream-chunk should have been emitted.
+        XCTAssertTrue(events.filter { $0.type == "stream-end" }.isEmpty)
+    }
+
+    // MARK: - §10.1 Case 11: chatStream HTTP 500 → stream-error llm.http-5xx-retry-exhausted
+
+    func testChatStream_HTTPError() async throws {
+        let url = testURL
+        MockURLProtocol.requestHandler = { _ in
+            (makeHTTPResponse(status: 500, url: url),
+             Data("{\"error\":{\"code\":\"internal\",\"message\":\"server error\"}}".utf8))
+        }
+        let sut = LLMGateway(keychain: mockKeychain, session: makeMockSession(), endpoint: testURL)
+        let dispatcher = MockBridgeEventDispatching()
+        let streamId = "test-stream-http-error"
+
+        await sut.chatStream(minimalRequest(), streamId: streamId, dispatcher: dispatcher)
+
+        let events = dispatcher.events
+        XCTAssertEqual(events.count, 1, "expected exactly 1 stream-error event")
+        let errors = events.filter { $0.type == "stream-error" }
+        XCTAssertEqual(errors.count, 1)
+        if let errPayload = errors.first?.payload as? [String: String] {
+            XCTAssertEqual(errPayload["code"], "llm.http-5xx-retry-exhausted")
+        } else {
+            XCTFail("stream-error payload not a [String:String]")
         }
     }
 }
