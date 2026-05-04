@@ -4,6 +4,8 @@ import {
   llmChat,
   llmChatStream,
   llmStopStream,
+  createDataStream,
+  llmChatStreamAsAISDKStream,
   LLMChatResultSchema,
   StreamChunkPayloadSchema,
   StreamEndPayloadSchema,
@@ -250,5 +252,172 @@ describe("llm service", () => {
     expect(BridgeEventSchema.parse(makeEvent("stream-error"))).toMatchObject({ type: "stream-error" });
     expect(() => BridgeEventSchema.parse(makeEvent("stream-unknown"))).toThrow(z.ZodError);
     expect(() => BridgeEventSchema.parse(makeEvent("unknown-type"))).toThrow(z.ZodError);
+  });
+});
+
+// MARK: - M2.7.dev.d createDataStream adapter tests
+
+describe("createDataStream", () => {
+  // The bridge singleton accumulates event handlers in its internal Map.
+  // Strategy: each test creates a stream with a unique streamId, reads from it,
+  // then either cancels or lets stream-end/stream-error unsubscribe automatically.
+  // The bridge's dispatch hook is re-wired at module load (window.eatitBridge.dispatch);
+  // we re-establish window.webkit before each test so bridge.call works for cancel path.
+
+  beforeEach(() => {
+    (window as unknown as Record<string, unknown>).webkit = {
+      messageHandlers: {
+        eatit: { postMessage: vi.fn() },
+      },
+    };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("emits SSE-formatted Uint8Array on stream-chunk events", async () => {
+    const STREAM_ID = "ds-chunk-1";
+    const stream = createDataStream(STREAM_ID);
+    const reader = stream.getReader();
+
+    window.eatitBridge!.dispatch!({
+      type: "stream-chunk",
+      streamId: STREAM_ID,
+      payload: { content: "Hello" },
+    });
+
+    const { value, done } = await reader.read();
+    expect(done).toBe(false);
+    const decoded = new TextDecoder().decode(value);
+    expect(decoded).toContain('"content":"Hello"');
+    expect(decoded.startsWith("data: ")).toBe(true);
+    expect(decoded.endsWith("\n\n")).toBe(true);
+
+    // Cleanup: cancel to unsubscribe handlers
+    reader.cancel();
+  });
+
+  it("appends [DONE] terminator on stream-end and closes the stream", async () => {
+    const STREAM_ID = "ds-end-1";
+    const stream = createDataStream(STREAM_ID);
+    const reader = stream.getReader();
+
+    window.eatitBridge!.dispatch!({
+      type: "stream-end",
+      streamId: STREAM_ID,
+      payload: { finishReason: "stop" },
+    });
+
+    // First read: the finish_reason chunk
+    const r1 = await reader.read();
+    expect(new TextDecoder().decode(r1.value)).toContain('"finish_reason":"stop"');
+    // Second read: the [DONE] sentinel
+    const r2 = await reader.read();
+    expect(new TextDecoder().decode(r2.value)).toBe("data: [DONE]\n\n");
+    // Third read: end of stream (stream is closed)
+    const r3 = await reader.read();
+    expect(r3.done).toBe(true);
+  });
+
+  it("errors stream on stream-error event", async () => {
+    const STREAM_ID = "ds-err-1";
+    const stream = createDataStream(STREAM_ID);
+    const reader = stream.getReader();
+
+    window.eatitBridge!.dispatch!({
+      type: "stream-error",
+      streamId: STREAM_ID,
+      payload: { code: "llm.stream-cancelled", message: "user cancelled" },
+    });
+
+    const err = await reader.read().catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain("llm.stream-cancelled");
+    expect((err as Error).message).toContain("user cancelled");
+  });
+
+  it("ignores events for other streamIds", async () => {
+    const STREAM_ID = "ds-mine-1";
+    const OTHER = "ds-other-1";
+    const stream = createDataStream(STREAM_ID);
+    const reader = stream.getReader();
+
+    // Dispatch event for a different stream — should be ignored
+    window.eatitBridge!.dispatch!({
+      type: "stream-chunk",
+      streamId: OTHER,
+      payload: { content: "leak" },
+    });
+    // Then dispatch one for our stream
+    window.eatitBridge!.dispatch!({
+      type: "stream-chunk",
+      streamId: STREAM_ID,
+      payload: { content: "mine" },
+    });
+
+    const r1 = await reader.read();
+    const decoded = new TextDecoder().decode(r1.value);
+    expect(decoded).toContain('"content":"mine"');
+    expect(decoded).not.toContain("leak");
+
+    // Cleanup
+    reader.cancel();
+  });
+
+  it("reader.cancel() invokes bridge.call('llm.stopStream', {streamId})", async () => {
+    const STREAM_ID = "ds-cancel-1";
+    const mockPost = window.webkit!.messageHandlers!.eatit!.postMessage as ReturnType<typeof vi.fn>;
+    mockPost.mockResolvedValue({ id: "any", ok: true, data: { stopped: true } });
+
+    const stream = createDataStream(STREAM_ID);
+    await stream.cancel();
+
+    const stopCall = mockPost.mock.calls.find(
+      (c) => (c[0] as { method: string }).method === "llm.stopStream"
+    );
+    expect(stopCall).toBeDefined();
+    expect(
+      (stopCall![0] as { params: { streamId: string } }).params.streamId
+    ).toBe(STREAM_ID);
+  });
+});
+
+// MARK: - M2.7.dev.d llmChatStreamAsAISDKStream wrapper tests
+
+describe("llmChatStreamAsAISDKStream", () => {
+  beforeEach(() => {
+    (window as unknown as Record<string, unknown>).webkit = {
+      messageHandlers: {
+        eatit: { postMessage: vi.fn() },
+      },
+    };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("calls bridge.call('llm.chatStream') then returns ReadableStream with stream:true and a UUID streamId", async () => {
+    const mockPost = window.webkit!.messageHandlers!.eatit!.postMessage as ReturnType<typeof vi.fn>;
+    mockPost.mockResolvedValue({ id: "any", ok: true, data: { streamId: "s", started: true } });
+
+    const stream = await llmChatStreamAsAISDKStream({
+      model: "doubao-seed-1-6-250615",
+      messages: [{ role: "user", content: "hi" }],
+    });
+    expect(stream).toBeInstanceOf(ReadableStream);
+
+    const startCall = mockPost.mock.calls.find(
+      (c) => (c[0] as { method: string }).method === "llm.chatStream"
+    );
+    expect(startCall).toBeDefined();
+    const params = (startCall![0] as { params: { streamId: string; stream: boolean } }).params;
+    expect(params.stream).toBe(true);
+    expect(typeof params.streamId).toBe("string");
+    expect(params.streamId.length).toBeGreaterThan(0);
+
+    // Cleanup the returned stream
+    await stream.cancel();
   });
 });
