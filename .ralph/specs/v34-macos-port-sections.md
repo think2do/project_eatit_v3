@@ -1264,6 +1264,57 @@ corepack pnpm test src/__tests__/asrGateway.contract.test.ts
 
 **Commit.** `feat(F-403,F-404): implement asr gateway with volcengine sauc`
 
+> ⚠️ **2026-05-04 拆分**:本节点过重(二进制帧 + WS 鉴权 + receive loop + AVAudio 接通 + JS AsyncIterator 五件)已拆 .a~e 5 子节点。Ralph 不再读本段。
+
+### M2.8.dev.a — ASR 二进制帧 packing/unpacking + Codable
+**Lead Agent**: developer | **Deps**: M2.8.arch
+**Goal.** 火山 SAUC 自定义二进制帧协议(4-byte header + JSON/PCM payload + gzip)。先把帧编解码 + Codable struct + 边界 case 单测落地。本节点不连网络。
+**Files (new):**
+- `apps/macos/Eatit/Bridge/Models/ASRMessages.swift`(VolcAsrCreds / ASRResult / ASRUtterance Codable + definite=false partial / true final 判定)
+- `apps/macos/Eatit/Bridge/Models/ASRFrame.swift`(`pack(config:)` / `pack(audio:)` / `unpack(_:)`)
+- `apps/macos/EatitTests/ASRFrameTests.swift`(round-trip + 边界:首帧 JSON / audio / gzip / 短包 / 错误 magic)
+**Acceptance.** `xcodebuild test -only-testing:EatitTests/ASRFrameTests`
+**Commit.** `feat(F-403): asr binary frame packing + decoding`
+
+### M2.8.dev.b — ASRGateway WS connect + 4 header 鉴权 + 首帧
+**Lead Agent**: developer | **Deps**: M2.8.dev.a, M2.2
+**Goal.** Swift `ASRGateway.start(streamId:)` 建 WebSocket + 4 header(Keychain 读 volc-asr-credentials)+ 发首帧 full-client-request。本节点不发音频。
+**Files (new + modify):**
+- `apps/macos/Eatit/Services/ASRGateway.swift`(仅 start + stop + WS lifecycle)
+- `apps/macos/Eatit/WebViewController.swift`(modify — 注册 asr.start / asr.stop)
+- `apps/macos/EatitTests/ASRGatewayConnectTests.swift`(mock URLSessionWebSocketTask 验证 4 header + first-frame 字节序列)
+**Acceptance.** `xcodebuild test -only-testing:EatitTests/ASRGatewayConnectTests`
+**Commit.** `feat(F-403,F-404): asr gateway ws connect + auth + first frame`
+
+### M2.8.dev.c — feedPCM + receive loop + partial/final dispatch
+**Lead Agent**: developer | **Deps**: M2.8.dev.b
+**Goal.** Swift `feedPCM(_:)` 切包打 audio frame 推 WS;`receiveLoop` 解析 ASRResult,utterances.last?.definite 决定 dispatch `asr.partial` 还是 `asr.final`。
+**Files (modify + new):**
+- `apps/macos/Eatit/Services/ASRGateway.swift`(modify — 加 feedPCM + receiveLoop)
+- `apps/macos/EatitTests/ASRGatewayStreamTests.swift`(new — mock WS 推 5 partial + 1 final)
+**Acceptance.** `xcodebuild test -only-testing:EatitTests/ASRGatewayStreamTests`
+**Commit.** `feat(F-403): asr feedPCM + receive loop with bridge events`
+
+### M2.8.dev.d — AudioCaptureService → ASRGateway 直连
+**Lead Agent**: developer | **Deps**: M2.8.dev.c, M2.6
+**Goal.** AudioCaptureService 录音 callback 直接调 `asrGateway.feedPCM`(不经 JS),减少延迟。`asr.start` 同时启 audio + WS。
+**Files (modify + new):**
+- `apps/macos/Eatit/Services/AudioCaptureService.swift`(modify — 暴露 `start(onPCMChunk:)` callback)
+- `apps/macos/Eatit/Services/ASRGateway.swift`(modify — 内部 wire audio → feedPCM)
+- `apps/macos/EatitTests/AudioToASRBridgeTests.swift`(new — mock audio + mock WS 集成)
+**Acceptance.** `xcodebuild test -only-testing:EatitTests/AudioToASRBridgeTests`
+**Commit.** `feat(F-403): wire audio capture directly into asr gateway`
+
+### M2.8.dev.e — JS asr.ts AsyncIterator + 真调 SAUC 冒烟
+**Lead Agent**: developer | **Deps**: M2.8.dev.d
+**Goal.** JS `asr.ts` 把 bridge `asr.partial` / `asr.final` 包成 `AsyncIterableIterator<ASRPartial>`。本节点末**真调一次**火山 SAUC 冒烟(用 keychain 已配的 volc-asr-credentials)。
+**Files (new):**
+- `apps/desktop/src/services/asr.ts`
+- `apps/desktop/src/__tests__/asr.async-iterator.test.ts`(mock bridge event 5 partial + 1 final → for await yield 6)
+- `apps/macos/scripts/smoke-test-sauc.sh`(手工冒烟)
+**Acceptance.** `cd apps/desktop && corepack pnpm test src/__tests__/asr.async-iterator.test.ts`
+**Commit.** `feat(F-403,F-405): asr async iterator wrapper + sauc smoke`
+
 ---
 
 ## M2.X — tester audit M2 全段
