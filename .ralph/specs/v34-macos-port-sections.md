@@ -1932,6 +1932,36 @@ corepack pnpm test 2>&1 | grep -E "Tests: +[0-9]+ passed"  # ≥ 400
 
 **Commit.** `test(v34): port pytest to vitest reaching 400+`
 
+> ⚠️ **2026-05-04 拆分**:本节点过重(~350 pytest 一次 port),已拆为 M5.2.a~d。Ralph 不再读取本段,fix_plan 已切换。
+
+### M5.2.a — Vitest port: agents/* 单测(≥ 100 tests)
+**Lead Agent**: developer | **Deps**: M5.1
+**Goal.** 把 `apps/api/tests/agents/` 下 KEEP 标记的 pytest 翻译为 Vitest。
+**Files (new):** `apps/desktop/src/__tests__/agents/`(批量)
+**Acceptance.** `corepack pnpm test src/__tests__/agents/` ≥ 100
+**Commit.** `test(v34): port agents pytest to vitest (~100)`
+
+### M5.2.b — Vitest port: orchestrator graphs contract(≥ 30)
+**Lead Agent**: developer | **Deps**: M5.2.a
+**Goal.** turn / intake / post_report 三类 contract 测试 port + 节点名锁继续生效。
+**Files (new):** `apps/desktop/src/__tests__/graphs/*-contract.test.ts`
+**Acceptance.** `corepack pnpm test src/__tests__/graphs/` ≥ 30
+**Commit.** `test(v34): port langgraph contract tests (~30)`
+
+### M5.2.c — Vitest port: domain / repositories / infra(≥ 100)
+**Lead Agent**: developer | **Deps**: M5.2.b
+**Goal.** 后端 domain / repositories / infra 三类 KEEP 测试。DB 用 GRDB Bridge mock,LLM 用 ARK provider mock。
+**Files (new):** `apps/desktop/src/__tests__/{domain,repositories,infra}/`
+**Acceptance.** `corepack pnpm test src/__tests__/{domain,repositories,infra}/` ≥ 100
+**Commit.** `test(v34): port domain/repositories/infra (~100)`
+
+### M5.2.d — schemas + ethics fuzzers 收尾(总数 ≥ 400 + tsc 干净)
+**Lead Agent**: developer | **Deps**: M5.2.c
+**Goal.** 收口 schema 锁 + 12 禁止词 fuzz + 5 维度锁 + 隐私 fuzz。`pnpm test` 总数 ≥ 400。
+**Files (new):** `apps/desktop/src/__tests__/{contracts,fuzzers}/` 补缺
+**Acceptance.** `corepack pnpm exec tsc --noEmit && corepack pnpm test 2>&1 | grep -E "Tests: +[0-9]+ passed"` ≥ 400
+**Commit.** `test(v34): vitest reaches 400+`
+
 ---
 
 ## M5.3 — Playwright E2E 改造为启 Eatit.app
