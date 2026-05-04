@@ -163,3 +163,59 @@ export const ObserverAgentOutputSchema = z
   })
   .strict();
 export type ObserverAgentOutput = z.infer<typeof ObserverAgentOutputSchema>;
+
+// M3.3.1: Interviewer Agent contract schemas
+// §A11 PII guard: .strict() rejects extra fields (resume_text / candidate_email / etc.)
+
+export const TurnAssessmentSchema = z
+  .object({
+    summary: z.string(),
+    strengths: z.array(z.string()).default([]),
+    weaknesses: z.array(z.string()).default([]),
+  })
+  .strict();
+export type TurnAssessment = z.infer<typeof TurnAssessmentSchema>;
+
+export const TurnAssessmentSnippetSchema = z
+  .object({ summary: z.string() })
+  .strict();
+export type TurnAssessmentSnippet = z.infer<typeof TurnAssessmentSnippetSchema>;
+
+export const TurnRecordSchema = z
+  .object({
+    question: z.string(),
+    answer: z.string(),
+    assessment: TurnAssessmentSnippetSchema.nullable().optional(),
+  })
+  .strict();
+export type TurnRecord = z.infer<typeof TurnRecordSchema>;
+
+export const InterviewerAgentInputSchema = z
+  .object({
+    framework_json: z.string(),
+    recent_turns: z.array(TurnRecordSchema),
+    long_term_summary: z.string().nullable().optional(),
+    remaining_minutes: z.number().int().nullable().optional(),
+  })
+  .strict();
+export type InterviewerAgentInput = z.infer<typeof InterviewerAgentInputSchema>;
+
+export const InterviewerAgentOutputSchema = z
+  .object({
+    question: z.string(),
+    intent: z.string(),
+    expected_depth: z.enum(["surface", "tactical", "strategic"]),
+    followup_hint: z.string().nullable().optional(),
+    should_end: z.boolean().default(false),
+    followup_hints: z
+      .array(z.string().max(8))
+      .max(3)
+      .refine(
+        (arr) => arr.length === 0 || (arr.length >= 2 && arr.length <= 3),
+        { message: "followup_hints must be empty or 2-3 items" },
+      )
+      .default([]),
+    live_observation: z.string().max(30).nullable().optional(),
+  })
+  .strict();
+export type InterviewerAgentOutput = z.infer<typeof InterviewerAgentOutputSchema>;
