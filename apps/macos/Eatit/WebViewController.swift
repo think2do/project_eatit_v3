@@ -12,6 +12,7 @@ final class WebViewController: NSViewController {
     }()
     private let filePickerService = FilePickerService()
     private let pdfParserService = PDFParserService()
+    private let audioCaptureService = AudioCaptureService()
 
     override func loadView() {
         let config = WKWebViewConfiguration()
@@ -45,6 +46,7 @@ final class WebViewController: NSViewController {
         registerDatabaseHandlers()
         registerFilePickerHandlers()
         registerPDFParserHandlers()
+        registerAudioCaptureHandlers()
     }
 
     private func registerEchoHandler() {
@@ -203,6 +205,45 @@ final class WebViewController: NSViewController {
             } catch {
                 throw BridgeError(code: "pdf.extract-failed", message: "\(error)")
             }
+        }
+    }
+
+    /// Registers audio.start / audio.stop bridge methods (control only; PCM stays Swift-internal).
+    /// §C / §C3: PCM bytes never cross the JS boundary; M2.8 ASRGateway will register the
+    /// pcmCallback at the Swift level when an interview turn begins.
+    /// §B9: Codable params + Zod schemas updated in the same commit.
+    private func registerAudioCaptureHandlers() {
+        struct StartParams: Codable { let streamId: String }
+        struct EmptyParams: Codable {}
+        struct EmptyResponse: Codable {}
+
+        bridgeRouter.register(method: "audio.start") { [weak self] (p: StartParams) -> EmptyResponse in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            do {
+                // M2.6 baseline: no real callback yet (M2.8 will replace this no-op).
+                try await self.audioCaptureService.start(streamId: p.streamId, onPCMChunk: { _ in
+                    // §C3: no-op. M2.8 ASRGateway will install the real consumer.
+                })
+                return EmptyResponse()
+            } catch AudioCaptureService.AudioError.permissionDenied {
+                throw BridgeError(code: "audio.permission-denied", message: "microphone permission denied")
+            } catch AudioCaptureService.AudioError.converterInitFailed {
+                throw BridgeError(code: "audio.converter-init-failed", message: "AVAudioConverter init failed")
+            } catch AudioCaptureService.AudioError.engineStartFailed(let why) {
+                throw BridgeError(code: "audio.engine-start-failed", message: why)
+            } catch {
+                throw BridgeError(code: "audio.start-failed", message: "\(error)")
+            }
+        }
+
+        bridgeRouter.register(method: "audio.stop") { [weak self] (_: EmptyParams) -> EmptyResponse in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            self.audioCaptureService.stop()
+            return EmptyResponse()
         }
     }
 
