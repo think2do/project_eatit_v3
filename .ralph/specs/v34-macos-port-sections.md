@@ -1674,6 +1674,36 @@ corepack pnpm test src/__tests__/researchAgent.privacy.test.ts
 **Commit (.arch):** `docs(v34): design intake_graph in langgraph.js`
 **Commit (.dev):** `feat(F-405): land intake_graph with research opt-in`
 
+> ⚠️ **2026-05-04 拆分**:.dev 部分(intake_graph + Framework + Research 一锅)过重,已拆 .dev.a~c。Ralph 不再读 .dev 整段。
+
+### M3.3.2.dev.a — Framework Agent(predicted_questions 8-15 锁)
+**Lead Agent**: developer | **Parallel-safe with .b** | **Deps**: M3.3.2.arch
+**Goal.** Framework Agent 翻译 + predicted_questions 长度 8-15 锁。本节点不动 graph。
+**Files (new):**
+- `apps/desktop/src/core/agents/framework/index.ts` + `prompts.ts`
+- `apps/desktop/src/__tests__/frameworkAgent.test.ts`(predicted_questions 长度边界)
+**Acceptance.** `corepack pnpm test src/__tests__/frameworkAgent.test.ts`
+**Commit.** `feat(F-405): framework agent with question prediction`
+
+### M3.3.2.dev.b — Research Agent(strict() 隐私护栏 重灾区)
+**Lead Agent**: developer | **Parallel-safe with .a** | **Deps**: M3.3.2.arch
+**Goal.** Research Agent 翻译 + .strict() 拒任何 PII(L0 红线 11)+ N=300 fuzz 验证。
+**Files (new):**
+- `apps/desktop/src/core/agents/research/index.ts` + `prompts.ts`
+- `apps/desktop/src/__tests__/researchAgent.privacy.test.ts`(N=300 fuzz)
+**Acceptance.** `corepack pnpm test src/__tests__/researchAgent.privacy.test.ts`
+**Commit.** `feat(F-405): research agent with strict() privacy guard`
+
+### M3.3.2.dev.c — intake_graph 接通(parse → research → predict + 节点名锁)
+**Lead Agent**: developer | **Deps**: M3.3.2.dev.a + .b
+**Goal.** LangGraph.js 三节点 sequential 接通,Research opt-in 短路。节点名锁 contract test。
+**Files (new):**
+- `apps/desktop/src/core/graphs/intakeGraph.ts`
+- `apps/desktop/src/__tests__/intakeGraph.contract.test.ts`
+- `apps/desktop/src/__tests__/intakeGraph.optin.test.ts`(opt-in=false 时跳过 research)
+**Acceptance.** `corepack pnpm test src/__tests__/intakeGraph.{contract,optin}.test.ts`
+**Commit.** `feat(F-405): intake_graph with research opt-in shortcut`
+
 ---
 
 ## M3.3.3.arch / M3.3.3.dev — post_report_graph + Coach + Reflection + Report
