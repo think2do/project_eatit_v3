@@ -5,6 +5,7 @@ final class WebViewController: NSViewController {
     private let schemeHandler = EatitURLSchemeHandler()
     let bridgeRouter = BridgeRouter()  // internal — accessible from tests and future service registration
     private var webView: WKWebView!
+    private let keychainService = KeychainService()
 
     override func loadView() {
         let config = WKWebViewConfiguration()
@@ -21,6 +22,7 @@ final class WebViewController: NSViewController {
         view = webView
         bridgeRouter.webView = webView
         registerEchoHandler()
+        registerKeychainHandlers()
     }
 
     private func registerEchoHandler() {
@@ -29,6 +31,52 @@ final class WebViewController: NSViewController {
         // Test method: bridge.echo({ msg }) → { msg }
         bridgeRouter.register(method: "bridge.echo") { (p: EchoParams) -> EchoResult in
             EchoResult(msg: p.msg)
+        }
+    }
+
+    /// Registers keychain bridge methods: save / exists / delete.
+    /// §C3: keychain.read / keychain.get are intentionally NOT registered — secrets must not cross the Bridge boundary.
+    /// §C2: Single-app private keychain mode; no kSecAttrAccessGroup (access-group entitlement deferred to Apple Dev Portal config).
+    /// Design note: spec lists AppDelegate as the registration site, but M2.1.dev fixed bridgeRouter as a WebViewController
+    /// property bound after webView is created — so registration lives here, not in AppDelegate.
+    private func registerKeychainHandlers() {
+        struct SaveParams: Codable { let account: String; let secret: String }
+        struct AccountParams: Codable { let account: String }
+        struct EmptyResponse: Codable {}
+        struct ExistsResponse: Codable { let exists: Bool }
+
+        bridgeRouter.register(method: "keychain.save") { [weak self] (p: SaveParams) -> EmptyResponse in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            guard let data = p.secret.data(using: .utf8) else {
+                throw BridgeError(code: "bridge.params-invalid", message: "secret encoding failed")
+            }
+            do {
+                try self.keychainService.save(account: p.account, secret: data)
+                return EmptyResponse()
+            } catch {
+                throw BridgeError(code: "keychain.save-failed", message: "\(error)")
+            }
+        }
+
+        bridgeRouter.register(method: "keychain.exists") { [weak self] (p: AccountParams) -> ExistsResponse in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            return ExistsResponse(exists: self.keychainService.exists(account: p.account))
+        }
+
+        bridgeRouter.register(method: "keychain.delete") { [weak self] (p: AccountParams) -> EmptyResponse in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            do {
+                try self.keychainService.delete(account: p.account)
+                return EmptyResponse()
+            } catch {
+                throw BridgeError(code: "keychain.delete-failed", message: "\(error)")
+            }
         }
     }
 
