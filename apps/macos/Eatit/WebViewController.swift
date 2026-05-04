@@ -13,6 +13,9 @@ final class WebViewController: NSViewController {
     private let filePickerService = FilePickerService()
     private let pdfParserService = PDFParserService()
     private let audioCaptureService = AudioCaptureService()
+    // lazy var avoids stored-property ordering issue: keychainService is init'd before this runs.
+    // §A0.4: apiKey is read inside LLMGateway per-call; not cached here.
+    private lazy var llmGateway: LLMGateway = LLMGateway(keychain: keychainService)
 
     override func loadView() {
         let config = WKWebViewConfiguration()
@@ -47,6 +50,7 @@ final class WebViewController: NSViewController {
         registerFilePickerHandlers()
         registerPDFParserHandlers()
         registerAudioCaptureHandlers()
+        registerLLMHandlers()
     }
 
     private func registerEchoHandler() {
@@ -244,6 +248,26 @@ final class WebViewController: NSViewController {
             }
             self.audioCaptureService.stop()
             return EmptyResponse()
+        }
+    }
+
+    /// Registers LLM Bridge methods. Only llm.chat (sync) for M2.7.dev.b.
+    /// chatStream / stopStream are M2.7.dev.c.
+    /// §C3: Authorization injected in LLMGateway.makeRequest; never crosses Bridge.
+    /// §A0.4: apiKey read per-call in LLMGateway, not stored in this controller.
+    private func registerLLMHandlers() {
+        bridgeRouter.register(method: "llm.chat") { [weak self] (p: ChatCompletionRequest) -> LLMChatResult in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            let resp = try await self.llmGateway.chat(p)
+            let first = resp.choices.first
+            return LLMChatResult(
+                content: first?.message.content,
+                toolCalls: first?.message.toolCalls,
+                finishReason: first?.finishReason ?? "stop",
+                usage: resp.usage
+            )
         }
     }
 

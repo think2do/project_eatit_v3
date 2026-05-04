@@ -12,7 +12,8 @@
     "test": "vitest run",
     "e2e": "playwright test",
     "tauri": "tauri",
-    "build:dmg": "tauri build --target aarch64-apple-darwin --bundles dmg"
+    "build:dmg": "tauri build --target aarch64-apple-darwin --bundles dmg",
+    "lint:no-key-leak": "bash ../../scripts/check-no-key-leak.sh"
   },
   "dependencies": {
     "@eatit/shared-types": "workspace:*",

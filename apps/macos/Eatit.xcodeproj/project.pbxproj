@@ -11,6 +11,7 @@
 		1621B4ADC84A30CD390A4007 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52966AFF5F89B7324625F160 /* KeychainService.swift */; };
 		168D525C07E20BC8867C57F6 /* FilePickerServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47B0A1C75CC77F33B8806EAC /* FilePickerServiceTests.swift */; };
 		1763841EC90FE25B31E8589B /* PDFParserService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A7F87BEE0962BBA16ADAB3 /* PDFParserService.swift */; };
+		1977B2F507013A76B830B7F6 /* LLMGatewayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32BAC8BAAED38EB71FFA21EE /* LLMGatewayTests.swift */; };
 		1A5207CBA5AED8FA837F5CF9 /* BridgeRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45C767D9E819A827DDC9D2F4 /* BridgeRouterTests.swift */; };
 		234C778F7F573D0CE3905495 /* Migrations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0397716BAA6A496E05797317 /* Migrations.swift */; };
 		2DF11A4F786459CE4BB395B5 /* EatitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D97BCF787590B906ED24F7A /* EatitApp.swift */; };
@@ -28,6 +29,7 @@
 		D0931A2EBAC2396B6C57777B /* LLMTypesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC6E03864EC3C7AB2ECD3093 /* LLMTypesTests.swift */; };
 		D7B912071A26D6B1F55BB1CA /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = EB6C3281A76DF9FEC0ECC39C /* GRDB */; };
 		DB99DAD8206009767658D505 /* FilePickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 827D64E28B1441E3C1AFF23A /* FilePickerService.swift */; };
+		E3E2A896733ACC932A789561 /* LLMGateway.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BB8B1A7332F04B1A2EF8AA5 /* LLMGateway.swift */; };
 		E65B6758081226158E022E42 /* BridgeMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DCBBE303E57BB0D2DBDC5C7 /* BridgeMessage.swift */; };
 		E8262C9FB5A4A6A6EB15D53A /* AudioCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2BDD48C47FA2C8804AC270C /* AudioCaptureService.swift */; };
 		F2608B5578A37B276C915E7A /* LLMTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 662B1731127C5013918D1DAF /* LLMTypes.swift */; };
@@ -46,9 +48,11 @@
 
 /* Begin PBXFileReference section */
 		0397716BAA6A496E05797317 /* Migrations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Migrations.swift; sourceTree = "<group>"; };
+		0BB8B1A7332F04B1A2EF8AA5 /* LLMGateway.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMGateway.swift; sourceTree = "<group>"; };
 		1D97BCF787590B906ED24F7A /* EatitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EatitApp.swift; sourceTree = "<group>"; };
 		24D007F9DD23D7323372CF2A /* Eatit.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Eatit.entitlements; sourceTree = "<group>"; };
 		29BA4CD12763DB886C67A4C9 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
+		32BAC8BAAED38EB71FFA21EE /* LLMGatewayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMGatewayTests.swift; sourceTree = "<group>"; };
 		376F711F8F6001004EF9471A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		45C767D9E819A827DDC9D2F4 /* BridgeRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeRouterTests.swift; sourceTree = "<group>"; };
 		47B0A1C75CC77F33B8806EAC /* FilePickerServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePickerServiceTests.swift; sourceTree = "<group>"; };
@@ -115,6 +119,7 @@
 			isa = PBXGroup;
 			children = (
 				E4BFF142990BD0B24759F60B /* Bridge */,
+				9C1DD7C3618B91838C7AB1BA /* Services */,
 				CC00254BA0742E6AE2B81E90 /* AudioCaptureServiceTests.swift */,
 				45C767D9E819A827DDC9D2F4 /* BridgeRouterTests.swift */,
 				84A1C10BF214F3B9C20D9C99 /* DatabaseServiceTests.swift */,
@@ -142,6 +147,14 @@
 				A5EA76747759170E42A8C8E4 /* BridgeRouter.swift */,
 			);
 			path = Bridge;
+			sourceTree = "<group>";
+		};
+		9C1DD7C3618B91838C7AB1BA /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				32BAC8BAAED38EB71FFA21EE /* LLMGatewayTests.swift */,
+			);
+			path = Services;
 			sourceTree = "<group>";
 		};
 		AF4CEE95509F31FCC22C340C /* Resources */ = {
@@ -193,6 +206,7 @@
 				29BA4CD12763DB886C67A4C9 /* DatabaseService.swift */,
 				827D64E28B1441E3C1AFF23A /* FilePickerService.swift */,
 				52966AFF5F89B7324625F160 /* KeychainService.swift */,
+				0BB8B1A7332F04B1A2EF8AA5 /* LLMGateway.swift */,
 				0397716BAA6A496E05797317 /* Migrations.swift */,
 				D1A7F87BEE0962BBA16ADAB3 /* PDFParserService.swift */,
 			);
@@ -376,6 +390,7 @@
 				12877B5CFC5FA06436E473BE /* EatitURLSchemeHandler.swift in Sources */,
 				DB99DAD8206009767658D505 /* FilePickerService.swift in Sources */,
 				1621B4ADC84A30CD390A4007 /* KeychainService.swift in Sources */,
+				E3E2A896733ACC932A789561 /* LLMGateway.swift in Sources */,
 				F2608B5578A37B276C915E7A /* LLMTypes.swift in Sources */,
 				234C778F7F573D0CE3905495 /* Migrations.swift in Sources */,
 				1763841EC90FE25B31E8589B /* PDFParserService.swift in Sources */,
@@ -392,6 +407,7 @@
 				46CFD08BFA28F55C008DA677 /* DatabaseServiceTests.swift in Sources */,
 				168D525C07E20BC8867C57F6 /* FilePickerServiceTests.swift in Sources */,
 				B111728351EC4034DC0075C4 /* KeychainServiceTests.swift in Sources */,
+				1977B2F507013A76B830B7F6 /* LLMGatewayTests.swift in Sources */,
 				D0931A2EBAC2396B6C57777B /* LLMTypesTests.swift in Sources */,
 				F38861CD9B82CB95B3D49ADB /* PDFParserServiceTests.swift in Sources */,
 			);
