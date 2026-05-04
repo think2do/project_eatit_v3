@@ -11,6 +11,7 @@ final class WebViewController: NSViewController {
         catch { fatalError("DatabaseService init failed: \(error)") }
     }()
     private let filePickerService = FilePickerService()
+    private let pdfParserService = PDFParserService()
 
     override func loadView() {
         let config = WKWebViewConfiguration()
@@ -43,6 +44,7 @@ final class WebViewController: NSViewController {
         registerKeychainHandlers()
         registerDatabaseHandlers()
         registerFilePickerHandlers()
+        registerPDFParserHandlers()
     }
 
     private func registerEchoHandler() {
@@ -179,6 +181,28 @@ final class WebViewController: NSViewController {
                 self.webView.dropInterceptEnabled = p.enabled
             }
             return EmptyResponse()
+        }
+    }
+
+    /// Registers pdf.extractText bridge method.
+    /// §B9: Swift PDFExtractResult Codable + JS PDFExtractResultSchema Zod in same commit.
+    /// §C3: handler must NOT log p.base64 (PDF may contain candidate PII).
+    private func registerPDFParserHandlers() {
+        struct ExtractParams: Codable { let base64: String }
+
+        bridgeRouter.register(method: "pdf.extractText") { [weak self] (p: ExtractParams) -> PDFExtractResult in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            do {
+                return try self.pdfParserService.extractText(base64: p.base64)
+            } catch PDFParserService.PDFParseError.invalidBase64 {
+                throw BridgeError(code: "pdf.invalid-base64", message: "params.base64 is not valid base64")
+            } catch PDFParserService.PDFParseError.invalidPDF {
+                throw BridgeError(code: "pdf.invalid-pdf", message: "decoded data is not a valid PDF")
+            } catch {
+                throw BridgeError(code: "pdf.extract-failed", message: "\(error)")
+            }
         }
     }
 
