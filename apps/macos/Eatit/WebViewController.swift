@@ -4,12 +4,13 @@ import WebKit
 final class WebViewController: NSViewController {
     private let schemeHandler = EatitURLSchemeHandler()
     let bridgeRouter = BridgeRouter()  // internal — accessible from tests and future service registration
-    private var webView: WKWebView!
+    private var webView: DropAwareWebView!
     private let keychainService = KeychainService()
     private let databaseService: DatabaseService = {
         do { return try DatabaseService() }
         catch { fatalError("DatabaseService init failed: \(error)") }
     }()
+    private let filePickerService = FilePickerService()
 
     override func loadView() {
         let config = WKWebViewConfiguration()
@@ -21,13 +22,27 @@ final class WebViewController: NSViewController {
             contentWorld: .page,
             name: "eatit"
         )
-        webView = WKWebView(frame: .zero, configuration: config)
+        webView = DropAwareWebView(frame: .zero, configuration: config)
         webView.translatesAutoresizingMaskIntoConstraints = false
         view = webView
         bridgeRouter.webView = webView
+        // §A0.1: files.user-selected.read-write covers drop; Powerbox auto-grants access.
+        webView.onFilesDropped = { [weak self] urls in
+            guard let self = self else { return }
+            let files = urls.compactMap(FilePickerService.makePickedFile(from:))
+            let dicts = files.map { f -> [String: Any] in
+                ["name": f.name, "size": f.size, "base64": f.base64]
+            }
+            self.bridgeRouter.dispatchEvent(
+                type: "file-dropped",
+                streamId: UUID().uuidString,
+                payload: ["files": dicts]
+            )
+        }
         registerEchoHandler()
         registerKeychainHandlers()
         registerDatabaseHandlers()
+        registerFilePickerHandlers()
     }
 
     private func registerEchoHandler() {
@@ -140,9 +155,71 @@ final class WebViewController: NSViewController {
         }
     }
 
+    /// Registers file bridge methods: file.pick / file.dropEnable.
+    /// §A0.1: NSOpenPanel + drag-and-drop use files.user-selected.read-write (M1.4) — no new entitlement.
+    /// §C3: payload is user resume/transcript content, not secret material.
+    /// §B9: dual-end contract — JS Zod BridgeEventSchema enum updated in same commit.
+    private func registerFilePickerHandlers() {
+        struct PickParams: Codable { let accept: [String]?; let multiple: Bool }
+        struct DropEnableParams: Codable { let enabled: Bool }
+        struct EmptyResponse: Codable {}
+
+        bridgeRouter.register(method: "file.pick") { [weak self] (p: PickParams) -> [PickedFile] in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            return await self.filePickerService.pick(accept: p.accept, multiple: p.multiple)
+        }
+
+        bridgeRouter.register(method: "file.dropEnable") { [weak self] (p: DropEnableParams) -> EmptyResponse in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            await MainActor.run {
+                self.webView.dropInterceptEnabled = p.enabled
+            }
+            return EmptyResponse()
+        }
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         let url = URL(string: "eatit://app/index.html")!
         webView.load(URLRequest(url: url))
+    }
+}
+
+// MARK: - DropAwareWebView
+
+/// WKWebView subclass that surfaces file drops to a closure.
+/// Default WKWebView routes drags to the page; we intercept at the view level so
+/// drops on the WebView container fire a BridgeEvent instead.
+/// §A0.1: files.user-selected.read-write entitlement (M1.4) covers user-initiated drops via Powerbox.
+final class DropAwareWebView: WKWebView {
+    /// Invoked on a successful drop with the dragged file URLs.
+    var onFilesDropped: (([URL]) -> Void)?
+    /// Toggled from JS via file.dropEnable({enabled}). When false, drops fall through to WKWebView default.
+    var dropInterceptEnabled: Bool = false
+
+    override init(frame: CGRect, configuration: WKWebViewConfiguration) {
+        super.init(frame: frame, configuration: configuration)
+        registerForDraggedTypes([.fileURL])
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        dropInterceptEnabled ? .copy : super.draggingEntered(sender)
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard dropInterceptEnabled,
+              let urls = sender.draggingPasteboard.readObjects(
+                  forClasses: [NSURL.self],
+                  options: [.urlReadingFileURLsOnly: true]
+              ) as? [URL]
+        else { return super.performDragOperation(sender) }
+        onFilesDropped?(urls)
+        return true
     }
 }

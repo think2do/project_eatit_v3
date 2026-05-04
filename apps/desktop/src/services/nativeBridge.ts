@@ -23,7 +23,7 @@ export type BridgeResponse = z.infer<typeof BridgeResponseSchema>;
 // MARK: - BridgeEvent schema
 
 export const BridgeEventSchema = z.object({
-  type: z.enum(["stream-chunk", "asr-partial", "asr-final", "asr-end"]),
+  type: z.enum(["stream-chunk", "asr-partial", "asr-final", "asr-end", "file-dropped"]),
   streamId: z.string(),
   payload: z.unknown(),
 });

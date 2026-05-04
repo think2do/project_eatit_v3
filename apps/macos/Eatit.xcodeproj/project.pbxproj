@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		12877B5CFC5FA06436E473BE /* EatitURLSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ABC08D39D205B42554753E9 /* EatitURLSchemeHandler.swift */; };
 		1621B4ADC84A30CD390A4007 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52966AFF5F89B7324625F160 /* KeychainService.swift */; };
+		168D525C07E20BC8867C57F6 /* FilePickerServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47B0A1C75CC77F33B8806EAC /* FilePickerServiceTests.swift */; };
 		1A5207CBA5AED8FA837F5CF9 /* BridgeRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45C767D9E819A827DDC9D2F4 /* BridgeRouterTests.swift */; };
 		234C778F7F573D0CE3905495 /* Migrations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0397716BAA6A496E05797317 /* Migrations.swift */; };
 		2DF11A4F786459CE4BB395B5 /* EatitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D97BCF787590B906ED24F7A /* EatitApp.swift */; };
@@ -23,6 +24,7 @@
 		B111728351EC4034DC0075C4 /* KeychainServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78EA1BE62430794ECCF5180B /* KeychainServiceTests.swift */; };
 		C72BF0F75A83CC59AF604D5A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9C4F92E482943CF0EAFEC515 /* PrivacyInfo.xcprivacy */; };
 		D7B912071A26D6B1F55BB1CA /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = EB6C3281A76DF9FEC0ECC39C /* GRDB */; };
+		DB99DAD8206009767658D505 /* FilePickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 827D64E28B1441E3C1AFF23A /* FilePickerService.swift */; };
 		E65B6758081226158E022E42 /* BridgeMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DCBBE303E57BB0D2DBDC5C7 /* BridgeMessage.swift */; };
 /* End PBXBuildFile section */
 
@@ -43,9 +45,11 @@
 		29BA4CD12763DB886C67A4C9 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
 		376F711F8F6001004EF9471A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		45C767D9E819A827DDC9D2F4 /* BridgeRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeRouterTests.swift; sourceTree = "<group>"; };
+		47B0A1C75CC77F33B8806EAC /* FilePickerServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePickerServiceTests.swift; sourceTree = "<group>"; };
 		4DCBBE303E57BB0D2DBDC5C7 /* BridgeMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeMessage.swift; sourceTree = "<group>"; };
 		52966AFF5F89B7324625F160 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		78EA1BE62430794ECCF5180B /* KeychainServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainServiceTests.swift; sourceTree = "<group>"; };
+		827D64E28B1441E3C1AFF23A /* FilePickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePickerService.swift; sourceTree = "<group>"; };
 		84234450F65D5CF7E0E02A2A /* EatitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EatitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		84A1C10BF214F3B9C20D9C99 /* DatabaseServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseServiceTests.swift; sourceTree = "<group>"; };
 		8ABC08D39D205B42554753E9 /* EatitURLSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EatitURLSchemeHandler.swift; sourceTree = "<group>"; };
@@ -100,6 +104,7 @@
 			children = (
 				45C767D9E819A827DDC9D2F4 /* BridgeRouterTests.swift */,
 				84A1C10BF214F3B9C20D9C99 /* DatabaseServiceTests.swift */,
+				47B0A1C75CC77F33B8806EAC /* FilePickerServiceTests.swift */,
 				78EA1BE62430794ECCF5180B /* KeychainServiceTests.swift */,
 			);
 			path = EatitTests;
@@ -153,6 +158,7 @@
 			isa = PBXGroup;
 			children = (
 				29BA4CD12763DB886C67A4C9 /* DatabaseService.swift */,
+				827D64E28B1441E3C1AFF23A /* FilePickerService.swift */,
 				52966AFF5F89B7324625F160 /* KeychainService.swift */,
 				0397716BAA6A496E05797317 /* Migrations.swift */,
 			);
@@ -333,6 +339,7 @@
 				72DD76D89A2E681BDF370A65 /* DatabaseService.swift in Sources */,
 				2DF11A4F786459CE4BB395B5 /* EatitApp.swift in Sources */,
 				12877B5CFC5FA06436E473BE /* EatitURLSchemeHandler.swift in Sources */,
+				DB99DAD8206009767658D505 /* FilePickerService.swift in Sources */,
 				1621B4ADC84A30CD390A4007 /* KeychainService.swift in Sources */,
 				234C778F7F573D0CE3905495 /* Migrations.swift in Sources */,
 				A124C35BA81F3FB27B49C690 /* WebViewController.swift in Sources */,
@@ -345,6 +352,7 @@
 			files = (
 				1A5207CBA5AED8FA837F5CF9 /* BridgeRouterTests.swift in Sources */,
 				46CFD08BFA28F55C008DA677 /* DatabaseServiceTests.swift in Sources */,
+				168D525C07E20BC8867C57F6 /* FilePickerServiceTests.swift in Sources */,
 				B111728351EC4034DC0075C4 /* KeychainServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
