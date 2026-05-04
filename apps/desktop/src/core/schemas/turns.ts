@@ -111,3 +111,30 @@ export const ReferenceAgentOutputSchema = z
   })
   .strict();
 export type ReferenceAgentOutput = z.infer<typeof ReferenceAgentOutputSchema>;
+
+// M3.2.3: Compression Agent contract (turn input + agent input/output)
+// §A11 PII guard: .strict() rejects extra fields (resume_text / candidate_email / etc.)
+export const CompressionTurnSchema = z
+  .object({
+    question: z.string(),
+    answer: z.string(),
+  })
+  .strict();
+export type CompressionTurn = z.infer<typeof CompressionTurnSchema>;
+
+export const CompressionAgentInputSchema = z
+  .object({
+    previous_summary: z.string().nullable().optional(),
+    turns: z.array(CompressionTurnSchema),
+  })
+  .strict();
+export type CompressionAgentInput = z.infer<typeof CompressionAgentInputSchema>;
+
+export const CompressionAgentOutputSchema = z
+  .object({
+    summary: z.string(),
+    preserved_keywords: z.array(z.string()),
+    open_threads: z.array(z.string()),
+  })
+  .strict();
+export type CompressionAgentOutput = z.infer<typeof CompressionAgentOutputSchema>;
