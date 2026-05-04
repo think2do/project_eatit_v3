@@ -1707,6 +1707,45 @@ corepack pnpm test src/__tests__/reportAgent.ethics.test.ts
 **Commit (.arch):** `docs(v34): design post_report_graph in langgraph.js`
 **Commit (.dev):** `feat(F-405): land post_report_graph with parallel coach||reflection`
 
+> ⚠️ **2026-05-04 拆分**:.dev 部分过重(2 节点 graph + 3 个 Agent + 5 维度 + 12 禁止词 + 教学护栏一锅),已拆为 .dev.a~d 4 子节点。Ralph 不再读 .dev 整段,fix_plan 已切换。
+
+### M3.3.3.dev.a — Report Agent(主报告,5 维度 + 3 档 + 12 禁止词)
+**Lead Agent**: developer | **Deps**: M3.3.3.arch
+**Goal.** Report Agent 主报告。L0 锁:dimensions[5] + pass_likelihood 3 档 + 12 禁止词 sanitize + ai_verdict 后置 regex。本节点不动 graph。
+**Files (new):**
+- `apps/desktop/src/core/agents/report/index.ts` + `prompts.ts` + `sanitizers.ts`
+- `apps/desktop/src/__tests__/reportAgent.test.ts`(happy + 12 禁止词 fuzz N=100)
+**Acceptance.** `corepack pnpm test src/__tests__/reportAgent.test.ts`
+**Commit.** `feat(F-405): report agent with 5-dim + 3-tier + 12-banned`
+
+### M3.3.3.dev.b — Coach Agent(跨 session 异步 + 教学护栏)
+**Lead Agent**: developer | **Parallel-safe with .c** | **Deps**: M3.3.3.arch
+**Goal.** Coach Agent 跨 session 分析 + UserInsightCache 输出。教学护栏(general_growth_advice 必须建设性)。
+**Files (new):**
+- `apps/desktop/src/core/agents/coach/index.ts` + `prompts.ts`
+- `apps/desktop/src/__tests__/coachAgent.teaching.test.ts`
+**Acceptance.** `corepack pnpm test src/__tests__/coachAgent.teaching.test.ts`
+**Commit.** `feat(F-405): coach agent with teaching guardrail`
+
+### M3.3.3.dev.c — Reflection Agent(单场教学复盘 + 教学护栏)
+**Lead Agent**: developer | **Parallel-safe with .b** | **Deps**: M3.3.3.arch
+**Goal.** Reflection Agent 单场深度复盘。L0 红线 12:diagnosis 不评判 / mistakes_to_avoid 用"建议下次"句式。
+**Files (new):**
+- `apps/desktop/src/core/agents/reflection/index.ts` + `prompts.ts`
+- `apps/desktop/src/__tests__/reflectionAgent.teaching.test.ts`(句式 + 禁止词 fuzz)
+**Acceptance.** `corepack pnpm test src/__tests__/reflectionAgent.teaching.test.ts`
+**Commit.** `feat(F-405): reflection agent with non-judgmental phrasing`
+
+### M3.3.3.dev.d — post_report_graph 接通(coach ‖ reflection,节点名锁)
+**Lead Agent**: developer | **Deps**: M3.3.3.dev.a + .b + .c
+**Goal.** LangGraph.js 二节点 graph 接通 Coach + Reflection,验证并行 + 错误隔离。节点名锁 contract test。
+**Files (new):**
+- `apps/desktop/src/core/graphs/postReportGraph.ts`
+- `apps/desktop/src/__tests__/postReportGraph.contract.test.ts`
+- `apps/desktop/src/__tests__/postReportGraph.parallel.test.ts`
+**Acceptance.** `corepack pnpm test src/__tests__/postReportGraph.{contract,parallel}.test.ts`
+**Commit.** `feat(F-405): post_report_graph parallel coach||reflection`
+
 ---
 
 ## M3.3.X — tester re-audit 三图(必须)
