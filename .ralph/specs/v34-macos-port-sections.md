@@ -1641,6 +1641,28 @@ corepack pnpm test src/__tests__/interviewerAgent.test.ts
 
 **Commit.** `feat(F-405): land turn_graph with locked node names`
 
+> ⚠️ **2026-05-04 拆分**:本节点(turn_graph + Interviewer + Persona 锁一锅)已拆为 .dev.a + .dev.b。Ralph 不再读本段。
+
+### M3.3.1.dev.a — Interviewer Agent + Persona 4 名锁
+**Lead Agent**: developer | **Deps**: M3.3.1.arch
+**Goal.** Interviewer Agent + Persona 4 名锁(Sarah / Marcus / Lin / Daniel)+ live_observation ≤ 30 字 + followup_hints 2-3 个 ≤ 8 字。本节点不动 graph。
+**Files (new):**
+- `apps/desktop/src/core/agents/interviewer/index.ts` + `prompts.ts` + `personas.ts`
+- `apps/desktop/src/__tests__/interviewerAgent.test.ts` + `persona.contract.test.ts`(4 名锁)
+**Key.** `export const PERSONA_MAP = Object.freeze({ structured:"Sarah", pressure:"Marcus", friendly:"Lin", expert:"Daniel" } as const);`
+**Acceptance.** `corepack pnpm test src/__tests__/{interviewerAgent,persona.contract}.test.ts`
+**Commit.** `feat(F-405): interviewer agent with locked 4-persona`
+
+### M3.3.1.dev.b — turn_graph 三节点接通 + 节点名锁
+**Lead Agent**: developer | **Deps**: M3.3.1.dev.a
+**Goal.** turn_graph LangGraph.js 三节点(turn_assessment ‖ compression → next_question)接通。节点名锁 contract test。
+**Files (new):**
+- `apps/desktop/src/core/graphs/turnGraph.ts`
+- `apps/desktop/src/__tests__/turnGraph.contract.test.ts` + `turnGraph.parallel.test.ts`
+**Key.** `export const TURN_GRAPH_NODES = Object.freeze(new Set(["turn_assessment", "compression", "next_question"]));`
+**Acceptance.** `corepack pnpm test src/__tests__/turnGraph.{contract,parallel}.test.ts`
+**Commit.** `feat(F-405): turn_graph with locked node names + parallel`
+
 ---
 
 ## M3.3.2.arch / M3.3.2.dev — intake_graph + Framework + Research
