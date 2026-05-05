@@ -1,26 +1,22 @@
-// V32.M2.3.5 (F-320) — typed client for the research opt-in toggle.
-// Backend contract: GET/PUT /api/v1/settings/research-opt-in returns
-// { enabled: boolean }. PUT body uses StrictBool, so anything other
-// than `true` / `false` becomes a 422 — keep the call site honest.
-import { apiClient } from "@/api/client";
+// v3.4 — axios removed. Research opt-in is stored in the shared `app_settings`
+// table under key "research_opt_in_enabled", reusing the db CRUD pattern
+// established in appSettings.ts (§B9 Bridge dual-contract).
+//
+// Absence of a row → enabled: false (equivalent to the old HTTP 204 default).
+import { getAppSetting, putAppSetting } from "@/api/appSettings";
 
 export interface ResearchOptInState {
   enabled: boolean;
 }
 
 export async function getResearchOptIn(): Promise<ResearchOptInState> {
-  const response = await apiClient.get<ResearchOptInState>(
-    "/api/v1/settings/research-opt-in",
-  );
-  return response.data;
+  const v = await getAppSetting<boolean>("research_opt_in_enabled");
+  return { enabled: v ?? false };
 }
 
 export async function setResearchOptIn(
   enabled: boolean,
 ): Promise<ResearchOptInState> {
-  const response = await apiClient.put<ResearchOptInState>(
-    "/api/v1/settings/research-opt-in",
-    { enabled },
-  );
-  return response.data;
+  await putAppSetting<boolean>("research_opt_in_enabled", enabled);
+  return { enabled };
 }
