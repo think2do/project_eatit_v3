@@ -1,1 +1,0 @@
-"""Eatit API package."""

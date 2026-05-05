@@ -1,7 +1,0 @@
-## 检索请求
-
-公司名(company_name):{{ company_name }}
-岗位名(role_title):{{ role_title }}
-行业关键词(industry_hints):{{ industry_hints | join("、") }}
-
-请按 system 提示中的规则使用 `web_search` 检索,产出 JSON,字段对齐 schema `ResearchAgentOutput.company` 与 `industry`(`fetched_at` / `cache_key` / `degraded` / `degraded_reason` 由系统填充,你只输出 `company` 与 `industry` 即可)。
