@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import axios from "axios";
 import { Loader2, RefreshCw, Sparkles } from "lucide-react";
 import type { ReflectionReport } from "@eatit/shared-types";
 import { getReflection } from "@/api/reflections";
@@ -33,9 +32,6 @@ const POLL_INTERVAL_MS = 2_000;
 const POLL_TIMEOUT_MS = 180_000;
 
 function extractError(err: unknown): string {
-  if (axios.isAxiosError(err)) {
-    return err.response?.data?.detail ?? err.message;
-  }
   return err instanceof Error ? err.message : "请求失败";
 }
 

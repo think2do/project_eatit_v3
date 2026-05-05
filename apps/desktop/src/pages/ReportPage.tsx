@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Printer } from "lucide-react";
 import type {
@@ -43,9 +42,6 @@ const POLL_INTERVAL_MS = 1500;
 const POLL_TIMEOUT_MS = 120_000;
 
 function extractError(err: unknown): string {
-  if (axios.isAxiosError(err)) {
-    return err.response?.data?.detail ?? err.message;
-  }
   return err instanceof Error ? err.message : "请求失败";
 }
 
@@ -64,20 +60,18 @@ export function ReportPage(): JSX.Element {
 
     async function ensureAndPoll() {
       setState({ kind: "loading" });
-      // First attempt: fetch existing; if 409 (still generating) or 404 (not
-      // yet requested), trigger + poll. This makes the page idempotent: the
-      // same URL works whether the report was previously requested or not.
+      // First attempt: fetch existing report. If it succeeds, render it.
+      // Any error means the report has not been generated yet — fall through
+      // unconditionally to generateReport.
+      // (v3.3 axios path discriminated 404 vs 409; v3.4 has no HTTP status —
+      //  fall through unconditionally.)
       try {
         const existing = await getSessionReport(sessionId!);
         if (cancelled) return;
         setState({ kind: "ready", data: existing });
         return;
-      } catch (err) {
-        const status = axios.isAxiosError(err) ? err.response?.status : null;
-        if (status !== 404 && status !== 409) {
-          if (!cancelled) setState({ kind: "error", message: extractError(err) });
-          return;
-        }
+      } catch {
+        // v3.4: any error here means "report not yet generated" — fall through to generateReport.
       }
 
       try {
@@ -101,11 +95,8 @@ export function ReportPage(): JSX.Element {
           setState({ kind: "ready", data: response });
           return;
         } catch (err) {
-          const status = axios.isAxiosError(err) ? err.response?.status : null;
-          if (status === 409) {
-            await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-            continue;
-          }
+          // v3.4: generateReport is synchronous; polling loop should not normally hit a transient error.
+          // Any error here is treated as terminal.
           if (!cancelled) setState({ kind: "error", message: extractError(err) });
           return;
         }

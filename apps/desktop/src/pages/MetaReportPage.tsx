@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import axios from "axios";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronDown, ChevronRight } from "lucide-react";
 import type {
@@ -21,9 +20,6 @@ const POLL_INTERVAL_MS = 1500;
 const POLL_TIMEOUT_MS = 180_000;
 
 function extractError(err: unknown): string {
-  if (axios.isAxiosError(err)) {
-    return err.response?.data?.detail ?? err.message;
-  }
   return err instanceof Error ? err.message : "请求失败";
 }
 
@@ -78,13 +74,9 @@ export function MetaReportPage(): JSX.Element {
           }
           setState({ kind: "generating" });
         } catch (err) {
-          const status = axios.isAxiosError(err) ? err.response?.status : null;
-          if (status === 409) {
-            setState({ kind: "generating" });
-          } else {
-            setState({ kind: "error", message: extractError(err) });
-            return;
-          }
+          // v3.4: triggerMetaReport runs synchronously; polling loop should not normally hit a transient error.
+          if (!cancelledRef.current) setState({ kind: "error", message: extractError(err) });
+          return;
         }
         await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
       }

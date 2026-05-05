@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
 import { Loader2 } from "lucide-react";
 import { putAppSetting } from "@/api/appSettings";
 
@@ -27,11 +26,7 @@ export function StepDone({ onBack }: Props): JSX.Element {
       queryClient.setQueryData(["app-settings", "onboarding_completed_at"], now);
       navigate("/", { replace: true });
     } catch (err) {
-      const message = axios.isAxiosError(err)
-        ? (err.response?.data?.detail ?? err.message)
-        : err instanceof Error
-          ? err.message
-          : "保存失败";
+      const message = err instanceof Error ? err.message : "保存失败";
       setStatus({ kind: "error", message });
     }
   };

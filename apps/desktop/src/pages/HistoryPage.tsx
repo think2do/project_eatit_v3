@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import { Loader2, Sparkles } from "lucide-react";
 import type {
   InterviewSessionStatus,
@@ -443,13 +442,7 @@ function MetaReportModal({
       navigate(`/meta-report/${response.id}`);
     },
     onError: (err) => {
-      if (axios.isAxiosError(err)) {
-        setErrorMessage(err.response?.data?.detail ?? err.message);
-      } else if (err instanceof Error) {
-        setErrorMessage(err.message);
-      } else {
-        setErrorMessage("请求失败");
-      }
+      setErrorMessage(err instanceof Error ? err.message : "请求失败");
     },
   });
 

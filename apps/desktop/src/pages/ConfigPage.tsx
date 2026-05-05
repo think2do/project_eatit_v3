@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import type {
   InterviewDirectionV32,
@@ -74,9 +73,6 @@ const MAX_DIRECTIONS = 3;
 const MIN_DIRECTIONS = 1;
 
 function extractError(err: unknown): string {
-  if (axios.isAxiosError(err)) {
-    return err.response?.data?.detail ?? err.message;
-  }
   return err instanceof Error ? err.message : "请求失败";
 }
 
