@@ -31,7 +31,7 @@ import {
 // Layout:
 //   1. Hero strip (eyebrow + h1 + sub copy)
 //   2. 4 StatCards row (累计场次 / 已就绪报告 / 平均时长 / 上次面试)
-//   3. AICoachCard ← /api/v1/users/me/insights (M3.1.3)
+//   3. AICoachCard — user insights via Bridge → DatabaseService
 //      — Hidden when insights == null OR status !== "ok"; falls back to
 //        progress card "已完成 N/3 场,再完成 M 场解锁 AI 成长洞察".
 //   4. FilterTabs (4 tabs) + 综合分析 trigger button

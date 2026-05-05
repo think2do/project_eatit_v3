@@ -30,7 +30,7 @@ type ReportState =
 
 // F-322 V32.M3.2.3 — top-level segment tab on the ready state. The
 // "评估" view is the existing v3.2 report content; "复盘" pulls in the
-// teaching-tone Reflection from /api/v1/sessions/{id}/reflection.
+// teaching-tone Reflection via Bridge → DatabaseService.
 type ReportTab = "evaluation" | "reflection";
 
 const REPORT_TABS: SegmentTab<ReportTab>[] = [

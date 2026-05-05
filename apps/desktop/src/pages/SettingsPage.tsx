@@ -527,12 +527,12 @@ function InterviewExperienceSection(): JSX.Element {
 
 // V32.M2.3.5 (F-320) — Research opt-in toggle.
 //
-// Hydrates from `GET /api/v1/settings/research-opt-in` on mount and
-// mirrors into the Zustand store so ParsedPanel can react instantly
-// without re-fetching. The first time the user flips the toggle ON we
-// open PrivacyOptInDialog; only after they confirm does the PUT fire.
-// Flipping OFF is a one-step write (no confirmation) — disabling a
-// network feature is always safe to make easy.
+// Hydrates from Bridge → DatabaseService on mount and mirrors into the
+// Zustand store so ParsedPanel can react instantly without re-fetching.
+// The first time the user flips the toggle ON we open PrivacyOptInDialog;
+// only after they confirm does the PUT fire. Flipping OFF is a one-step
+// write (no confirmation) — disabling a network feature is always safe
+// to make easy.
 export function ResearchOptInSection(): JSX.Element {
   const researchOptIn = useAppStore((s) => s.researchOptIn);
   const setStoreOptIn = useAppStore((s) => s.setResearchOptIn);
