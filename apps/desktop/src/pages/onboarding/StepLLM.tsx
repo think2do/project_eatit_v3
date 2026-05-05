@@ -138,6 +138,7 @@ export function StepLLM({ onNext, onBack }: Props): JSX.Element {
               value={config.model}
               onChange={(e) => setConfig((c) => ({ ...c, model: e.target.value }))}
               style={fieldStyle}
+              className="select"
             >
               {suggestedModels.map((m) => (
                 <option key={m} value={m}>

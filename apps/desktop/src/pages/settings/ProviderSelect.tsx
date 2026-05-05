@@ -29,7 +29,7 @@ export function ProviderSelect({ value, onChange }: Props): JSX.Element {
       <span style={{ fontSize: 12, fontWeight: 500, color: "var(--ink-700)" }}>
         Provider
       </span>
-      <select value={value} onChange={handleChange} style={fieldStyle}>
+      <select value={value} onChange={handleChange} style={fieldStyle} className="select">
         {PROVIDERS.map((p) => (
           <option key={p.id} value={p.id}>
             {p.label}

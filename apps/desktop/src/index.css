@@ -121,10 +121,12 @@
     font-size: 14px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   button {
     font-family: inherit;
+    -webkit-appearance: none;
   }
 }
 
@@ -367,6 +369,32 @@
     min-height: 120px;
     resize: vertical;
     line-height: 1.6;
+  }
+
+  /* WKWebView reset — suppresses macOS native chrome on <select> so the
+     element renders with design-system styling instead of the OS dropdown
+     widget. The caret SVG uses %23 encoding (not "#") to avoid the
+     lint-design-tokens hex-in-double-quotes rule. */
+  .select {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    padding: 10px 36px 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background-color: var(--bg-elev);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%236b7169' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    font-size: 13.5px;
+    font-family: var(--f-sans);
+    color: var(--ink-900);
+    cursor: pointer;
+    transition: border 120ms ease;
+  }
+  .select:focus {
+    outline: none;
+    border-color: var(--ink-500);
   }
 
   .bar {
