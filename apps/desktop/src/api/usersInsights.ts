@@ -1,17 +1,19 @@
 import type { UserInsightCache } from "@eatit/shared-types";
-import { apiClient } from "@/api/client";
+import { db } from "@/services/db";
 
+// §A0.4: read-only path; no secret bind values.
 // F-318 V32.M3.1.4 — Dashboard reads the cross-session Coach insight to
-// render the AICoachCard. 204 No Content → null (first run / Coach has
-// not been triggered yet); the page falls back to the "complete N more
-// sessions" empty state when null OR when status !== "ok".
+// render the AICoachCard. Returns null when:
+//   - row absent (Coach has never run for this user), OR
+//   - status !== "ok" (running / failed / skipped — Dashboard treats as no insight)
+// Sql-level: SELECT payload, status FROM user_insight_cache WHERE user_id = 'local'
 export const getUserInsights = async (): Promise<UserInsightCache | null> => {
-  const response = await apiClient.get<UserInsightCache>(
-    "/api/v1/users/me/insights",
-    { validateStatus: (status) => status === 200 || status === 204 },
+  const rows = await db.query(
+    "SELECT payload, status FROM user_insight_cache WHERE user_id = ?",
+    ["local"],
   );
-  if (response.status === 204) {
-    return null;
-  }
-  return response.data;
+  if (rows.length === 0) return null;
+  const row = rows[0];
+  if (row.status !== "ok") return null;
+  return JSON.parse(row.payload as string) as UserInsightCache;
 };
