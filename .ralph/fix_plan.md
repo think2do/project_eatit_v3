@@ -137,7 +137,7 @@ Match the section prefix(`V34.M*.*`)to 当前 spec 文件即可。
 
 ### M6 — Privacy Manifest + App Store 准备(3-5 天,5 节点 + 1 dual-audit)
 
-- [ ] M6.1 PrivacyInfo.xcprivacy 完整版(developer)— FileTimestamp + UserDefaults 两类 NSPrivacyAccessedAPI
+- [x] M6.1 PrivacyInfo.xcprivacy 完整版(developer)— M1.4 placeholder `<array/>` → 2 类 NSPrivacyAccessedAPI dicts。**FileTimestamp + C617.1**(file picker / Upload 展示用户简历/JD modification time)+ **UserDefaults + CA92.1**(macOS app 默认非敏感设置存储)。`apps/macos/Eatit/PrivacyInfo.xcprivacy` +13/-1 LOC。**Acceptance**(6 gates 全绿):plutil -lint OK / NSPrivacyTracking 计数 2 / 2 categories present / 2 reason codes present / NSPrivacyTracking=false 不变。F-406 advance。M6 phase 起步,这是 App Store submission 必备 manifest。(2f4b3f7, 2026-05-05)
 - [ ] M6.2 5 张截图 + 文案(product-manager,**Parallel-safe with M6.3/M6.4**)— 1280×800 macOS 14
 - [ ] M6.3 隐私政策网页(product-manager,**Parallel-safe**)— 中英双语
 - [ ] M6.4 App Store Connect 元数据(product-manager,**Parallel-safe**)— 描述/关键词/Review Notes
