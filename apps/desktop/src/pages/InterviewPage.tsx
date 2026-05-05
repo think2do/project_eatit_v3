@@ -2,15 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMachine } from "@xstate/react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Loader2, Pause, Volume2, ChevronRight as ChevronRightIcon } from "lucide-react";
-import type {
-  ClientTextEvent,
-  ServerEvent,
-} from "@eatit/shared-types";
-import { API_BASE_URL } from "@/api/client";
 import { getAppSetting } from "@/api/appSettings";
 import { loadLLMConfig, type LLMConfig } from "@/lib/llm/config";
 import { useConnectivityStore } from "@/stores/connectivity-store";
-import { pushToast } from "@/stores/toast-store";
 import {
   requestMicPermission,
 } from "@/lib/mic";
@@ -19,6 +13,13 @@ import { useGlobalKeymap } from "@/lib/useGlobalKeymap";
 import { EndConfirmDialog } from "@/components/EndConfirmDialog";
 import { getSession } from "@/api/sessions";
 import { getParseResult } from "@/api/assets";
+import {
+  runInterviewSession,
+  createAsyncQueue,
+  type InterviewSessionInput,
+  type RunInterviewSessionInput,
+  type AsyncQueue,
+} from "@/core/sessions/runInterviewSession";
 import { FollowupHintChips } from "@/pages/interview/FollowupHintChips";
 import { KeyboardShortcutHelper } from "@/pages/interview/KeyboardShortcutHelper";
 import { LiveCaption } from "@/pages/interview/LiveCaption";
@@ -43,8 +44,6 @@ import {
 } from "@/core/asr/volcStreamAsr";
 
 const OBSERVER_BREAKPOINT_PX = 1100;
-const MAX_RECONNECT_ATTEMPTS = 3;
-const RECONNECT_BACKOFF_MS = 1000;
 
 // F-308 personas — keep the desktop-side mapping local so we don't have
 // to fetch /personas just to label the topbar. A6 red line: these names
@@ -95,23 +94,15 @@ function getViewportWidth(): number {
   return window.innerWidth;
 }
 
-function toWs(baseUrl: string): string {
-  return baseUrl.startsWith("https://")
-    ? baseUrl.replace("https://", "wss://")
-    : baseUrl.replace("http://", "ws://");
-}
-
 export function InterviewPage(): JSX.Element {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const [state, send] = useMachine(interviewMachine);
-  const socketRef = useRef<WebSocket | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const controllerRef = useRef<VolcStreamAsrController | null>(null);
-  const reconnectAttemptsRef = useRef<number>(0);
-  const reconnectTimerRef = useRef<number | null>(null);
-  const [reconnectNonce, setReconnectNonce] = useState(0);
+  const inputQueueRef = useRef<AsyncQueue<InterviewSessionInput> | null>(null);
   const setConnectivity = useConnectivityStore((s) => s.set);
+  const [sessionInitialContext, setSessionInitialContext] = useState<RunInterviewSessionInput | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
   const [llmConfig, setLlmConfig] = useState<LLMConfig | null>(null);
   const [inputMode, setInputMode] = useState<InputMode>("voice");
@@ -126,17 +117,6 @@ export function InterviewPage(): JSX.Element {
     () => getViewportWidth() < OBSERVER_BREAKPOINT_PX,
   );
 
-  // The WebSocket effect reads `state` inside its onclose handler to decide
-  // whether to reconnect after the session ended normally. Putting `state`
-  // on the effect's dep list would tear down + rebuild the socket on every
-  // XState transition (including incoming question / assessment events),
-  // which is why we saw three WS connections open-then-close in the backend
-  // log. Stash the latest state on a ref instead so the effect reads fresh
-  // values without re-running.
-  const stateRef = useRef(state);
-  useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
 
   useEffect(() => {
     let mounted = true;
@@ -271,112 +251,153 @@ export function InterviewPage(): JSX.Element {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  // Setup effect: fetch session detail + parse result, then build sessionInitialContext.
+  // Runs once sessionId + llmConfig are ready (configLoading gate keeps it from firing
+  // before the keychain read completes).
   useEffect(() => {
     if (!sessionId || configLoading) return;
     if (!llmConfig) {
       send({ type: "WS_ERROR", message: "尚未配置 LLM,请先前往「设置」。" });
       return;
     }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const session = await getSession(sessionId);
+        const parseResult = await getParseResult(session.candidate_asset_id);
+        if (cancelled) return;
+        const config = (session.config_snapshot ?? {}) as {
+          duration_minutes?: number;
+          style?: string;
+          directions?: string[];
+          direction?: string;
+        };
+        const durationMinutes =
+          typeof config.duration_minutes === "number" ? config.duration_minutes : 30;
+        const frameworkJson = session.direction_framework
+          ? JSON.stringify(session.direction_framework)
+          : "{}";
+        setSessionInitialContext({
+          sessionId,
+          llmConfigMeta: {
+            provider: llmConfig.provider,
+            model: llmConfig.model,
+            base_url: llmConfig.base_url ?? null,
+          },
+          frameworkJson,
+          parseSummary: parseResult.payload,
+          durationMinutes,
+        });
+      } catch (err) {
+        if (!cancelled) {
+          send({
+            type: "WS_ERROR",
+            message: err instanceof Error ? err.message : "session setup failed",
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, configLoading, llmConfig, send]);
 
+  // Generator effect: drive the AsyncGenerator and dispatch events to the statechart.
+  // turn_index is tracked locally here because InterviewerAgentOutput doesn't carry it;
+  // the generator increments its internal counter after each turn in lockstep with this
+  // local counter.
+  useEffect(() => {
+    if (!sessionId || !sessionInitialContext) return;
+
+    const inputQueue = createAsyncQueue<InterviewSessionInput>();
+    inputQueueRef.current = inputQueue;
+    setConnectivity("online");
     send({ type: "CONNECT", sessionId });
 
-    let closedByCleanup = false;
-    const url = `${toWs(API_BASE_URL)}/ws/sessions/${sessionId}?token=mock`;
-    const socket = new WebSocket(url);
-    socketRef.current = socket;
+    let cancelled = false;
+    let localTurnIndex = 0;
 
-    socket.onopen = () => {
-      reconnectAttemptsRef.current = 0;
-      setConnectivity("online");
-      const initFrame: ClientTextEvent = {
-        event: "client.session.init",
-        config: {
-          provider: llmConfig.provider,
-          api_key: llmConfig.api_key,
-          model: llmConfig.model,
-          base_url: llmConfig.base_url ?? null,
-        },
-      };
-      socket.send(JSON.stringify(initFrame));
-      send({ type: "WS_OPEN" });
-    };
-
-    socket.onmessage = (message) => {
+    void (async () => {
       try {
-        const parsed = JSON.parse(message.data) as ServerEvent;
-        if (parsed.event === "server.question.generated") {
-          send({ type: "SERVER_QUESTION", payload: parsed.payload });
-        } else if (parsed.event === "server.turn.assessed") {
-          send({ type: "SERVER_ASSESSED", payload: parsed.payload });
-        } else if (parsed.event === "server.coach.observation") {
-          send({ type: "SERVER_OBSERVATION", payload: parsed.payload });
-        } else if (parsed.event === "server.reference.ready") {
-          send({ type: "SERVER_REFERENCE", payload: parsed.payload });
-        } else if (parsed.event === "server.error") {
-          send({ type: "WS_ERROR", message: `${parsed.code}: ${parsed.message}` });
+        send({ type: "WS_OPEN" });
+        for await (const event of runInterviewSession(sessionInitialContext, inputQueue.iter())) {
+          if (cancelled) break;
+          switch (event.type) {
+            case "question.generated":
+              send({
+                type: "SERVER_QUESTION",
+                payload: {
+                  turn_index: localTurnIndex,
+                  question: event.payload.question,
+                  intent: event.payload.intent,
+                  expected_depth: event.payload.expected_depth,
+                  followup_hint: event.payload.followup_hint ?? null,
+                  should_end: event.payload.should_end,
+                  followup_hints: event.payload.followup_hints,
+                  live_observation: event.payload.live_observation ?? null,
+                },
+              });
+              // Increment after bootstrap; subsequent questions come one per turn.
+              localTurnIndex += 1;
+              break;
+            case "turn.assessed":
+              send({
+                type: "SERVER_ASSESSED",
+                payload: {
+                  turn_index: localTurnIndex - 1,
+                  summary: event.payload.summary,
+                  strengths: event.payload.strengths,
+                  weaknesses: event.payload.weaknesses,
+                },
+              });
+              break;
+            case "coach.observation":
+              send({
+                type: "SERVER_OBSERVATION",
+                payload: {
+                  turn_index: localTurnIndex - 1,
+                  observation: event.payload.observation,
+                  tone: event.payload.tone,
+                  actionable: event.payload.actionable,
+                },
+              });
+              break;
+            case "reference.ready":
+              send({
+                type: "SERVER_REFERENCE",
+                payload: {
+                  turn_index: localTurnIndex - 1,
+                  answer_outline: event.payload.answer_outline,
+                  ideal_answer: event.payload.ideal_answer,
+                  key_evaluation_points: event.payload.key_evaluation_points,
+                  common_pitfalls: event.payload.common_pitfalls,
+                },
+              });
+              break;
+            case "session.ended":
+              send({ type: "END_SESSION" });
+              break;
+            case "error":
+              send({ type: "WS_ERROR", message: `${event.payload.code}: ${event.payload.message}` });
+              break;
+          }
         }
       } catch (err) {
-        send({
-          type: "WS_ERROR",
-          message: err instanceof Error ? err.message : "无法解析服务器消息",
-        });
+        if (!cancelled) {
+          send({
+            type: "WS_ERROR",
+            message: err instanceof Error ? err.message : "session aborted",
+          });
+        }
       }
-    };
-
-    socket.onerror = () => {
-      // onerror fires before onclose; defer user-facing messaging to the
-      // close handler so we only surface one narrative per outage.
-    };
-
-    socket.onclose = (event) => {
-      socketRef.current = null;
-      if (closedByCleanup) return;
-      if (event.code === 1000 || stateRef.current.matches("ended")) {
-        setConnectivity("online");
-        return;
-      }
-      const nextAttempt = reconnectAttemptsRef.current + 1;
-      if (nextAttempt > MAX_RECONNECT_ATTEMPTS) {
-        setConnectivity(
-          "offline",
-          `已尝试重连 ${MAX_RECONNECT_ATTEMPTS} 次仍未成功`,
-        );
-        pushToast({
-          tone: "error",
-          title: "WebSocket 连接中断",
-          message: `已尝试重连 ${MAX_RECONNECT_ATTEMPTS} 次仍未成功,请稍后刷新页面重试。`,
-          ttlMs: 0,
-        });
-        send({ type: "WS_ERROR", message: "连接中断,请刷新页面。" });
-        return;
-      }
-      reconnectAttemptsRef.current = nextAttempt;
-      setConnectivity(
-        "reconnecting",
-        `连接断开,正在第 ${nextAttempt} / ${MAX_RECONNECT_ATTEMPTS} 次重连`,
-      );
-      reconnectTimerRef.current = window.setTimeout(() => {
-        setReconnectNonce((n) => n + 1);
-      }, RECONNECT_BACKOFF_MS * nextAttempt);
-    };
+    })();
 
     return () => {
-      closedByCleanup = true;
-      if (reconnectTimerRef.current !== null) {
-        window.clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
-      try {
-        if (socket.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({ event: "client.session.end" }));
-        }
-      } catch {
-        /* socket already closed */
-      }
-      socket.close(1000, "client cleanup");
-      socketRef.current = null;
+      cancelled = true;
+      inputQueue.close();
+      inputQueueRef.current = null;
     };
-  }, [sessionId, configLoading, llmConfig, send, reconnectNonce, setConnectivity]);
+  }, [sessionId, sessionInitialContext, send, setConnectivity]);
 
   useEffect(() => {
     if (state.matches("ended") && sessionId) {
@@ -384,11 +405,12 @@ export function InterviewPage(): JSX.Element {
     }
   }, [state, sessionId, navigate]);
 
-  const sendClientFrame = useCallback((frame: ClientTextEvent) => {
-    const socket = socketRef.current;
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify(frame));
-    }
+  const submitAnswer = useCallback((text: string, turnIndex: number) => {
+    inputQueueRef.current?.push({ type: "answer.submitted", text, turnIndex });
+  }, []);
+
+  const endSession = useCallback(() => {
+    inputQueueRef.current?.push({ type: "session.end" });
   }, []);
 
   const handleVoiceStart = useCallback(async () => {
@@ -455,12 +477,7 @@ export function InterviewPage(): JSX.Element {
     if (!question) return;
     const answer = state.context.draftAnswer.trim();
     if (!answer) return;
-    sendClientFrame({
-      event: "client.turn.end",
-      turn_index: question.turn_index,
-      question: question.question,
-      answer,
-    });
+    submitAnswer(answer, question.turn_index);
     // Snapshot for RecentRounds (M2.1.5). Tone defaults to "normal" until
     // server.turn.assessed comes back; an effect below upgrades it to
     // good/risk based on the assessment summary.
@@ -667,9 +684,9 @@ export function InterviewPage(): JSX.Element {
 
   const handleEndSession = useCallback(() => {
     setEndConfirmOpen(false);
-    sendClientFrame({ event: "client.session.end" });
+    endSession();
     send({ type: "END_SESSION" });
-  }, [sendClientFrame, send]);
+  }, [endSession, send]);
 
   // Suspend the keymap once the session has wrapped — pressing Esc on a
   // navigated-away page would otherwise reopen the dialog.
