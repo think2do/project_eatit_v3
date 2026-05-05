@@ -12,12 +12,11 @@ import { deleteLLMConfig } from "@/lib/llm/config";
 const FALLBACK_PATH = "项目 .data/";
 
 async function resolveLocalDataDir(): Promise<string> {
-  try {
-    const mod = await import("@tauri-apps/api/path");
-    return await mod.appLocalDataDir();
-  } catch {
-    return FALLBACK_PATH;
-  }
+  // §A0 永久排除 Tauri: @tauri-apps/api/path 已废弃。
+  // macOS 沙盒容器路径由系统决定,用户视图中显示 fallback 字符串即可;
+  // 真实路径由 Swift Bridge 内部使用,不需 surface 给 JS。
+  // TODO M5: 若 UX 需要展示真实路径,新增 Bridge 方法 app.dataDirectory()。
+  return FALLBACK_PATH;
 }
 
 type Feedback =

@@ -1008,20 +1008,12 @@ export function InterviewPage(): JSX.Element {
                 {voiceError.kind === "mic_denied" ? (
                   <button
                     type="button"
-                    onClick={async () => {
-                      // WKWebView silently drops `location.href = "x-apple...:"`
-                      // because its navigation handler never forwards unknown
-                      // schemes to LaunchServices. The Rust `open_system_url`
-                      // command shells out to `/usr/bin/open`, which always
-                      // honours the handler registered for the scheme.
-                      try {
-                        const { invoke } = await import("@tauri-apps/api/core");
-                        await invoke("open_system_url", {
-                          url: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
-                        });
-                      } catch {
-                        /* not running under Tauri (plain vite dev): no-op, user reads the text instead */
-                      }
+                    onClick={() => {
+                      // §A0 永久排除 Tauri: invoke("open_system_url") 路径已废弃。
+                      // 暂时 no-op — 用户按提示文字手动打开"系统设置 → 隐私与安全性 → 麦克风"。
+                      // TODO M5: 新增 Bridge 方法 system.openUrl(url) (Swift NSWorkspace.shared.open)
+                      // 让按钮可一键打开;或改用 <a href="x-apple.systempreferences:..."> 锚点 +
+                      // WKWebView 的 decidePolicyFor 在 Swift 端拦截转 NSWorkspace.open。
                     }}
                     style={{
                       alignSelf: "flex-start",

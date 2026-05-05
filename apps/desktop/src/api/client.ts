@@ -18,56 +18,15 @@ export const apiClient = axios.create({
 });
 
 /**
- * Ask the Tauri host for the backend port and rewrite API_BASE_URL +
- * apiClient's defaults. Called from main.tsx before React renders so
- * every subsequent request uses the right URL.
- *
- * Timing wrinkle: the Rust side launches the bundled backend in a
- * worker thread and stores the port only once the child prints
- * `EATIT_BACKEND_READY port=<N>` to stdout. The webview hits this
- * function almost immediately, often before the backend has finished
- * booting. `get_backend_port` returns Err("backend not ready") during
- * that window, which we used to swallow — and the webview then raced
- * to the fallback `:8000`, showed the offline banner, and fired a
- * toast for every subsequent heartbeat.
- *
- * Poll instead: retry every 500 ms up to 30 s (matches the Rust
- * side's BACKEND_READY_TIMEOUT_SECS). In dev without Tauri the first
- * `import("@tauri-apps/api/core")` rejects and we fall through to
- * the `:8000` fallback on the first iteration.
+ * §A0 永久排除 Tauri: 在 v3.4 macOS port 中 Tauri Rust sidecar 已废弃。
+ * M2.7+ 把所有 LLM 调用走 Bridge → Swift LLMGateway。M4.2 删除 v3.3 backend
+ * WebSocket;M5 全量移除 axios apiClient + apps/api 路径。
+ * 本函数保留为兼容已存在的调用点(main.tsx 启动时调一次),但不再做任何事。
+ * TODO M5: remove this export and its callsites entirely.
  */
-const BACKEND_POLL_INTERVAL_MS = 500;
-const BACKEND_POLL_MAX_MS = 30_000;
-
 export async function initBackendUrl(): Promise<void> {
-  let invoke: (<T>(cmd: string) => Promise<T>) | null = null;
-  try {
-    const mod = await import("@tauri-apps/api/core");
-    invoke = mod.invoke as typeof invoke;
-  } catch {
-    // Not running under Tauri (plain vite dev in a browser tab).
-    // Keep the :8000 fallback; assume dev uvicorn is up.
-    return;
-  }
-  if (!invoke) return;
-
-  const deadline = Date.now() + BACKEND_POLL_MAX_MS;
-  while (Date.now() < deadline) {
-    try {
-      const port = await invoke<number>("get_backend_port");
-      if (typeof port === "number" && port > 0 && port < 65536) {
-        API_BASE_URL = `http://127.0.0.1:${port}`;
-        apiClient.defaults.baseURL = API_BASE_URL;
-        return;
-      }
-    } catch {
-      /* backend still booting — retry */
-    }
-    await new Promise((resolve) => setTimeout(resolve, BACKEND_POLL_INTERVAL_MS));
-  }
-  // 30 s elapsed and the backend never announced itself. Keep the
-  // :8000 fallback so the offline banner surfaces for a genuine
-  // "backend won't start" failure rather than a transient startup.
+  // no-op in v3.4 — Tauri backend polling permanently removed (§A0).
+  return;
 }
 
 /**
