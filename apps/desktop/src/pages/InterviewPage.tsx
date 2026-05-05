@@ -8,14 +8,11 @@ import type {
 } from "@eatit/shared-types";
 import { API_BASE_URL } from "@/api/client";
 import { getAppSetting } from "@/api/appSettings";
-import { fetchASRHealth } from "@/api/asr";
 import { loadLLMConfig, type LLMConfig } from "@/lib/llm/config";
 import { useConnectivityStore } from "@/stores/connectivity-store";
 import { pushToast } from "@/stores/toast-store";
 import {
-  createAudioRecorder,
   requestMicPermission,
-  type AudioRecorderHandle,
 } from "@/lib/mic";
 import { speakInterviewerLine, stopInterviewerLine } from "@/lib/tts";
 import { useGlobalKeymap } from "@/lib/useGlobalKeymap";
@@ -40,6 +37,10 @@ import { useTurnStats } from "@/pages/interview/useTurnStats";
 import { VoiceControl } from "@/pages/interview/VoiceControl";
 import { WaveBars } from "@/pages/interview/WaveBars";
 import { interviewMachine } from "@/statecharts/interview-machine";
+import {
+  createVolcStreamAsr,
+  type VolcStreamAsrController,
+} from "@/core/asr/volcStreamAsr";
 
 const OBSERVER_BREAKPOINT_PX = 1100;
 const MAX_RECONNECT_ATTEMPTS = 3;
@@ -106,7 +107,7 @@ export function InterviewPage(): JSX.Element {
   const [state, send] = useMachine(interviewMachine);
   const socketRef = useRef<WebSocket | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
-  const recorderRef = useRef<AudioRecorderHandle | null>(null);
+  const controllerRef = useRef<VolcStreamAsrController | null>(null);
   const reconnectAttemptsRef = useRef<number>(0);
   const reconnectTimerRef = useRef<number | null>(null);
   const [reconnectNonce, setReconnectNonce] = useState(0);
@@ -218,18 +219,14 @@ export function InterviewPage(): JSX.Element {
     };
   }, [ttsEnabled, currentQuestionText, currentTurnIndex]);
 
+  // M3.4.1.dev — init VolcStreamAsr controller once on mount; abort on unmount.
   useEffect(() => {
-    let mounted = true;
-    fetchASRHealth()
-      .then((health) => {
-        if (!mounted) return;
-        setAsrAvailable(Boolean(health.available));
-      })
-      .catch(() => {
-        if (mounted) setAsrAvailable(false);
-      });
+    controllerRef.current = createVolcStreamAsr({
+      enableITN: true,
+      enablePunc: true,
+    });
     return () => {
-      mounted = false;
+      controllerRef.current?.abort();
     };
   }, []);
 
@@ -240,7 +237,6 @@ export function InterviewPage(): JSX.Element {
   // skip a second getUserMedia call inside handleVoiceStart.
   useEffect(() => {
     if (inputMode !== "voice") return;
-    if (asrAvailable === false) return;
     if (micStreamRef.current) return;
     let cancelled = false;
     void (async () => {
@@ -263,20 +259,7 @@ export function InterviewPage(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [inputMode, asrAvailable]);
-
-  useEffect(() => {
-    // If the server can't do ASR, voice mode is unusable. Flip to text and
-    // explain in a banner. Deliberately a one-way transition — the user can
-    // still flip back manually once they fix the server env.
-    if (asrAvailable === false && inputMode === "voice") {
-      setInputMode("text");
-      setVoiceError({
-        kind: "other",
-        message: "语音模式不可用:服务端未配置 Azure Speech。已切换到文字模式。",
-      });
-    }
-  }, [asrAvailable, inputMode]);
+  }, [inputMode]);
 
   useEffect(() => {
     function onResize() {
@@ -305,7 +288,6 @@ export function InterviewPage(): JSX.Element {
     socket.onopen = () => {
       reconnectAttemptsRef.current = 0;
       setConnectivity("online");
-      // First frame must be client.session.init — see phase3-constraints A2.
       const initFrame: ClientTextEvent = {
         event: "client.session.init",
         config: {
@@ -330,25 +312,8 @@ export function InterviewPage(): JSX.Element {
           send({ type: "SERVER_OBSERVATION", payload: parsed.payload });
         } else if (parsed.event === "server.reference.ready") {
           send({ type: "SERVER_REFERENCE", payload: parsed.payload });
-        } else if (parsed.event === "server.transcript.partial") {
-          send({ type: "TRANSCRIPT_PARTIAL", text: parsed.payload.text });
-        } else if (parsed.event === "server.transcript.final") {
-          send({ type: "TRANSCRIPT_FINAL", text: parsed.payload.text });
         } else if (parsed.event === "server.error") {
-          if (parsed.code === "asr_unavailable") {
-            // Backend rejected audio.start because Azure env isn't
-            // configured. Fall back to text mode so the user can still
-            // answer; banner explains what happened.
-            setAsrAvailable(false);
-            setInputMode("text");
-            setVoiceError({
-              kind: "other",
-              message: `语音模式不可用:${parsed.message || "服务端未配置 Azure Speech"}。已切换到文字模式。`,
-            });
-            send({ type: "AUDIO_STOP" });
-          } else {
-            send({ type: "WS_ERROR", message: `${parsed.code}: ${parsed.message}` });
-          }
+          send({ type: "WS_ERROR", message: `${parsed.code}: ${parsed.message}` });
         }
       } catch (err) {
         send({
@@ -366,9 +331,6 @@ export function InterviewPage(): JSX.Element {
     socket.onclose = (event) => {
       socketRef.current = null;
       if (closedByCleanup) return;
-      // Graceful end (session.end or 1000) = no reconnect. Read from the
-      // ref so this branch sees the latest machine state without pinning
-      // the effect to the state object.
       if (event.code === 1000 || stateRef.current.matches("ended")) {
         setConnectivity("online");
         return;
@@ -414,9 +376,6 @@ export function InterviewPage(): JSX.Element {
       socket.close(1000, "client cleanup");
       socketRef.current = null;
     };
-    // Intentionally omit `state` from the dep list — we read it via
-    // `stateRef` inside onclose. Including it would re-open the WS on
-    // every XState transition.
   }, [sessionId, configLoading, llmConfig, send, reconnectNonce, setConnectivity]);
 
   useEffect(() => {
@@ -432,17 +391,8 @@ export function InterviewPage(): JSX.Element {
     }
   }, []);
 
-  const stopRecording = useCallback(() => {
-    const recorder = recorderRef.current;
-    if (recorder) {
-      recorder.stop();
-    }
-    recorderRef.current = null;
-  }, []);
-
   const handleVoiceStart = useCallback(async () => {
-    const question = state.context.currentQuestion;
-    if (!question) return;
+    if (!state.context.currentQuestion) return;
     if (state.context.isRecording) return;
     // Cut the interviewer mid-sentence so the user's own voice isn't
     // mixed with the playback through the mic feedback loop.
@@ -463,57 +413,42 @@ export function InterviewPage(): JSX.Element {
       micStreamRef.current = stream;
     }
 
-    const socket = socketRef.current;
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      setVoiceError({ kind: "other", message: "WebSocket 尚未连接,无法开始录音" });
-      return;
-    }
-
-    const turnIndex = question.turn_index;
-    const recorder = createAudioRecorder(
-      stream,
-      (chunk) => {
-        chunk
-          .arrayBuffer()
-          .then((buffer) => {
-            const s = socketRef.current;
-            if (s && s.readyState === WebSocket.OPEN) {
-              s.send(buffer);
-            }
-          })
-          .catch(() => {
-            /* chunk arrayBuffer failure is non-fatal for the stream */
-          });
+    // M3.4.1.dev — Bridge-based ASR: beginCapture dispatches partials/errors
+    // to XState; no PCM bytes cross the Bridge from JS.
+    controllerRef.current?.beginCapture({
+      onPartial: (text) => {
+        send({ type: "TRANSCRIPT_PARTIAL", text });
       },
-      undefined,
-      { timesliceMs: 100 },
-    );
-    recorderRef.current = recorder;
-
-    sendClientFrame({ event: "client.audio.start", turn_index: turnIndex });
-    recorder.start();
+      onError: (err) => {
+        send({ type: "WS_ERROR", message: err.message });
+      },
+    });
     send({ type: "AUDIO_START" });
-  }, [state, sendClientFrame, send]);
+  }, [state, send]);
 
-  const handleVoiceStop = useCallback(() => {
-    const question = state.context.currentQuestion;
-    if (!question) return;
+  const handleVoiceStop = useCallback(async () => {
     if (!state.context.isRecording) return;
-    stopRecording();
-    sendClientFrame({ event: "client.audio.stop", turn_index: question.turn_index });
-    send({ type: "AUDIO_STOP" });
-  }, [state, sendClientFrame, send, stopRecording]);
+    try {
+      const result = await controllerRef.current?.endCapture();
+      if (result) {
+        send({ type: "TRANSCRIPT_FINAL", text: result.finalText });
+      }
+    } catch (err) {
+      send({ type: "WS_ERROR", message: (err as Error).message });
+    } finally {
+      send({ type: "AUDIO_STOP" });
+    }
+  }, [state, send]);
 
   useEffect(() => {
     return () => {
-      stopRecording();
       const stream = micStreamRef.current;
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
         micStreamRef.current = null;
       }
     };
-  }, [stopRecording]);
+  }, []);
 
   const handleSubmit = () => {
     const question = state.context.currentQuestion;
@@ -801,7 +736,7 @@ export function InterviewPage(): JSX.Element {
         <button
           type="button"
           className="btn btn-sm"
-          onClick={handleVoiceStop}
+          onClick={() => { void handleVoiceStop(); }}
           disabled={!state.context.isRecording}
           aria-label="暂停录音"
         >
@@ -1030,7 +965,7 @@ export function InterviewPage(): JSX.Element {
           voiceDisabled={asrAvailable === false}
           onChange={(next) => {
             if (next === inputMode) return;
-            if (state.context.isRecording) handleVoiceStop();
+            if (state.context.isRecording) { void handleVoiceStop(); }
             setInputMode(next);
             setVoiceError(null);
           }}
@@ -1046,13 +981,14 @@ export function InterviewPage(): JSX.Element {
                 onStart={() => {
                   void handleVoiceStart();
                 }}
-                onStop={handleVoiceStop}
+                onStop={() => { void handleVoiceStop(); }}
               />
               <WaveBars active={state.context.isRecording} />
             </div>
             <LiveCaption
-              finalTranscript={state.context.finalTranscript}
-              partialTranscript={state.context.partialTranscript}
+              partialText={state.context.partialTranscript}
+              finalText={state.context.finalTranscript}
+              isCapturing={state.context.isRecording}
             />
             {voiceError ? (
               <div
