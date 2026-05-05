@@ -1,3 +1,6 @@
+// §A0.4 §A11 §B9: sessions.ts — all functions use db Bridge + local agents. No axios/apiClient.
+// JS never sees ARK_API_KEY — llm singleton reads from Swift Keychain Bridge.
+// §A0.4: read-only OR write path; no secret bind values.
 import type {
   CreateSessionRequest,
   CreateSessionResponse,
@@ -14,14 +17,14 @@ import type {
   TriggerReportRequest,
   TriggerReportResponse,
 } from "@eatit/shared-types";
-import { apiClient } from "@/api/client";
+import type { ReflectionAgentInput } from "@/core/schemas/reflection";
 import { db } from "@/services/db";
 import { runFrameworkAgent } from "@/core/agents/framework";
+import { runReportAgent } from "@/core/agents/report";
+import { buildPostReportGraph } from "@/core/graphs/postReportGraph";
 import { llm } from "@/core/llm";
 
 // §A0.4 §A11 §B9: createSession runs FrameworkAgent inline and writes 2 rows in a single tx.
-// JS never sees ARK_API_KEY — llm singleton reads from Swift Keychain Bridge.
-// generateReport remains on axios (PR3b2).
 export const createSession = async (
   request: CreateSessionRequest,
 ): Promise<CreateSessionResponse> => {
@@ -233,19 +236,131 @@ export const endSession = async (sessionId: string): Promise<EndSessionResponse>
   return { session_id: sessionId, status: "ended", ended_at: now };
 };
 
-// ★ KEEP UNCHANGED PR3a: generateReport (复杂 — runReportAgent inline + post_report_graph, PR3b)
+// §A0.4 §A11 §B9: generateReport — multi-table read + ReportAgent inline + tx INSERT + fire-and-forget postReportGraph.
+// Synchronous: waits for ReportAgent (~40-90s), returns status="ready".
+// ReportPage polling hits ready on first poll. coach_input=null (cross-session aggregation deferred).
 export const generateReport = async (
   sessionId: string,
-  request: TriggerReportRequest = {},
+  _request: TriggerReportRequest = {},
 ): Promise<TriggerReportResponse> => {
-  const response = await apiClient.post<TriggerReportResponse>(
-    `/api/v1/sessions/${sessionId}/report`,
-    request,
-    // ReportPage renders its own error UI (inline banner + retry affordance),
-    // so the generic axios toast would just duplicate and confuse users.
-    { skipErrorToast: true },
+  const requestedAt = new Date().toISOString();
+
+  // 1) Read interview_sessions (get candidate_asset_id).
+  const sessRows = await db.query(
+    "SELECT candidate_asset_id, status FROM interview_sessions WHERE id = ?",
+    [sessionId],
   );
-  return response.data;
+  if (sessRows.length === 0) throw new Error(`session not found: ${sessionId}`);
+  const candidateAssetId = sessRows[0].candidate_asset_id as string;
+
+  // 2) Read direction_frameworks (framework_json).
+  const fwRows = await db.query(
+    "SELECT payload FROM direction_frameworks WHERE interview_session_id = ?",
+    [sessionId],
+  );
+  if (fwRows.length === 0)
+    throw new Error(`direction_framework not found for session: ${sessionId}`);
+  const frameworkJson = fwRows[0].payload as string;
+
+  // 3) Read parse_results (parse_payload_json).
+  const parseRows = await db.query(
+    "SELECT payload FROM parse_results WHERE candidate_asset_id = ?",
+    [candidateAssetId],
+  );
+  if (parseRows.length === 0)
+    throw new Error(`parse_results not found for asset: ${candidateAssetId}`);
+  const parsePayloadJson = parseRows[0].payload as string;
+
+  // 4) Read interview_turns + turn_assessments (LEFT JOIN) → ReportTurnRecord[].
+  const turnRows = await db.query(
+    `SELECT t.id AS turn_id, t.turn_index, t.question_text, t.answer_text,
+            ta.strengths AS strengths_json, ta.weaknesses AS weaknesses_json
+       FROM interview_turns t
+       LEFT JOIN turn_assessments ta ON ta.interview_turn_id = t.id
+      WHERE t.interview_session_id = ?
+      ORDER BY t.turn_index ASC`,
+    [sessionId],
+  );
+
+  const turns = turnRows.map((row) => {
+    let assessmentSummary: string | null = null;
+    if (row.strengths_json != null && row.weaknesses_json != null) {
+      try {
+        const strengths = JSON.parse(row.strengths_json as string) as string[];
+        const weaknesses = JSON.parse(row.weaknesses_json as string) as string[];
+        const parts: string[] = [];
+        if (strengths.length > 0) parts.push(`优势:${strengths.join("、")}`);
+        if (weaknesses.length > 0) parts.push(`不足:${weaknesses.join("、")}`);
+        assessmentSummary = parts.join("。") || null;
+      } catch {
+        /* ignore malformed JSON, leave null */
+      }
+    }
+    return {
+      question: (row.question_text as string) ?? "",
+      answer: (row.answer_text as string | null) ?? "",
+      assessment: assessmentSummary ? { summary: assessmentSummary } : null,
+    };
+  });
+
+  // 5) Run ReportAgent (~40-90s). §L0 #1-3 sanitization pipeline runs inside runReportAgent.
+  const reportOutput = await runReportAgent(
+    {
+      parse_payload_json: parsePayloadJson,
+      framework_json: frameworkJson,
+      turns,
+      long_term_summary: null,
+    },
+    { llm },
+  );
+
+  // 6) Upsert interview_reports via ON CONFLICT(session_id) DO UPDATE.
+  const generatedAt = new Date().toISOString();
+  await db.exec(
+    `INSERT INTO interview_reports
+       (session_id, status, requested_at, generated_at, payload, created_at, updated_at)
+     VALUES (?, 'ready', ?, ?, ?, ?, ?)
+     ON CONFLICT(session_id) DO UPDATE SET
+       status = 'ready',
+       requested_at = excluded.requested_at,
+       generated_at = excluded.generated_at,
+       payload = excluded.payload,
+       updated_at = excluded.updated_at`,
+    [sessionId, requestedAt, generatedAt, JSON.stringify(reportOutput), generatedAt, generatedAt],
+  );
+
+  // 7) Fire-and-forget post_report_graph. coach_input=null → coach_node soft-skip (cross-session
+  //    aggregation needs ≥3 prior ready reports; deferred to a later loop).
+  //    §L0 #13: node names coach_node / reflection_node are locked — do not rename.
+  //    ReflectionAgentInput .strict(): 6 fields only — session_id/report_id/report_payload/turns/parse_payload/research_payload.
+  const reflectionInput: ReflectionAgentInput = {
+    session_id: sessionId,
+    report_id: sessionId,                                          // §6.2 PK = session_id
+    report_payload: reportOutput as unknown as Record<string, unknown>,
+    turns: turnRows.slice(0, 30) as Record<string, unknown>[],     // raw db rows (record<string,unknown> shape)
+    parse_payload: JSON.parse(parsePayloadJson) as Record<string, unknown>,
+    research_payload: null,
+  };
+
+  void buildPostReportGraph({ llm })
+    .invoke({
+      user_id: "local",
+      last_session_id: sessionId,
+      coach_input: null,
+      reflection_input: reflectionInput,
+      coach_skipped: false,
+      coach_error: null,
+      reflection_error: null,
+    } as Parameters<ReturnType<typeof buildPostReportGraph>["invoke"]>[0])
+    .catch(() => {
+      /* graph never throws, but defensive noop */
+    });
+
+  return {
+    session_id: sessionId,
+    status: "ready",
+    requested_at: requestedAt,
+  };
 };
 
 // §A0.4: read-only path; no secret bind values.

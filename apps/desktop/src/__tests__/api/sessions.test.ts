@@ -1,10 +1,8 @@
 /**
- * api/sessions — M5.4.dev.b PR3a
+ * api/sessions — M5.4.dev.b PR3a + PR3b1 + PR3b2
  *
  * Tests the db Bridge CRUD pattern for getSession / getSessionList /
- * endSession / getSessionReport.
- * createSession + generateReport remain on axios (PR3b scope) and are
- * not tested here.
+ * endSession / getSessionReport / createSession / generateReport.
  *
  * Mocks @/services/db so the bridge layer is not exercised here
  * (bridge contract is covered by infra/db.expanded.test.ts).
@@ -22,16 +20,16 @@ vi.mock("@/services/db", () => ({
   },
 }));
 
-// apiClient mock needed because sessions.ts still imports it for generateReport (PR3b2)
-vi.mock("@/api/client", () => ({
-  apiClient: {
-    get: vi.fn(),
-    post: vi.fn(),
-  },
-}));
-
 vi.mock("@/core/agents/framework", () => ({
   runFrameworkAgent: vi.fn(),
+}));
+
+vi.mock("@/core/agents/report", () => ({
+  runReportAgent: vi.fn(),
+}));
+
+vi.mock("@/core/graphs/postReportGraph", () => ({
+  buildPostReportGraph: vi.fn(),
 }));
 
 vi.mock("@/core/llm", () => ({
@@ -39,19 +37,32 @@ vi.mock("@/core/llm", () => ({
 }));
 
 import { db } from "@/services/db";
-import { getSession, getSessionList, endSession, getSessionReport, createSession } from "@/api/sessions";
+import {
+  getSession,
+  getSessionList,
+  endSession,
+  getSessionReport,
+  createSession,
+  generateReport,
+} from "@/api/sessions";
 import { runFrameworkAgent } from "@/core/agents/framework";
+import { runReportAgent } from "@/core/agents/report";
+import { buildPostReportGraph } from "@/core/graphs/postReportGraph";
 
 const mockQuery = vi.mocked(db.query);
 const mockExec = vi.mocked(db.exec);
 const mockTx = vi.mocked(db.tx);
 const fwMock = vi.mocked(runFrameworkAgent);
+const reportMock = vi.mocked(runReportAgent);
+const buildGraphMock = vi.mocked(buildPostReportGraph);
 
 beforeEach(() => {
   mockQuery.mockReset();
   mockExec.mockReset();
   mockTx.mockReset();
   fwMock.mockReset();
+  reportMock.mockReset();
+  buildGraphMock.mockReset();
 });
 
 // ─── fixture helpers ──────────────────────────────────────────────────────────
@@ -485,5 +496,207 @@ describe("createSession", () => {
     const [input] = fwMock.mock.calls[0] as any[];
     expect(input.research_payload_json).toBeNull();
     expect(input.parse_payload_json).toBe('{"resume":"text"}');
+  });
+});
+
+// ─── generateReport ───────────────────────────────────────────────────────────
+
+const REPORT_OUTPUT = {
+  pass_probability: 70,
+  summary: "Solid candidate with good structure",
+  reasons: [],
+  next_actions: [],
+  pass_likelihood: "中" as const,
+  overall_score: 70,
+  ai_verdict: null,
+  dimensions: [],
+  round_reviews_v2: [],
+  next_actions_v2: null,
+};
+
+const PARSE_PAYLOAD = JSON.stringify({ skills: ["TypeScript", "React"] });
+const FRAMEWORK_JSON = JSON.stringify({ style: "behavioral", direction: "product", duration_minutes: 45 });
+
+/** Sets up db.query mocks in order: sessions → direction_frameworks → parse_results → interview_turns */
+function setupHappyPathMocks(turnRows: Record<string, unknown>[] = []) {
+  mockQuery
+    .mockResolvedValueOnce([{ candidate_asset_id: CANDIDATE_ASSET_ID, status: "ended" }]) // sessions
+    .mockResolvedValueOnce([{ payload: FRAMEWORK_JSON }])                                  // direction_frameworks
+    .mockResolvedValueOnce([{ payload: PARSE_PAYLOAD }])                                   // parse_results
+    .mockResolvedValueOnce(turnRows);                                                       // interview_turns + turn_assessments
+}
+
+describe("generateReport", () => {
+  beforeEach(() => {
+    reportMock.mockResolvedValue(REPORT_OUTPUT as any);
+    buildGraphMock.mockReturnValue({
+      invoke: vi.fn().mockResolvedValue({}),
+    } as any);
+    mockExec.mockResolvedValue({ rowsAffected: 1 });
+  });
+
+  it("happy path: reads 4 tables, runs ReportAgent, inserts report, returns {session_id, status:'ready', requested_at}", async () => {
+    setupHappyPathMocks();
+
+    const result = await generateReport(SESSION_ID);
+
+    expect(result.session_id).toBe(SESSION_ID);
+    expect(result.status).toBe("ready");
+    expect(typeof result.requested_at).toBe("string");
+    expect(new Date(result.requested_at).toISOString()).toBe(result.requested_at);
+  });
+
+  it("throws 'session not found' when interview_sessions row missing", async () => {
+    mockQuery.mockResolvedValueOnce([]);
+
+    await expect(generateReport(SESSION_ID)).rejects.toThrow(`session not found: ${SESSION_ID}`);
+    expect(reportMock).not.toHaveBeenCalled();
+  });
+
+  it("throws 'direction_framework not found' when direction_frameworks row missing", async () => {
+    mockQuery
+      .mockResolvedValueOnce([{ candidate_asset_id: CANDIDATE_ASSET_ID, status: "ended" }])
+      .mockResolvedValueOnce([]);
+
+    await expect(generateReport(SESSION_ID)).rejects.toThrow(
+      `direction_framework not found for session: ${SESSION_ID}`,
+    );
+    expect(reportMock).not.toHaveBeenCalled();
+  });
+
+  it("throws 'parse_results not found' when parse_results row missing", async () => {
+    mockQuery
+      .mockResolvedValueOnce([{ candidate_asset_id: CANDIDATE_ASSET_ID, status: "ended" }])
+      .mockResolvedValueOnce([{ payload: FRAMEWORK_JSON }])
+      .mockResolvedValueOnce([]);
+
+    await expect(generateReport(SESSION_ID)).rejects.toThrow(
+      `parse_results not found for asset: ${CANDIDATE_ASSET_ID}`,
+    );
+    expect(reportMock).not.toHaveBeenCalled();
+  });
+
+  it("runs ReportAgent with empty turns array when no interview_turns rows exist", async () => {
+    setupHappyPathMocks([]);
+
+    await generateReport(SESSION_ID);
+
+    const [input] = reportMock.mock.calls[0] as any[];
+    expect(input.turns).toEqual([]);
+    expect(input.parse_payload_json).toBe(PARSE_PAYLOAD);
+    expect(input.framework_json).toBe(FRAMEWORK_JSON);
+    expect(input.long_term_summary).toBeNull();
+  });
+
+  it("maps turn with both strengths + weaknesses → assessment.summary with 优势/不足 parts", async () => {
+    const turnRows = [
+      {
+        turn_id: "t1",
+        turn_index: 0,
+        question_text: "Tell me about your project",
+        answer_text: "I led a team of 5",
+        strengths_json: JSON.stringify(["领导力", "执行力"]),
+        weaknesses_json: JSON.stringify(["细节把控"]),
+      },
+    ];
+    setupHappyPathMocks(turnRows);
+
+    await generateReport(SESSION_ID);
+
+    const [input] = reportMock.mock.calls[0] as any[];
+    expect(input.turns).toHaveLength(1);
+    const turn = input.turns[0];
+    expect(turn.question).toBe("Tell me about your project");
+    expect(turn.answer).toBe("I led a team of 5");
+    expect(turn.assessment).not.toBeNull();
+    expect(turn.assessment.summary).toContain("优势:领导力、执行力");
+    expect(turn.assessment.summary).toContain("不足:细节把控");
+  });
+
+  it("maps turn without turn_assessments → assessment=null", async () => {
+    const turnRows = [
+      {
+        turn_id: "t1",
+        turn_index: 0,
+        question_text: "Question?",
+        answer_text: "Answer.",
+        strengths_json: null,
+        weaknesses_json: null,
+      },
+    ];
+    setupHappyPathMocks(turnRows);
+
+    await generateReport(SESSION_ID);
+
+    const [input] = reportMock.mock.calls[0] as any[];
+    expect(input.turns[0].assessment).toBeNull();
+  });
+
+  it("maps turn with malformed strengths JSON → assessment=null (silent skip)", async () => {
+    const turnRows = [
+      {
+        turn_id: "t1",
+        turn_index: 0,
+        question_text: "Q",
+        answer_text: "A",
+        strengths_json: "NOT_VALID_JSON",
+        weaknesses_json: "[]",
+      },
+    ];
+    setupHappyPathMocks(turnRows);
+
+    await generateReport(SESSION_ID);
+
+    const [input] = reportMock.mock.calls[0] as any[];
+    expect(input.turns[0].assessment).toBeNull();
+  });
+
+  it("inserts interview_reports with ON CONFLICT upsert SQL and sessionId + 'ready' status", async () => {
+    setupHappyPathMocks();
+
+    await generateReport(SESSION_ID);
+
+    expect(mockExec).toHaveBeenCalledTimes(1);
+    const [sql, params] = mockExec.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("INSERT INTO interview_reports");
+    expect(sql).toContain("ON CONFLICT(session_id) DO UPDATE SET");
+    expect(params[0]).toBe(SESSION_ID);
+    expect(sql).toContain("'ready'");
+  });
+
+  it("calls buildPostReportGraph (fire-and-forget) with coach_input=null", async () => {
+    setupHappyPathMocks();
+    const invokeMock = vi.fn().mockResolvedValue({});
+    buildGraphMock.mockReturnValue({ invoke: invokeMock } as any);
+
+    await generateReport(SESSION_ID);
+
+    expect(buildGraphMock).toHaveBeenCalledTimes(1);
+    const stateArg = invokeMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(stateArg.coach_input).toBeNull();
+    expect(stateArg.user_id).toBe("local");
+    expect(stateArg.last_session_id).toBe(SESSION_ID);
+  });
+
+  it("reflection_input.report_id equals sessionId (§6.2 PK lock)", async () => {
+    setupHappyPathMocks();
+    const invokeMock = vi.fn().mockResolvedValue({});
+    buildGraphMock.mockReturnValue({ invoke: invokeMock } as any);
+
+    await generateReport(SESSION_ID);
+
+    const stateArg = invokeMock.mock.calls[0][0] as Record<string, unknown>;
+    const reflectionInput = stateArg.reflection_input as Record<string, unknown>;
+    expect(reflectionInput.report_id).toBe(SESSION_ID);
+    expect(reflectionInput.session_id).toBe(SESSION_ID);
+  });
+
+  it("does not throw when buildPostReportGraph.invoke rejects (fire-and-forget noop catch)", async () => {
+    setupHappyPathMocks();
+    const invokeMock = vi.fn().mockRejectedValue(new Error("graph error"));
+    buildGraphMock.mockReturnValue({ invoke: invokeMock } as any);
+
+    // Should not throw — fire-and-forget catches errors
+    await expect(generateReport(SESSION_ID)).resolves.toBeDefined();
   });
 });
