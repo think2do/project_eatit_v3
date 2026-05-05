@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getParseResult, triggerParse, uploadJd, uploadResume } from "@/api/assets";
@@ -16,9 +15,6 @@ import { selectTips } from "@/lib/tips";
 import { useAppStore } from "@/stores/app-store";
 
 function extractError(err: unknown): string {
-  if (axios.isAxiosError(err)) {
-    return err.response?.data?.detail ?? err.message;
-  }
   return err instanceof Error ? err.message : "请求失败";
 }
 

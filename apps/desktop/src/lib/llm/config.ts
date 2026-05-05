@@ -49,13 +49,3 @@ export async function deleteLLMConfig(): Promise<void> {
   await keychain.delete("ark-api-key");
   // TODO M5: also delete db.deleteAppSetting("llm-meta") once db.appSettings API lands.
 }
-
-/** Base64 encoding of the config for the X-LLM-Config HTTP header. */
-export function encodeForHeader(config: LLMConfig): string {
-  const json = JSON.stringify(config);
-  // btoa requires ASCII; apply TextEncoder for safety with non-ASCII.
-  const bytes = new TextEncoder().encode(json);
-  let binary = "";
-  for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary);
-}

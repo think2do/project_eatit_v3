@@ -1,5 +1,4 @@
 import { useState } from "react";
-import axios from "axios";
 import { Loader2 } from "lucide-react";
 import { saveLLMConfig, type LLMConfig } from "@/lib/llm/config";
 import { testLLMConnection, type LLMTestResponse } from "@/api/llm";
@@ -57,11 +56,7 @@ export function TestConnectionButton({ config, disabled, onSuccess }: Props): JS
         });
       }
     } catch (err) {
-      const message = axios.isAxiosError(err)
-        ? (err.response?.data?.detail ?? err.message)
-        : err instanceof Error
-          ? err.message
-          : "请求失败";
+      const message = err instanceof Error ? err.message : "请求失败";
       setStatus({ kind: "error", code: "network", message });
     }
   };
