@@ -1,5 +1,4 @@
 import { Outlet } from "react-router-dom";
-import { OfflineBanner } from "@/components/OfflineBanner";
 import { Sidebar } from "@/components/Sidebar";
 import { ToastRail } from "@/components/Toast";
 import { Topbar } from "@/components/Topbar";
@@ -42,7 +41,6 @@ export function AppShell(): JSX.Element {
         >
           <div className="app-shell__topbar">
             <Topbar />
-            <OfflineBanner />
           </div>
           <div
             className="app-shell__content"

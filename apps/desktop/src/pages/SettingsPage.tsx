@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { getAppSetting, putAppSetting } from "@/api/appSettings";
-import { fetchASRHealth } from "@/api/asr";
+// §A0 v3.4: ASR availability surfaced via ASRGateway errors at runtime; no health probe.
 import {
   getResearchOptIn,
   setResearchOptIn as putResearchOptIn,
@@ -225,7 +225,7 @@ function InterviewExperienceSection(): JSX.Element {
   const [modeHydrated, setModeHydrated] = useState(false);
   const [modeSaving, setModeSaving] = useState(false);
   const [modeError, setModeError] = useState<string | null>(null);
-  const [asrAvailable, setAsrAvailable] = useState<boolean | null>(null);
+  const [asrAvailable] = useState<boolean>(true);
 
   useEffect(() => {
     let mounted = true;
@@ -275,20 +275,6 @@ function InterviewExperienceSection(): JSX.Element {
       })
       .finally(() => {
         if (mounted) setModeHydrated(true);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-    fetchASRHealth()
-      .then((health) => {
-        if (mounted) setAsrAvailable(Boolean(health.available));
-      })
-      .catch(() => {
-        if (mounted) setAsrAvailable(false);
       });
     return () => {
       mounted = false;
