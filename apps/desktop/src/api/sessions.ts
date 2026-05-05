@@ -16,20 +16,94 @@ import type {
 } from "@eatit/shared-types";
 import { apiClient } from "@/api/client";
 import { db } from "@/services/db";
+import { runFrameworkAgent } from "@/core/agents/framework";
+import { llm } from "@/core/llm";
 
-// ★ KEEP UNCHANGED PR3a: createSession (复杂 — runFrameworkAgent inline, PR3b)
+// §A0.4 §A11 §B9: createSession runs FrameworkAgent inline and writes 2 rows in a single tx.
+// JS never sees ARK_API_KEY — llm singleton reads from Swift Keychain Bridge.
+// generateReport remains on axios (PR3b2).
 export const createSession = async (
   request: CreateSessionRequest,
 ): Promise<CreateSessionResponse> => {
-  // FrameworkAgent runs inline on POST /sessions; on slower LLM tiers
-  // (free siliconflow / deepseek) the framework synthesis routinely
-  // takes 40-90s. Default 30s axios timeout fires "timeout of 30000ms
-  // exceeded" mid-call. Allow 3 minutes here — the user is staring at
-  // the TipsCarousel in the meantime.
-  const response = await apiClient.post<CreateSessionResponse>("/api/v1/sessions", request, {
-    timeout: 180_000,
-  });
-  return response.data;
+  // 1) Read parse_results to get parse_payload_json for FrameworkAgent input.
+  const parseRows = await db.query(
+    "SELECT payload FROM parse_results WHERE candidate_asset_id = ?",
+    [request.asset_bundle_id],
+  );
+  if (parseRows.length === 0) {
+    throw new Error(`parse_results not found for asset_bundle_id: ${request.asset_bundle_id}`);
+  }
+  const parsePayloadJson = parseRows[0].payload as string;
+
+  // 2) Build FrameworkConfigInput.
+  // level: stringify the first selected direction (InterviewDirectionV32) as the
+  // position-level signal the LLM uses to calibrate question depth.
+  const config = {
+    level: String(request.config.directions[0] ?? request.config.direction ?? "general"),
+    style: request.config.style as string,
+    duration_minutes:
+      typeof request.config.duration_minutes === "number"
+        ? request.config.duration_minutes
+        : parseInt(String(request.config.duration_minutes), 10),
+  };
+
+  // 3) Run FrameworkAgent inline (~40-90s on slower LLM tiers).
+  // research_payload_json is null — v3.4 createSession does not run Research opt-in.
+  const fwOutput = await runFrameworkAgent(
+    { parse_payload_json: parsePayloadJson, config, research_payload_json: null },
+    { llm },
+  );
+
+  // 4) Map FrameworkAgentOutput → DirectionFramework (shared-types contract).
+  // FrameworkAgentOutput fields: direction (4-value enum), focus_competencies,
+  // opening_questions, deep_dive_anchors, pace_plan, predicted_questions.
+  // DirectionFramework fields: style, direction (InterviewDirectionV32|InterviewDirection),
+  // duration_minutes, stages, focus_points, risk_points.
+  //
+  // direction: use the user-selected direction from config (InterviewDirectionV32),
+  //   not fwOutput.direction which uses a different 4-value internal enum.
+  // stages: derived from pace_plan.segments; question_budget estimated proportionally
+  //   (rough_minutes / total_minutes * 10, floor, min 1).
+  // focus_points: competency titles from focus_competencies.
+  // risk_points: not produced by FrameworkAgentOutput → empty array.
+  const totalMinutes = fwOutput.pace_plan.total_minutes;
+  const directionFramework: DirectionFramework = {
+    style: request.config.style,
+    direction: request.config.directions[0] ?? request.config.direction ?? "role_match",
+    duration_minutes: totalMinutes,
+    stages: fwOutput.pace_plan.segments.map((seg) => ({
+      name: seg.name,
+      goal: seg.goal,
+      question_budget: Math.max(1, Math.floor((seg.rough_minutes / totalMinutes) * 10)),
+    })),
+    focus_points: fwOutput.focus_competencies.map((c) => c.title),
+    risk_points: [],
+  };
+
+  // 5) Write interview_sessions + direction_frameworks in a single atomic tx.
+  const sessionId = crypto.randomUUID();
+  const fwId = crypto.randomUUID();
+  const now = new Date().toISOString();
+  await db.tx([
+    {
+      sql: `INSERT INTO interview_sessions
+            (id, user_id, candidate_asset_id, status, started_at, ended_at, turn_count, config_snapshot, created_at, updated_at)
+            VALUES (?, 'local', ?, 'created', NULL, NULL, 0, ?, ?, ?)`,
+      params: [sessionId, request.asset_bundle_id, JSON.stringify(request.config), now, now],
+    },
+    {
+      sql: `INSERT INTO direction_frameworks
+            (id, interview_session_id, payload, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)`,
+      params: [fwId, sessionId, JSON.stringify(directionFramework), now, now],
+    },
+  ]);
+
+  return {
+    session_id: sessionId,
+    status: "created",
+    direction_framework: directionFramework,
+  };
 };
 
 // §A0.4: read-only path; no secret bind values.
