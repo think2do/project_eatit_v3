@@ -95,26 +95,26 @@ Follow these steps to verify all major features end-to-end:
    - Select "Volcengine Ark" (or choose any supported provider)
    - Paste the ARK API Key from the test credentials above
    - Model: `doubao-seed-1-6-250615`
-   - Tap "Test Connection" — wait approximately 3 seconds for the green
+   - Click "Test Connection" — wait approximately 3 seconds for the green
      confirmation badge.
 
 3. **Configure ASR for voice mode** (optional but recommended).
    - Open Settings → ASR
    - Paste the App ID and Access Token from the test credentials above
-   - Tap "Test Connection"
+   - Click "Test Connection"
 
 4. **Upload a resume and job description.**
-   - Tap "New Interview" → "Upload Resume"
+   - Click "New Interview" → "Upload Resume"
    - Upload any PDF resume (1–5 pages)
    - Paste or upload a plain-text job description
-   - Tap "Start Parse" and wait approximately 20–40 seconds for the
+   - Click "Start Parse" and wait approximately 20–40 seconds for the
      Parse Agent to extract key signals and generate predicted questions.
 
 5. **Configure the interview session.**
    - Select interview style: Structured (recommended for demo)
    - Select 1 focus direction
    - Set duration: 30 minutes
-   - Tap "Start Interview" and wait approximately 10–30 seconds for the
+   - Click "Start Interview" and wait approximately 10–30 seconds for the
      Framework Agent to build the question plan.
 
 6. **Run a mock interview.**
@@ -124,7 +124,7 @@ Follow these steps to verify all major features end-to-end:
      your responses.
 
 7. **End the session and review the report.**
-   - Tap "End Session"
+   - Click "End Session"
    - Wait approximately 20–40 seconds for the Report Agent to generate.
    - Review: pass likelihood score, five-dimension radar chart,
      per-question critique with evidence anchors from your answers.

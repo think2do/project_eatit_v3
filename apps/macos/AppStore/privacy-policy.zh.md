@@ -74,7 +74,7 @@ Eatit 采用自带密钥(BYOK, Bring Your Own Key)模式。你在「设置」中
 
 ### 4.2 语音识别(ASR)调用
 
-如果你开启语音模式,录音内容将通过 WebSocket 直接发送到你配置的 ASR Provider 端点。Eatit 不拦截、不存储该音频或转写结果。
+如果你开启语音模式,录音内容将通过 WebSocket 直接发送到 Volcengine SAUC(火山引擎语音开放平台,`openspeech.bytedance.com`),用于实时语音转写。Eatit 不拦截、不存储该音频或转写结果。当前版本 ASR 端点固定为 Volcengine SAUC,因为 SAUC 是目前唯一以稳定流式协议提供低延迟、中英文兼优转写的服务方;未来版本可能开放为可配置项。
 
 ### 4.3 联网情报检索(可选,默认关闭)
 

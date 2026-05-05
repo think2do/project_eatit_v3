@@ -74,7 +74,7 @@ Eatit operates in Bring Your Own Key (BYOK) mode. You configure your chosen prov
 
 ### 4.2 ASR (Automatic Speech Recognition) Calls
 
-When voice mode is enabled, recorded audio is sent over WebSocket directly to your configured ASR provider. Eatit does not intercept, store, or retain the audio or the resulting transcript.
+When voice mode is enabled, recorded audio is sent over WebSocket directly to Volcengine SAUC (the ByteDance Speech Open Platform, `openspeech.bytedance.com`) for real-time transcription. Eatit does not intercept, store, or retain the audio or the resulting transcript. The ASR endpoint is currently fixed to Volcengine SAUC because it is the only provider offering a stable streaming protocol with low latency and strong Chinese-English bilingual accuracy; future versions may make this configurable.
 
 ### 4.3 Connected Research (Optional, Off by Default)
 
@@ -88,7 +88,7 @@ Eatit itself does not bundle any third-party SDKs or services. The LLM and ASR p
 
 - SiliconFlow: https://cloud.siliconflow.cn/
 - DeepSeek: https://platform.deepseek.com/
-- Alibaba Cloud: https://www.aliyun.com/product/bailian
+- Alibaba Cloud DashScope: https://bailian.console.aliyun.com/
 - OpenAI: https://openai.com/privacy
 - Anthropic: https://www.anthropic.com/privacy
 
