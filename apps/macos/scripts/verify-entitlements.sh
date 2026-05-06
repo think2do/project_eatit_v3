@@ -73,4 +73,11 @@ if [[ -d "$APP_PATH" ]]; then
     fi
 fi
 
+# 写 stamp 文件让 Xcode dependency analysis 知道 outputFiles 已落地。
+# 不写 → "entitlements modified during build" 误报。
+if [[ -n "${DERIVED_FILE_DIR:-}" ]]; then
+    mkdir -p "$DERIVED_FILE_DIR"
+    touch "$DERIVED_FILE_DIR/verify-entitlements.stamp"
+fi
+
 exit 0

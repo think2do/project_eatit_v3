@@ -20,9 +20,13 @@ settings:
     GENERATE_INFOPLIST_FILE: NO
     INFOPLIST_FILE: Eatit/Info.plist
     CODE_SIGN_ENTITLEMENTS: Eatit/Eatit.entitlements
-    CODE_SIGN_STYLE: Manual
+    # 本地 Build & Run 用 Automatic + Apple Development(Xcode 自动管 dev profile)。
+    # Archive 上 App Store 时由 apps/macos/ExportOptions-AppStore.plist 的
+    # signingStyle=manual + Apple Distribution override(见 archive-and-upload.sh)。
+    # ⚠️ v3.4 §A0 总纲红线禁止 "Developer ID Application"(等价 DMG 直分发渠道)
+    CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: 469QTH6TU2
-    CODE_SIGN_IDENTITY: "Developer ID Application"
+    CODE_SIGN_IDENTITY: "Apple Development"
     ENABLE_HARDENED_RUNTIME: YES
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
@@ -56,9 +60,9 @@ targets:
           "${SRCROOT}/scripts/verify-entitlements.sh"
         inputFiles:
           - "$(SRCROOT)/scripts/verify-entitlements.sh"
+          - "$(SRCROOT)/Eatit/Eatit.entitlements"
         outputFiles:
           - "$(DERIVED_FILE_DIR)/verify-entitlements.stamp"
-        basedOnDependencyAnalysis: false
       - name: "Verify Embedded Binary Team ID"
         script: |
           echo "[M1.1.dev placeholder] team-id sweep deferred to M2.3+ when SPM deps land"

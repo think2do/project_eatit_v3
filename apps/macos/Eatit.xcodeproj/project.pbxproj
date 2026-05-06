@@ -299,11 +299,11 @@
 				TargetAttributes = {
 					8BEA0381BDF80C378D8B7CB3 = {
 						DevelopmentTeam = 469QTH6TU2;
-						ProvisioningStyle = Manual;
+						ProvisioningStyle = Automatic;
 					};
 					E5EC5143DE42C1C4FC676DC1 = {
 						DevelopmentTeam = 469QTH6TU2;
-						ProvisioningStyle = Manual;
+						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -363,7 +363,6 @@
 		};
 		51DAD4BC0303CE4EED09B3E7 /* Verify Entitlements */ = {
 			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -371,6 +370,7 @@
 			);
 			inputPaths = (
 				"$(SRCROOT)/scripts/verify-entitlements.sh",
+				"$(SRCROOT)/Eatit/Eatit.entitlements",
 			);
 			name = "Verify Entitlements";
 			outputFileListPaths = (
@@ -508,9 +508,9 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_ENTITLEMENTS = Eatit/Eatit.entitlements;
-				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
@@ -594,9 +594,9 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_ENTITLEMENTS = Eatit/Eatit.entitlements;
-				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
