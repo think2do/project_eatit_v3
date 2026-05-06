@@ -10,68 +10,37 @@ export interface ProviderPreset {
 }
 
 /**
- * Static metadata for the six supported providers plus a "custom" escape hatch.
+ * v3.4 收敛:LLM 只支持火山方舟 ARK 一家。
  *
- * baseUrl / models are used to pre-fill the Settings form; registerUrl is shown
- * as a help link when the user has not yet created a key. None of these URLs
- * are ever used for client-side `fetch` — the backend is the only LLM client
- * (see phase3-constraints.md §A1). They exist purely as provider metadata.
+ * 红线依据:
+ *   - PRD v3.4 §2.3 / §4.5.1:LLM Provider 收敛火山方舟
+ *   - constraints §A0.3:出站 host 白名单仅 ark.cn-beijing.volces.com
+ *   - Info.plist NSAppTransportSecurity:仅 ark.cn-beijing.volces.com + openspeech.bytedance.com
+ *   - LLMGateway.swift hardcoded baseURL + allowedHost = ark.cn-beijing.volces.com
+ *
+ * 因此 UI 只显示一个 provider(火山方舟),不再让用户选 OpenAI / DeepSeek /
+ * SiliconFlow / Anthropic / 自定义 — 选了也跑不通(host 不在白名单 + LLMGateway
+ * 忽略 baseURL)。
+ *
+ * 历史 v3.3 的 6 provider preset 已在本节点移除(M5.X.audit-fix UI 收敛)。
  */
 export const PROVIDERS: readonly ProviderPreset[] = [
   {
-    id: "siliconflow",
-    label: "硅基流动 SiliconFlow",
-    registerUrl: "https://cloud.siliconflow.cn/",
-    baseUrl: "https://api.siliconflow.cn/v1",
+    id: "volcengine",
+    label: "火山方舟 (Doubao)",
+    registerUrl: "https://www.volcengine.com/product/ark",
+    baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
     models: [
-      "Qwen/Qwen2.5-7B-Instruct",
-      "Qwen/Qwen2.5-32B-Instruct",
-      "deepseek-ai/DeepSeek-V2.5",
+      "doubao-seed-1-6-250615",
+      "doubao-seed-1-6-flash-250615",
+      "doubao-seed-1-6-thinking-250715",
     ],
-    hint: "国内直连,兼容 OpenAI 协议。",
-  },
-  {
-    id: "deepseek",
-    label: "DeepSeek",
-    registerUrl: "https://platform.deepseek.com/",
-    baseUrl: "https://api.deepseek.com/v1",
-    models: ["deepseek-chat", "deepseek-reasoner"],
-    hint: "性价比高,官方 OpenAI 兼容端点。",
-  },
-  {
-    id: "dashscope",
-    label: "阿里云百炼 DashScope",
-    registerUrl: "https://bailian.console.aliyun.com/",
-    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    models: ["qwen-plus", "qwen-max", "qwen-turbo"],
-    hint: "阿里云百炼平台,需开通 OpenAI 兼容模式。",
-  },
-  {
-    id: "openai",
-    label: "OpenAI",
-    registerUrl: "https://platform.openai.com/api-keys",
-    baseUrl: "https://api.openai.com/v1",
-    models: ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini"],
-    hint: "境外访问,注意网络环境。",
-  },
-  {
-    id: "anthropic",
-    label: "Anthropic",
-    registerUrl: "https://console.anthropic.com/",
-    baseUrl: "https://api.anthropic.com/v1",
-    models: ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"],
-    hint: "境外访问,注意网络环境。",
-  },
-  {
-    id: "custom",
-    label: "自定义 (OpenAI 兼容)",
-    registerUrl: "",
-    baseUrl: "",
-    models: [],
-    hint: "任意 OpenAI 兼容端点,自行填写 Base URL 与模型名。",
+    hint:
+      "v3.4 唯一支持的 LLM Provider。请在火山方舟控制台创建 API Key 后填入。" +
+      "出站 host 严格白名单(constraints §A0.3),无法切到 OpenAI / DeepSeek / OpenRouter 等。",
   },
 ] as const;
 
 export function getProvider(id: LLMProvider): ProviderPreset {
-  return PROVIDERS.find((p) => p.id === id) ?? PROVIDERS[PROVIDERS.length - 1];
+  return PROVIDERS.find((p) => p.id === id) ?? PROVIDERS[0];
 }

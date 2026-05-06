@@ -6,7 +6,16 @@
 
 import { keychain } from "@/services/keychain";
 
+/**
+ * v3.4 收敛:LLM Provider 仅 "volcengine"(火山方舟 ARK / Doubao)。
+ * 历史 v3.3 union(openai / anthropic / siliconflow / deepseek / dashscope /
+ * custom)在 M5.X.audit-fix UI 收敛节点移除。原因见 lib/llm/providers.ts。
+ *
+ * 旧 union 字面量保留为 "legacy-only" 类型(只读取老 keychain meta 时用),
+ * 不再被 UI / saveLLMConfig 写入。新 user 仅能选 volcengine。
+ */
 export type LLMProvider =
+  | "volcengine"
   | "openai"
   | "anthropic"
   | "siliconflow"
