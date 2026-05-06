@@ -14,7 +14,7 @@ interface Props {
   onBack: () => void;
 }
 
-const DEFAULT_PROVIDER: LLMProvider = "siliconflow";
+const DEFAULT_PROVIDER: LLMProvider = "volcengine";
 
 function initialConfig(): LLMConfig {
   const preset = getProvider(DEFAULT_PROVIDER);
@@ -63,8 +63,6 @@ export function StepLLM({ onNext, onBack }: Props): JSX.Element {
   const preset = getProvider(config.provider);
   const suggestedModels =
     PROVIDERS.find((p) => p.id === config.provider)?.models ?? [];
-  const showCustomModel =
-    config.provider === "custom" || !suggestedModels.includes(config.model);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
@@ -125,28 +123,25 @@ export function StepLLM({ onNext, onBack }: Props): JSX.Element {
           <span style={{ fontSize: 12, fontWeight: 500, color: "var(--ink-700)" }}>
             模型名称
           </span>
-          {showCustomModel ? (
-            <input
-              type="text"
-              value={config.model}
-              onChange={(e) => setConfig((c) => ({ ...c, model: e.target.value }))}
-              placeholder="例如 gpt-4o-mini"
-              style={fieldStyle}
-            />
-          ) : (
-            <select
-              value={config.model}
-              onChange={(e) => setConfig((c) => ({ ...c, model: e.target.value }))}
-              style={fieldStyle}
-              className="select"
-            >
-              {suggestedModels.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          )}
+          <input
+            type="text"
+            list="step-llm-model-suggestions"
+            value={config.model}
+            onChange={(e) => setConfig((c) => ({ ...c, model: e.target.value }))}
+            placeholder="例如 doubao-seed-1-6-250615"
+            style={fieldStyle}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+          />
+          <datalist id="step-llm-model-suggestions">
+            {suggestedModels.map((m) => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
+          <span style={{ fontSize: 11, color: "var(--ink-500)" }}>
+            可自由输入任何已开通的模型 ID(如 doubao-1-5-pro-32k-250115)。下拉为推荐建议,非限定。
+          </span>
         </label>
       </div>
 
