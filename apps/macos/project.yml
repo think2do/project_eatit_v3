@@ -29,7 +29,10 @@ settings:
     CODE_SIGN_IDENTITY: "Apple Development"
     ENABLE_HARDENED_RUNTIME: YES
     ENABLE_USER_SCRIPT_SANDBOXING: NO
-    CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+    # CODE_SIGN_INJECT_BASE_ENTITLEMENTS=YES:Debug build 注入 get-task-allow=true 让
+    # LLDB 能 attach;Release/Archive 时 Xcode 本就不会加 get-task-allow(否则 App Store
+    # 会 reject)。verify-entitlements.sh 仍校验 SOURCE 文件,不受影响。
+    CODE_SIGN_INJECT_BASE_ENTITLEMENTS: YES
 
 packages:
   GRDB:
