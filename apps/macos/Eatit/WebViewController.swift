@@ -34,6 +34,10 @@ final class WebViewController: NSViewController {
         )
         webView = DropAwareWebView(frame: .zero, configuration: config)
         webView.translatesAutoresizingMaskIntoConstraints = false
+        // 让 <input type="file"> 在 WKWebView 内可触发 NSOpenPanel(WKUIDelegate.runOpenPanel)。
+        // M2.4 FilePickerService 的 bridge.call("file.pick") 是 JS 主动调用通道;
+        // 这里是 web 标准 input.click() 通道,二者并存。§A0.1 复用 files.user-selected.read-write entitlement。
+        webView.uiDelegate = self
         view = webView
         bridgeRouter.webView = webView
         // §A0.1: files.user-selected.read-write covers drop; Powerbox auto-grants access.
@@ -387,6 +391,49 @@ final class WebViewController: NSViewController {
         super.viewDidLoad()
         let url = URL(string: "eatit://app/index.html")!
         webView.load(URLRequest(url: url))
+    }
+}
+
+// MARK: - WKUIDelegate (NSOpenPanel for <input type="file">)
+
+extension WebViewController: WKUIDelegate {
+    /// 当 WKWebView 内 `<input type="file">` 触发文件选择时,弹原生 NSOpenPanel。
+    /// §A0.1 files.user-selected.read-write entitlement 覆盖 Powerbox,无需新 entitlement。
+    /// §C3 PickedFile 内容由 WebKit 自动从用户选中的 URL 读取并交给 web,Bridge 不参与。
+    func webView(
+        _ webView: WKWebView,
+        runOpenPanelWith parameters: WKOpenPanelParameters,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping ([URL]?) -> Void
+    ) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = parameters.allowsMultipleSelection
+        panel.allowedContentTypes = [
+            .pdf,
+            .plainText,
+            .rtf,
+            .text,
+            // .doc / .docx 走通用 .data + .item;HTML accept 属性侧已经过滤
+            .data,
+            .item,
+        ]
+
+        let presentingWindow = webView.window
+        let handle: (NSApplication.ModalResponse) -> Void = { response in
+            if response == .OK && !panel.urls.isEmpty {
+                completionHandler(panel.urls)
+            } else {
+                completionHandler(nil)
+            }
+        }
+
+        if let window = presentingWindow {
+            panel.beginSheetModal(for: window, completionHandler: handle)
+        } else {
+            panel.begin(completionHandler: handle)
+        }
     }
 }
 
