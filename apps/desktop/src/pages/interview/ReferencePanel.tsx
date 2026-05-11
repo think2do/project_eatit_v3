@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Lightbulb, ChevronDown, Lock } from "lucide-react";
 import type { ReferenceAnswerHint } from "@/statecharts/interview-machine";
+import { MarkdownStream } from "@/components/MarkdownStream";
 
 type Props = {
   reference: ReferenceAnswerHint | null;
@@ -68,7 +69,7 @@ export function ReferencePanel({ reference, resetKey, streamingText }: Props): J
               whiteSpace: "pre-wrap",
             }}
           >
-            {streamingText}
+            <MarkdownStream text={streamingText} isComplete={false} />
           </div>
         </div>
       );
@@ -205,7 +206,7 @@ export function ReferencePanel({ reference, resetKey, streamingText }: Props): J
               whiteSpace: "pre-wrap",
             }}
           >
-            {streamingText}
+            <MarkdownStream text={streamingText} isComplete={false} />
           </div>
         </div>
       ) : null}

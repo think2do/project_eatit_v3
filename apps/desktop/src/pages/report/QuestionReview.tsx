@@ -7,11 +7,11 @@
  *   3. raw-answer-fold: <details> wrapping the user's original answer
  *      (collapsed by default)
  *
- * Rendering note: M8.5 will introduce <MarkdownStream /> for the AI answer.
- * Until then we use whiteSpace: "pre-wrap" plain text.
- * TODO M8.5: swap in <MarkdownStream text={aiAnswer} />
+ * Rendering note: AI answer and feedback use <MarkdownStream /> (M8.5) for
+ * live bold rendering. whiteSpace: "pre-wrap" on the wrapper preserves newlines.
  */
 import type { RoundReviewTone } from "@eatit/shared-types";
+import { MarkdownStream } from "@/components/MarkdownStream";
 
 interface QuestionReviewProps {
   index: number;
@@ -125,7 +125,6 @@ export function QuestionReview(props: QuestionReviewProps): JSX.Element {
         >
           {props.personaName} 这样回答
         </h3>
-        {/* TODO M8.5: swap in <MarkdownStream text={aiAnswer} /> */}
         <div
           style={{
             fontSize: 13.5,
@@ -134,7 +133,7 @@ export function QuestionReview(props: QuestionReviewProps): JSX.Element {
             whiteSpace: "pre-wrap",
           }}
         >
-          {aiAnswer.length > 0 ? aiAnswer : "（暂无范例答）"}
+          {aiAnswer.length > 0 ? <MarkdownStream text={aiAnswer} isComplete={true} /> : "（暂无范例答）"}
         </div>
 
         {props.aiFeedback.trim().length > 0 && (
@@ -152,7 +151,7 @@ export function QuestionReview(props: QuestionReviewProps): JSX.Element {
             <span className="muted" style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
               AI 总结及建议
             </span>
-            {props.aiFeedback}
+            <MarkdownStream text={props.aiFeedback} isComplete={true} />
           </div>
         )}
       </div>
