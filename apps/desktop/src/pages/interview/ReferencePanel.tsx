@@ -8,6 +8,10 @@ type Props = {
   // forces the user to opt in again instead of leaking the previous
   // turn's hint.
   resetKey: number;
+  // M8.3: streaming reference text arriving in real-time before reference.ready.
+  // Rendered as plain preformatted text (no markdown parsing — M8.5 will add that).
+  // When present and non-empty, shown above the structured reference sections.
+  streamingText?: string;
 };
 
 /**
@@ -24,7 +28,7 @@ type Props = {
  *   - reference !== null & not revealed: button to expand.
  *   - reference !== null & revealed: full content.
  */
-export function ReferencePanel({ reference, resetKey }: Props): JSX.Element {
+export function ReferencePanel({ reference, resetKey, streamingText }: Props): JSX.Element {
   const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
@@ -32,6 +36,43 @@ export function ReferencePanel({ reference, resetKey }: Props): JSX.Element {
   }, [resetKey]);
 
   if (!reference) {
+    // M8.3: show streaming text if available, otherwise show loading indicator
+    if (streamingText && streamingText.length > 0) {
+      return (
+        <div
+          style={{
+            padding: "10px 12px",
+            borderRadius: "var(--r-md)",
+            border: "1px dashed var(--brand-soft)",
+            background: "var(--bg-warm)",
+            fontSize: 12,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              marginBottom: 8,
+              color: "var(--ink-500)",
+            }}
+          >
+            <Lightbulb size={13} />
+            <span style={{ fontSize: 11.5 }}>AI 参考正在生成中...</span>
+          </div>
+          <div
+            style={{
+              fontSize: 12.5,
+              lineHeight: 1.7,
+              color: "var(--ink-900)",
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {streamingText}
+          </div>
+        </div>
+      );
+    }
     return (
       <div
         style={{
@@ -47,7 +88,7 @@ export function ReferencePanel({ reference, resetKey }: Props): JSX.Element {
         }}
       >
         <Lightbulb size={14} />
-        <span>AI 正在准备本轮参考答案,稍候可参考。</span>
+        <span>AI 正在后台生成参考答案,提交回答后可查看。</span>
       </div>
     );
   }
@@ -150,6 +191,24 @@ export function ReferencePanel({ reference, resetKey }: Props): JSX.Element {
           收起 <ChevronDown size={12} />
         </button>
       </header>
+
+      {streamingText && streamingText.length > 0 ? (
+        <div>
+          <div className="eyebrow" style={{ marginBottom: 6 }}>
+            AI 参考答案（流式）
+          </div>
+          <div
+            style={{
+              fontSize: 12.5,
+              lineHeight: 1.7,
+              color: "var(--ink-900)",
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {streamingText}
+          </div>
+        </div>
+      ) : null}
 
       {reference.answer_outline.length > 0 ? (
         <div>

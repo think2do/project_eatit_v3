@@ -17,6 +17,8 @@ import {
   userPrompt,
   readableAnswerSystemPrompt,
   readableAnswerUserPrompt,
+  readableAnswerStreamingSystemPrompt,
+  readableAnswerStreamingUserPrompt,
   type ReadableAnswerPersona,
 } from "./prompts";
 
@@ -193,4 +195,54 @@ export async function draftReadableAnswer(
 
   // ★ L0 §A11: parse with .strict() validates output shape ★
   return ReadableAnswerOutputSchema.parse(rawOut);
+}
+
+// ===== M8.3: Streaming Readable Answer Drafter =====
+
+export interface StreamDraftReadableAnswerDeps {
+  llm: LLMProvider;
+  logger?: Logger;
+}
+
+/**
+ * Stream a first-person markdown answer for a single interview question.
+ *
+ * Uses chatStream (raw SSE deltas) instead of generateObject, so chunks
+ * are plain markdown text — no JSON wrapper. This avoids {"ai_suggested_answer_markdown":"
+ * noise polluting the streaming UI.
+ *
+ * Cancel by calling iterator.return() or using a for-await break.
+ * chatStream Unsubscribes bridge handlers on iterator.return() / break / throw.
+ *
+ * L0 persona lock: persona must be one of Sarah / Marcus / Lin / Daniel.
+ * §A0.4: LLM call goes through deps.llm only — no api_key access.
+ * §A0.3: uses existing ARK channel (chatStream → Bridge → Swift LLMGateway).
+ */
+export async function* streamDraftReadableAnswer(
+  args: { question: string; persona: ReadableAnswerPersona },
+  deps: StreamDraftReadableAnswerDeps,
+): AsyncGenerator<string> {
+  const messages: Message[] = [
+    { role: "system", content: readableAnswerStreamingSystemPrompt(args.persona) },
+    { role: "user", content: readableAnswerStreamingUserPrompt(args.question) },
+  ];
+
+  const iter = deps.llm.chatStream({
+    messages,
+    model: await getConfiguredModel(),
+  });
+
+  try {
+    for await (const chunk of iter) {
+      if (chunk.content !== undefined) {
+        yield chunk.content;
+      }
+      if (chunk.finishReason !== undefined) {
+        break;
+      }
+    }
+  } finally {
+    // Ensure iterator cleanup even on break / throw — releases Bridge SSE handlers
+    await iter.return?.(undefined);
+  }
 }

@@ -12,15 +12,18 @@
  */
 
 import { llm } from "@/core/llm";
+import { db } from "@/services/db";
 import { runInterviewerAgent } from "@/core/agents/interviewer";
 import { runObserverAgent } from "@/core/agents/observer";
 import { runReferenceAgent } from "@/core/agents/reference";
+import { streamDraftReadableAnswer } from "@/core/agents/coach";
 import { buildTurnGraph } from "@/core/graphs/turnGraph";
 import { buildPostReportGraph } from "@/core/graphs/postReportGraph";
 import type { InterviewerAgentOutput, TurnAssessment, TurnRecord } from "@/core/schemas/turns";
 import type { ObserverAgentOutput } from "@/core/schemas/turns";
 import type { ReferenceAgentOutput } from "@/core/schemas/turns";
 import type { ParseOutput } from "@/core/schemas/parse";
+import type { ReadableAnswerPersona } from "@/core/agents/coach/prompts";
 
 // ─── Public input / event types ──────────────────────────────────────────────
 
@@ -35,6 +38,12 @@ export interface RunInterviewSessionInput {
   /** Parsed parse_results.payload — provides candidate/JD context to agents. */
   parseSummary: ParseOutput;
   durationMinutes: number;
+  /**
+   * Persona name for the streaming reference drafter (M8.3).
+   * Derived from session config style by the caller (InterviewPage).
+   * L0 persona lock: must be one of Sarah / Marcus / Lin / Daniel.
+   */
+  personaName: ReadableAnswerPersona;
 }
 
 /**
@@ -46,7 +55,16 @@ export type InterviewSessionEvent =
   | { type: "question.generated"; payload: InterviewerAgentOutput }
   | { type: "turn.assessed"; payload: TurnAssessment }
   | { type: "coach.observation"; payload: ObserverAgentOutput }
-  | { type: "reference.ready"; payload: ReferenceAgentOutput }
+  // turnIndex on reference.ready: reference agent fires asynchronously when
+  // the question is generated (peek-while-typing UX), so the event may
+  // arrive before / during / after the corresponding submit. The state
+  // machine drops late arrivals whose turnIndex doesn't match the active
+  // turn so a stale reference doesn't leak into the next question's view.
+  | { type: "reference.ready"; turnIndex: number; payload: ReferenceAgentOutput }
+  // M8.3: streaming reference draft events — fired concurrently with reference.ready.
+  // delta is a plain markdown text chunk (not JSON-wrapped).
+  | { type: "reference.chunk"; turnIndex: number; delta: string }
+  | { type: "reference.streamComplete"; turnIndex: number }
   | { type: "session.ended"; payload: { reason: "user-end" | "budget-exhausted" } }
   | { type: "error"; payload: { code: string; message: string } };
 
@@ -130,143 +148,283 @@ function computeRemaining(durationMinutes: number, startedAt: number): number {
  * Drives a local interview session as an AsyncGenerator.
  *
  * Lifecycle:
- *   1. Bootstrap: call runInterviewerAgent (no prior turn) → yield "question.generated"
+ *   1. Bootstrap: runInterviewerAgent → push "question.generated"
+ *      → fire reference for Q in background (resolves whenever LLM done →
+ *        push "reference.ready" with turnIndex)
  *   2. For each "answer.submitted" input:
- *      a. Check budget; yield "session.ended" { reason: "budget-exhausted" } if <= 0
- *      b. Run turnGraph → yield "turn.assessed"
- *      c. Concurrently run ObserverAgent + ReferenceAgent (both soft-failures via allSettled)
- *      d. Yield "coach.observation" / "reference.ready" if agents succeeded
- *      e. Yield "question.generated" with next turn question from turn_graph result
- *   3. On "session.end" input: fire-and-forget postReportGraph → yield "session.ended"
+ *      a. Check budget; push "session.ended" { reason: "budget-exhausted" } if <= 0
+ *      b. Run turnGraph → push "turn.assessed"
+ *      c. Run ObserverAgent (depends on user answer) → push "coach.observation"
+ *      d. Push next "question.generated" + fire its reference in background
+ *   3. On "session.end" input: fire-and-forget postReportGraph → push "session.ended"
  *
- * §A0: no /api/ calls; §A0.4: no api_key; §L0 #13: node names unchanged.
+ * §A0: no /api/ calls; §A0.4: no api_key; §L0 #13: graph node names unchanged.
+ *
+ * Implementation note: the loop runs as a detached async fn pushing to an
+ * internal queue.  An outer for-await yields from the queue.  This decoupling
+ * lets the reference-agent .then() callback push reference.ready as soon as
+ * the LLM completes, even while the main loop is parked on `for await
+ * (userInput of inputs)`.  Without this, reference would only be visible at
+ * submit time — defeating the peek-while-typing UX.
  */
 export async function* runInterviewSession(
   input: RunInterviewSessionInput,
   inputs: AsyncIterable<InterviewSessionInput>,
 ): AsyncGenerator<InterviewSessionEvent, void, unknown> {
-  const startedAt = Date.now();
-  const turns: TurnRecord[] = [];
-  let lastQuestion = "";
-  let turnIndex = 0;
-  let previousSummary: string | null = null;
+  const events = createAsyncQueue<InterviewSessionEvent>();
 
-  // 1) Bootstrap: first question — no prior turn available yet
-  try {
-    const bootstrap = await runInterviewerAgent(
+  // Fire reference for `question` in the background.  When the LLM call
+  // settles, push reference.ready with the captured turnIndex so the state
+  // machine can drop it if the user has already moved on (stale-arrival guard).
+  const startReference = (question: string, capturedTurnIndex: number): void => {
+    runReferenceAgent(
       {
-        framework_json: input.frameworkJson,
-        recent_turns: [],
-        remaining_minutes: input.durationMinutes,
+        question,
+        job_context: input.parseSummary.match_summary ?? null,
+        // Pre-answer: candidate hasn't typed yet. Output schema doesn't
+        // depend on candidate_answer; the comparison-to-user field in the
+        // prompt template is optional.
+        candidate_answer: null,
       },
       { llm },
-    );
-    lastQuestion = bootstrap.question;
-    yield { type: "question.generated", payload: bootstrap };
-  } catch (err) {
-    yield {
-      type: "error",
-      payload: { code: "bootstrap_failed", message: errorMessage(err) },
-    };
-    return;
-  }
+    )
+      .then((value) => {
+        events.push({
+          type: "reference.ready",
+          turnIndex: capturedTurnIndex,
+          payload: value,
+        });
+      })
+      .catch(() => {
+        /* soft-fail: reference is opt-in surface, never blocks the turn */
+      });
+  };
 
-  // 2) Main loop: each user input drives one interview turn
-  for await (const userInput of inputs) {
-    if (userInput.type === "session.end") {
-      void buildPostReportGraph({ llm })
-        .invoke({
-          user_id: "local",
-          last_session_id: input.sessionId,
-          coach_input: null,
-          reflection_input: null,
-          coach_skipped: false,
-          coach_error: null,
-          reflection_error: null,
-        } as Parameters<ReturnType<typeof buildPostReportGraph>["invoke"]>[0])
-        .catch(() => {});
-      yield { type: "session.ended", payload: { reason: "user-end" } };
+  // M8.3: per-turn AbortController map for streaming draft cancellation.
+  // Keyed by turnIndex. abort() is called when the next turn starts or session ends,
+  // so we don't waste tokens on stale streaming for a question the user moved past.
+  const draftAbortControllers = new Map<number, AbortController>();
+
+  // M8.3: Start streaming reference draft concurrently with startReference().
+  // Fires chatStream (Bridge → Swift LLMGateway → ARK) and pushes reference.chunk
+  // events to the UI for real-time rendering. The previous turn's controller is
+  // aborted before starting a new one — abort triggers break inside the for-await.
+  const startStreamingDraft = (
+    question: string,
+    capturedTurnIndex: number,
+  ): void => {
+    // Cancel any still-running draft from a prior turn
+    for (const [idx, ctrl] of draftAbortControllers) {
+      if (idx !== capturedTurnIndex) {
+        ctrl.abort();
+        draftAbortControllers.delete(idx);
+      }
+    }
+
+    const controller = new AbortController();
+    draftAbortControllers.set(capturedTurnIndex, controller);
+
+    void (async () => {
+      try {
+        for await (const chunk of streamDraftReadableAnswer(
+          { question, persona: input.personaName },
+          { llm },
+        )) {
+          if (controller.signal.aborted) break;
+          events.push({ type: "reference.chunk", turnIndex: capturedTurnIndex, delta: chunk });
+        }
+        if (!controller.signal.aborted) {
+          events.push({ type: "reference.streamComplete", turnIndex: capturedTurnIndex });
+        }
+      } catch {
+        // Soft-fail: streaming failure does not abort the session.
+        // The user still gets the structured reference via reference.ready.
+      } finally {
+        draftAbortControllers.delete(capturedTurnIndex);
+      }
+    })();
+  };
+
+  void (async () => {
+    const startedAt = Date.now();
+    const turns: TurnRecord[] = [];
+    let lastQuestion = "";
+    let turnIndex = 0;
+    let previousSummary: string | null = null;
+
+    // 1) Bootstrap: first question — no prior turn available yet
+    try {
+      const bootstrap = await runInterviewerAgent(
+        {
+          framework_json: input.frameworkJson,
+          recent_turns: [],
+          remaining_minutes: input.durationMinutes,
+        },
+        { llm },
+      );
+      lastQuestion = bootstrap.question;
+      events.push({ type: "question.generated", payload: bootstrap });
+      startReference(lastQuestion, turnIndex);
+      startStreamingDraft(lastQuestion, turnIndex);
+    } catch (err) {
+      events.push({
+        type: "error",
+        payload: { code: "bootstrap_failed", message: errorMessage(err) },
+      });
+      events.close();
       return;
     }
 
-    // userInput.type === "answer.submitted"
-    try {
-      const remaining = computeRemaining(input.durationMinutes, startedAt);
-      if (remaining <= 0) {
-        yield { type: "session.ended", payload: { reason: "budget-exhausted" } };
+    // 2) Main loop: each user input drives one interview turn
+    for await (const userInput of inputs) {
+      if (userInput.type === "session.end") {
+        // M8.3: abort all active streaming drafts on session end to free resources
+        for (const ctrl of draftAbortControllers.values()) {
+          ctrl.abort();
+        }
+        draftAbortControllers.clear();
+        void buildPostReportGraph({ llm })
+          .invoke({
+            user_id: "local",
+            last_session_id: input.sessionId,
+            coach_input: null,
+            reflection_input: null,
+            coach_skipped: false,
+            coach_error: null,
+            reflection_error: null,
+          } as Parameters<ReturnType<typeof buildPostReportGraph>["invoke"]>[0])
+          .catch(() => {});
+        events.push({ type: "session.ended", payload: { reason: "user-end" } });
+        events.close();
         return;
       }
 
-      // Run turn graph (turn_assessment + compression + next_question in parallel internally)
-      // Spread turns to snapshot the current list — avoids the mock recording a live reference.
-      const result = await buildTurnGraph({ llm }).invoke({
-        turn_index: turnIndex,
-        question: lastQuestion,
-        answer: userInput.text,
-        framework_json: input.frameworkJson,
-        recent_turns: [...turns],
-        previous_summary: previousSummary,
-        remaining_minutes: remaining,
-      });
+      // userInput.type === "answer.submitted"
+      try {
+        const remaining = computeRemaining(input.durationMinutes, startedAt);
+        if (remaining <= 0) {
+          events.push({
+            type: "session.ended",
+            payload: { reason: "budget-exhausted" },
+          });
+          events.close();
+          return;
+        }
 
-      if (result.assessment) {
-        yield { type: "turn.assessed", payload: result.assessment };
+        // Run turn graph (turn_assessment + compression + next_question in parallel internally)
+        // Spread turns to snapshot the current list — avoids the mock recording a live reference.
+        const result = await buildTurnGraph({ llm }).invoke({
+          turn_index: turnIndex,
+          question: lastQuestion,
+          answer: userInput.text,
+          framework_json: input.frameworkJson,
+          recent_turns: [...turns],
+          previous_summary: previousSummary,
+          remaining_minutes: remaining,
+        });
+
+        if (result.assessment) {
+          events.push({ type: "turn.assessed", payload: result.assessment });
+        }
+
+        // Persist turn + assessment to SQLite so generateReport (later) sees the
+        // real candidate answers instead of an empty turns[] (which forces the
+        // ReportAgent LLM to hallucinate plausible-sounding round_reviews_v2).
+        // Soft-fail: a DB error must not abort the live interview.
+        try {
+          const turnId = crypto.randomUUID();
+          await db.exec(
+            `INSERT INTO interview_turns
+               (id, interview_session_id, turn_index, question_tag, question_text, answer_text)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+              turnId,
+              input.sessionId,
+              turnIndex,
+              "interview", // placeholder for NOT NULL; round_reviews_v2.question_tag is re-derived by ReportAgent
+              lastQuestion,
+              userInput.text,
+            ],
+          );
+          if (result.assessment) {
+            await db.exec(
+              `INSERT INTO turn_assessments
+                 (id, interview_turn_id, strengths, weaknesses, evidence)
+               VALUES (?, ?, ?, ?, ?)`,
+              [
+                crypto.randomUUID(),
+                turnId,
+                JSON.stringify(result.assessment.strengths ?? []),
+                JSON.stringify(result.assessment.weaknesses ?? []),
+                "[]",
+              ],
+            );
+          }
+        } catch (persistErr) {
+          events.push({
+            type: "error",
+            payload: {
+              code: "persist_turn_failed",
+              message: errorMessage(persistErr),
+            },
+          });
+        }
+
+        // Accumulate turn record (question / answer / assessment only — no turn_index)
+        turns.push({
+          question: lastQuestion,
+          answer: userInput.text,
+          assessment: result.assessment
+            ? { summary: result.assessment.summary }
+            : null,
+        });
+
+        if (result.compressed?.summary) {
+          previousSummary = result.compressed.summary;
+        }
+
+        // Observer needs the user's actual answer, so it only fires post-submit.
+        // Soft-fail; the panel just stays empty if it errors.
+        try {
+          const observation = await runObserverAgent(
+            {
+              turn_index: turnIndex,
+              question: lastQuestion,
+              answer: userInput.text,
+              remaining_minutes: remaining,
+              long_term_summary: previousSummary,
+            },
+            { llm },
+          );
+          events.push({ type: "coach.observation", payload: observation });
+        } catch {
+          /* soft-fail */
+        }
+
+        // Next question (turn_graph already computed it in the next_question node)
+        if (result.next_question_out) {
+          lastQuestion = result.next_question_out.question;
+          turnIndex += 1;
+          events.push({
+            type: "question.generated",
+            payload: result.next_question_out,
+          });
+          startReference(lastQuestion, turnIndex);
+          // M8.3: startStreamingDraft cancels any prior-turn draft before starting new one
+          startStreamingDraft(lastQuestion, turnIndex);
+        }
+      } catch (err) {
+        events.push({
+          type: "error",
+          payload: { code: "turn_failed", message: errorMessage(err) },
+        });
+        events.close();
+        return;
       }
-
-      // Accumulate turn record (TurnRecord schema: question / answer / assessment only — no turn_index)
-      turns.push({
-        question: lastQuestion,
-        answer: userInput.text,
-        assessment: result.assessment ? { summary: result.assessment.summary } : null,
-      });
-
-      // Update long-term summary if compression produced one
-      if (result.compressed?.summary) {
-        previousSummary = result.compressed.summary;
-      }
-
-      // Concurrently run observer + reference (per-turn side-channels)
-      // Both are soft-failures: Promise.allSettled ensures one failing never blocks the other
-      const [observerResult, referenceResult] = await Promise.allSettled([
-        runObserverAgent(
-          {
-            turn_index: turnIndex,
-            question: lastQuestion,
-            answer: userInput.text,
-            remaining_minutes: remaining,
-            long_term_summary: previousSummary,
-          },
-          { llm },
-        ),
-        runReferenceAgent(
-          {
-            question: lastQuestion,
-            job_context: input.parseSummary.match_summary ?? null,
-            candidate_answer: userInput.text,
-          },
-          { llm },
-        ),
-      ]);
-
-      if (observerResult.status === "fulfilled") {
-        yield { type: "coach.observation", payload: observerResult.value };
-      }
-      if (referenceResult.status === "fulfilled") {
-        yield { type: "reference.ready", payload: referenceResult.value };
-      }
-
-      // Next question (turn_graph already computed it in the next_question node)
-      if (result.next_question_out) {
-        lastQuestion = result.next_question_out.question;
-        turnIndex += 1;
-        yield { type: "question.generated", payload: result.next_question_out };
-      }
-    } catch (err) {
-      yield {
-        type: "error",
-        payload: { code: "turn_failed", message: errorMessage(err) },
-      };
-      return;
     }
+  })();
+
+  for await (const event of events.iter()) {
+    yield event;
   }
 }

@@ -270,6 +270,12 @@ export function InterviewPage(): JSX.Element {
         const frameworkJson = session.direction_framework
           ? JSON.stringify(session.direction_framework)
           : "{}";
+        const style = typeof config.style === "string" ? config.style : "structured";
+        const personaName = (PERSONA_NAME_BY_STYLE[style] ?? "Sarah") as
+          | "Sarah"
+          | "Marcus"
+          | "Lin"
+          | "Daniel";
         setSessionInitialContext({
           sessionId,
           llmConfigMeta: {
@@ -280,6 +286,7 @@ export function InterviewPage(): JSX.Element {
           frameworkJson,
           parseSummary: parseResult.payload,
           durationMinutes,
+          personaName,
         });
       } catch (err) {
         if (!cancelled) {
@@ -317,6 +324,8 @@ export function InterviewPage(): JSX.Element {
           if (cancelled) break;
           switch (event.type) {
             case "question.generated":
+              // Reset streaming text for the new turn
+              setCurrentTurnStreamingText(null);
               send({
                 type: "SERVER_QUESTION",
                 payload: {
@@ -366,6 +375,20 @@ export function InterviewPage(): JSX.Element {
                   common_pitfalls: event.payload.common_pitfalls,
                 },
               });
+              break;
+            case "reference.chunk": {
+              const map = referenceStreamingByTurnRef.current;
+              const prev = map.get(event.turnIndex) ?? "";
+              map.set(event.turnIndex, prev + event.delta);
+              // Only trigger re-render for the currently active turn
+              if (event.turnIndex === localTurnIndex - 1) {
+                setCurrentTurnStreamingText(map.get(event.turnIndex) ?? null);
+              }
+              break;
+            }
+            case "reference.streamComplete":
+              // Stream complete — no additional action needed;
+              // accumulated text is already in referenceStreamingByTurnRef
               break;
             case "session.ended":
               send({ type: "END_SESSION" });
@@ -659,6 +682,13 @@ export function InterviewPage(): JSX.Element {
   // typed/transcribed answer text before the state machine resets the
   // turn fields. The XState machine doesn't carry per-turn history.
   const [pastRounds, setPastRounds] = useState<RecentRound[]>([]);
+
+  // M8.3 — per-turn accumulated streaming reference text.
+  // Kept in a ref (not state) to avoid re-render on every chunk;
+  // a separate state triggers React re-render only when the current turn's
+  // text changes (batched by the chunk handler below).
+  const referenceStreamingByTurnRef = useRef<Map<number, string>>(new Map());
+  const [currentTurnStreamingText, setCurrentTurnStreamingText] = useState<string | null>(null);
 
   // F-310: per-turn wall-clock start. Resets the moment the user enters
   // the answering state for a new turn (covers both voice and text
@@ -957,6 +987,7 @@ export function InterviewPage(): JSX.Element {
           <ReferencePanel
             reference={state.context.referenceAnswer}
             resetKey={state.context.currentTurnIndex}
+            streamingText={currentTurnStreamingText ?? undefined}
           />
         ) : null}
       </section>
