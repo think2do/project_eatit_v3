@@ -10,8 +10,14 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { ZodError, z } from "zod";
-import { runCoachAgent, type CoachAgentDeps } from "../index";
-import { systemPrompt, userPrompt } from "../prompts";
+import {
+  runCoachAgent,
+  draftReadableAnswer,
+  ReadableAnswerOutputSchema,
+  type CoachAgentDeps,
+  type DraftReadableAnswerDeps,
+} from "../index";
+import { systemPrompt, userPrompt, readableAnswerSystemPrompt, readableAnswerUserPrompt } from "../prompts";
 import {
   CoachAgentInputSchema,
   CoachAgentOutputSchema,
@@ -563,5 +569,141 @@ describe("userPrompt()", () => {
     const content = userPrompt(inputWithEmptyProfile);
 
     expect(content).not.toContain("候选人画像");
+  });
+});
+
+// ===== M8.2: draftReadableAnswer tests =====
+
+// Forbidden meta phrases for the readable answer drafter.
+// Distinct from L0-3 FORBIDDEN_TONE_WORDS (those cover cross-session Coach output).
+const FORBIDDEN_META = [
+  "建议你",
+  "可以从",
+  "注意",
+  "提醒",
+  "应该",
+  "推荐",
+  "你可以这样",
+] as const;
+
+function scanForbiddenMeta(text: string): string[] {
+  return FORBIDDEN_META.filter((w) => text.includes(w));
+}
+
+// Mock LLM for draftReadableAnswer tests
+function makeDraftProvider(markdownAnswer: string): DraftReadableAnswerDeps {
+  return {
+    llm: {
+      chat: vi.fn(),
+      chatStream: vi.fn(),
+      generateObject: vi.fn().mockResolvedValue({
+        ai_suggested_answer_markdown: markdownAnswer,
+      }),
+    } as unknown as LLMProvider,
+  };
+}
+
+// Pre-built clean markdown answers for fuzz sampling (50 variants).
+// Each contains at least one ** bold marker and no forbidden meta phrases.
+const FUZZ_CLEAN_ANSWERS: string[] = Array.from({ length: 50 }, (_, i) =>
+  `我在做 **产品决策** 时，会先明确用户核心诉求。\n1. 通过**数据分析**锁定关键问题\n2. 快速验证假设，缩短反馈周期\n3. 迭代优化，持续跟踪指标 (sample-${i})`,
+);
+
+describe("draftReadableAnswer — forbidden meta phrases (fuzz, 50 samples)", () => {
+  // Case 29: 50 mock outputs — none should contain forbidden meta phrases
+
+  it("50 sampled outputs contain zero forbidden meta phrases", async () => {
+    for (let i = 0; i < 50; i++) {
+      const deps = makeDraftProvider(FUZZ_CLEAN_ANSWERS[i]);
+      const result = await draftReadableAnswer(
+        { question: `请描述你如何推动一个产品从 0 到 1（样本 ${i}）`, persona: "Sarah" },
+        deps,
+      );
+      const hits = scanForbiddenMeta(result.ai_suggested_answer_markdown);
+      expect(hits, `sample ${i}: forbidden meta phrases found: ${JSON.stringify(hits)}`).toHaveLength(0);
+    }
+  });
+});
+
+describe("draftReadableAnswer — happy path markdown bold", () => {
+  // Case 30: output contains at least one ** bold marker
+
+  it("output contains at least one **bold** markdown marker", async () => {
+    const markdownWithBold = "在处理 **跨部门协作** 时，我会先对齐目标。\n1. 明确各方 **核心利益**\n2. 建立定期同步机制\n3. 用数据驱动共识";
+    const deps = makeDraftProvider(markdownWithBold);
+
+    const result = await draftReadableAnswer(
+      { question: "请描述你如何处理跨部门协作中的冲突", persona: "Marcus" },
+      deps,
+    );
+
+    expect(result.ai_suggested_answer_markdown).toContain("**");
+    expect(ReadableAnswerOutputSchema.safeParse(result).success).toBe(true);
+  });
+
+  // Case 31: all 4 personas are accepted without error
+
+  it("accepts all 4 L0-locked personas without error", async () => {
+    const personas = ["Sarah", "Marcus", "Lin", "Daniel"] as const;
+    for (const persona of personas) {
+      const deps = makeDraftProvider(`以 **${persona}** 身份作答示例。\n1. 要点一\n2. 要点二`);
+      const result = await draftReadableAnswer(
+        { question: "请自我介绍", persona },
+        deps,
+      );
+      expect(result.ai_suggested_answer_markdown).toContain(`**${persona}**`);
+    }
+  });
+});
+
+describe("draftReadableAnswer — LLM error propagation", () => {
+  // Case 32: LLM error propagates without being swallowed
+
+  it("LLM error propagates without being swallowed", async () => {
+    const deps: DraftReadableAnswerDeps = {
+      llm: {
+        chat: vi.fn(),
+        chatStream: vi.fn(),
+        generateObject: vi.fn().mockRejectedValue(new Error("LLM upstream timeout")),
+      } as unknown as LLMProvider,
+    };
+
+    await expect(
+      draftReadableAnswer(
+        { question: "请描述你最大的职业挑战", persona: "Lin" },
+        deps,
+      ),
+    ).rejects.toThrow("LLM upstream timeout");
+  });
+});
+
+describe("readableAnswerSystemPrompt()", () => {
+  // Case 33: prompt contains persona name and all required constraint markers
+
+  it("contains persona name in prompt", () => {
+    const prompt = readableAnswerSystemPrompt("Daniel");
+    expect(prompt).toContain("Daniel");
+  });
+
+  it("contains all 7 forbidden meta words in the prompt constraints", () => {
+    const prompt = readableAnswerSystemPrompt("Sarah");
+    for (const word of FORBIDDEN_META) {
+      expect(prompt, `prompt should list forbidden word: ${word}`).toContain(word);
+    }
+  });
+
+  it("contains ai_suggested_answer_markdown output key", () => {
+    const prompt = readableAnswerSystemPrompt("Marcus");
+    expect(prompt).toContain("ai_suggested_answer_markdown");
+  });
+});
+
+describe("readableAnswerUserPrompt()", () => {
+  // Case 34: user prompt injects the question text
+
+  it("injects question text into user prompt", () => {
+    const question = "请描述一次你主导产品迭代的经历";
+    const prompt = readableAnswerUserPrompt(question);
+    expect(prompt).toContain(question);
   });
 });

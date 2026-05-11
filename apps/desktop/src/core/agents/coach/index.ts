@@ -1,5 +1,6 @@
 // §C3: No process.env / getApiKey / keychain access here. LLM calls go through deps.llm only.
 
+import { z } from "zod";
 import {
   CoachAgentInputSchema,
   CoachAgentOutputSchema,
@@ -10,7 +11,14 @@ import {
 } from "@/core/schemas/coach";
 import { scanForbiddenTone, sanitizeTone } from "@/core/schemas/reports";
 import type { LLMProvider, Message } from "@/core/llm/types";
-import { systemPrompt, userPrompt } from "./prompts";
+import { getConfiguredModel } from "@/core/llm/configuredModel";
+import {
+  systemPrompt,
+  userPrompt,
+  readableAnswerSystemPrompt,
+  readableAnswerUserPrompt,
+  type ReadableAnswerPersona,
+} from "./prompts";
 
 // ===== Verbatim fallback strings (translated from Python coach/service.py line 52-58) =====
 
@@ -122,7 +130,7 @@ export async function runCoachAgent(
   const rawLLMOut = await deps.llm.generateObject({
     schema: _LLMCoachOutputSchema,
     messages,
-    model: "doubao-seed-1-6-250615",
+    model: await getConfiguredModel(),
   });
 
   const sanitized = sanitizeOutput(rawLLMOut, deps.logger);
@@ -136,4 +144,53 @@ export async function runCoachAgent(
     generated_at: new Date().toISOString(),
     status: "ok",
   });
+}
+
+// ===== M8.2: Readable Answer Drafter =====
+// Independent of runCoachAgent — a per-question first-person answer drafter.
+// M8.3 will add streamDraftReadableAnswer() streaming variant on top of this.
+
+/**
+ * ★ L0 §A11 ★: .strict() rejects ANY unknown field.
+ * Single field: ai_suggested_answer_markdown — the first-person readable markdown answer.
+ */
+export const ReadableAnswerOutputSchema = z
+  .object({
+    ai_suggested_answer_markdown: z.string(),
+  })
+  .strict();
+
+export type ReadableAnswerOutput = z.infer<typeof ReadableAnswerOutputSchema>;
+
+export interface DraftReadableAnswerDeps {
+  llm: LLMProvider;
+  logger?: Logger;
+}
+
+/**
+ * Draft a first-person, naturally spoken markdown answer for a single interview question.
+ *
+ * NOT the cross-session Coach aggregator (runCoachAgent / F-318).
+ * This function is for per-question answer generation — see M8.3 for the streaming variant.
+ *
+ * §A11 PII defense: output validated with .strict() — rejects unexpected fields.
+ * L0 persona lock: persona must be one of Sarah / Marcus / Lin / Daniel.
+ */
+export async function draftReadableAnswer(
+  args: { question: string; persona: ReadableAnswerPersona },
+  deps: DraftReadableAnswerDeps,
+): Promise<ReadableAnswerOutput> {
+  const messages: Message[] = [
+    { role: "system", content: readableAnswerSystemPrompt(args.persona) },
+    { role: "user", content: readableAnswerUserPrompt(args.question) },
+  ];
+
+  const rawOut = await deps.llm.generateObject({
+    schema: ReadableAnswerOutputSchema,
+    messages,
+    model: await getConfiguredModel(),
+  });
+
+  // ★ L0 §A11: parse with .strict() validates output shape ★
+  return ReadableAnswerOutputSchema.parse(rawOut);
 }

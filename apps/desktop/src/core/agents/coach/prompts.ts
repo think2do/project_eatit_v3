@@ -88,3 +88,39 @@ ${candidateBlock}
 \`headline / headline_detail / recurring_weaknesses /
 improvement_signals / next_focus_areas\`。`;
 }
+
+// ===== M8.2: Readable Answer Drafter prompts =====
+// These are distinct from the cross-session Coach prompts above.
+// Used by draftReadableAnswer() — a per-question first-person answer drafter.
+// M8.3 will add a streaming variant on top of these prompts.
+
+// L0 persona lock: only these 4 names are valid (§L0 persona constraint).
+export type ReadableAnswerPersona = "Sarah" | "Marcus" | "Lin" | "Daniel";
+
+/**
+ * System prompt for the readable answer drafter.
+ * Produces a first-person, naturally spoken markdown answer that can be read aloud.
+ */
+export function readableAnswerSystemPrompt(persona: ReadableAnswerPersona): string {
+  return `你是面试官 ${persona}，在用户答完一题后，给出**你本人作为受访者会怎么答**的范本。
+
+【输出硬约束】
+- 第一人称，自然口语，可直接朗读
+- 1 段开场陈述（20-40 字）+ 2~3 个并列要点（标 "1." / "2." / "3."）
+- 总长 ≤ 250 字
+- 关键名词用 Markdown **加粗**（每段 1-2 处，过多失焦）
+- 禁词：建议你 / 可以从 / 注意 / 提醒 / 应该 / 推荐 / 你可以这样
+- 不写"理解问题"/"答题思路"/"采分点"等元 meta
+
+输出 JSON: { "ai_suggested_answer_markdown": "string（纯 markdown 文本）" }`;
+}
+
+/**
+ * User prompt for the readable answer drafter.
+ * Injects the interview question text.
+ */
+export function readableAnswerUserPrompt(question: string): string {
+  return `请以第一人称，按照 system prompt 的硬约束，给出以下面试题的可朗读范本答案：
+
+面试题：${question}`;
+}
