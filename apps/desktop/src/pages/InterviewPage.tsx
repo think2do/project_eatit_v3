@@ -11,8 +11,13 @@ import {
 import { speakInterviewerLine, stopInterviewerLine } from "@/lib/tts";
 import { useGlobalKeymap } from "@/lib/useGlobalKeymap";
 import { EndConfirmDialog } from "@/components/EndConfirmDialog";
-import { getSession } from "@/api/sessions";
-import { getParseResult } from "@/api/assets";
+import { showToast } from "@/components/Toast";
+import { useSessionStatusStore } from "@/stores/sessionStatus-store";
+import { getSession, getSessionList, finalizeSession } from "@/api/sessions";
+import { getCandidateAssetMeta, getParseResult } from "@/api/assets";
+import type { InterviewSessionStatus } from "@eatit/shared-types";
+import { hasASRCredentials } from "@/lib/asr/credentials";
+import { deriveJobTitle } from "@/lib/jobTitle";
 import {
   runInterviewSession,
   createAsyncQueue,
@@ -184,20 +189,8 @@ export function InterviewPage(): JSX.Element {
     };
   }, []);
 
-  // Speak each new interviewer line once, keyed by turn_index so a stale
-  // re-render of the same question doesn't replay. `stopInterviewerLine`
-  // on cleanup handles navigation away / component unmount / user starting
-  // to record (handleVoiceStart calls it explicitly too, belt-and-braces).
   const currentQuestionText = state.context.currentQuestion?.question;
   const currentTurnIndex = state.context.currentQuestion?.turn_index;
-  useEffect(() => {
-    if (!ttsEnabled) return;
-    if (!currentQuestionText) return;
-    speakInterviewerLine(currentQuestionText);
-    return () => {
-      stopInterviewerLine();
-    };
-  }, [ttsEnabled, currentQuestionText, currentTurnIndex]);
 
   // M3.4.1.dev — init VolcStreamAsr controller once on mount; abort on unmount.
   useEffect(() => {
@@ -211,7 +204,7 @@ export function InterviewPage(): JSX.Element {
   }, []);
 
   // Pre-warm the OS mic permission as soon as the page mounts, so the
-  // first "按住说话" click doesn't sit on a TCC prompt mid-answer.
+  // first "开始录音" click doesn't sit on a TCC prompt mid-answer.
   // Failures are silent: the user will see the actionable banner the
   // moment they try to record. We also reuse the resulting stream to
   // skip a second getUserMedia call inside handleVoiceStart.
@@ -366,7 +359,7 @@ export function InterviewPage(): JSX.Element {
               send({
                 type: "SERVER_REFERENCE",
                 payload: {
-                  turn_index: localTurnIndex - 1,
+                  turn_index: event.turnIndex,
                   answer_outline: event.payload.answer_outline,
                   ideal_answer: event.payload.ideal_answer,
                   key_evaluation_points: event.payload.key_evaluation_points,
@@ -399,11 +392,9 @@ export function InterviewPage(): JSX.Element {
     };
   }, [sessionId, sessionInitialContext, send, setConnectivity]);
 
-  useEffect(() => {
-    if (state.matches("ended") && sessionId) {
-      navigate(`/report/${sessionId}`, { replace: true });
-    }
-  }, [state, sessionId, navigate]);
+  // M8.1: state.ended no longer auto-navigates to /report.
+  // handleEndSession fires finalizeSession in the background and
+  // navigates directly to "/" so the user isn't blocked.
 
   const submitAnswer = useCallback((text: string, turnIndex: number) => {
     inputQueueRef.current?.push({ type: "answer.submitted", text, turnIndex });
@@ -420,6 +411,21 @@ export function InterviewPage(): JSX.Element {
     // mixed with the playback through the mic feedback loop.
     stopInterviewerLine();
     setVoiceError(null);
+
+    // Pre-flight: ASR credentials must exist before we even open the mic.
+    // Without this check the user would see AUDIO_START flicker briefly
+    // before WS_ERROR rolls isRecording back — a "click and immediately
+    // stops" experience that hides the actionable next step (go to
+    // Settings → ASR BYOK and fill in App ID + Access Token).
+    const asrConfigured = await hasASRCredentials();
+    if (!asrConfigured) {
+      setVoiceError({
+        kind: "other",
+        message:
+          "未配置火山引擎 ASR 凭证。请前往「设置 → ASR · 火山引擎语音识别凭证」填写 App ID + Access Token 后再试。",
+      });
+      return;
+    }
 
     let stream = micStreamRef.current;
     if (!stream) {
@@ -604,27 +610,26 @@ export function InterviewPage(): JSX.Element {
           primaryDirection,
           directions: directionsList,
         });
-        // Chain a parse-result fetch so the strip can show
-        // "{company} · {role}" exactly like design-reference. 404 here
-        // is fine (parse not run yet, or stale id) — we keep the
-        // placeholder.
+        // Chain parse-result + asset-meta fetches so the strip can show
+        // "{company} · {role}" — falling back to the JD filename when the
+        // LLM parse didn't surface either field. Both 404s are non-fatal:
+        // we keep the candidate-id placeholder.
         if (!detail.candidate_asset_id) return;
-        getParseResult(detail.candidate_asset_id)
-          .then((parse) => {
-            if (cancelled) return;
-            const company = parse.payload.jd_company_name?.trim() ?? "";
-            const role = parse.payload.jd_role_title?.trim() ?? "";
-            const composed =
-              company && role
-                ? `${company} · ${role}`
-                : role || company || null;
-            if (composed) {
-              setSessionMeta((prev) => ({ ...prev, jobTitle: composed }));
-            }
-          })
-          .catch(() => {
-            /* parse missing — keep the placeholder */
+        const assetId = detail.candidate_asset_id;
+        Promise.all([
+          getParseResult(assetId).catch(() => null),
+          getCandidateAssetMeta(assetId).catch(() => null),
+        ]).then(([parse, meta]) => {
+          if (cancelled) return;
+          const composed = deriveJobTitle({
+            company: parse?.payload.jd_company_name,
+            role: parse?.payload.jd_role_title,
+            jdFileName: meta?.jdFilename,
           });
+          if (composed) {
+            setSessionMeta((prev) => ({ ...prev, jobTitle: composed }));
+          }
+        });
       })
       .catch(() => {
         /* keep placeholder values; non-fatal */
@@ -676,17 +681,47 @@ export function InterviewPage(): JSX.Element {
   // 确认结束 button is what actually fires session.end.
   const [endConfirmOpen, setEndConfirmOpen] = useState(false);
 
+  // Speak each new interviewer line once, keyed by turn_index so a stale
+  // re-render of the same question doesn't replay. Lives below sessionMeta
+  // declaration — referencing sessionMeta.style above it hits TDZ.
+  useEffect(() => {
+    if (!ttsEnabled) return;
+    if (!currentQuestionText) return;
+    void speakInterviewerLine(currentQuestionText, sessionMeta.style);
+    return () => {
+      stopInterviewerLine();
+    };
+  }, [ttsEnabled, currentQuestionText, currentTurnIndex, sessionMeta.style]);
+
   const handleReplay = useCallback(() => {
     if (!ttsEnabled) return;
     if (!currentQuestionText) return;
-    speakInterviewerLine(currentQuestionText);
-  }, [ttsEnabled, currentQuestionText]);
+    void speakInterviewerLine(currentQuestionText, sessionMeta.style);
+  }, [ttsEnabled, currentQuestionText, sessionMeta.style]);
+
+  const markAnalyzing = useSessionStatusStore((s) => s.markAnalyzing);
+  const markReady = useSessionStatusStore((s) => s.markReady);
 
   const handleEndSession = useCallback(() => {
     setEndConfirmOpen(false);
+    const sid = sessionId!;
+    markAnalyzing(sid);
+    void finalizeSession(sid).then((result) => {
+      if (result.status === "ready") {
+        markReady(sid);
+        showToast("上一轮面试分析完成", {
+          actionLabel: "查看",
+          onAction: () => navigate(`/report/${sid}`),
+        });
+      } else {
+        showToast("分析生成失败,请稍后在面试记录中重试", { tone: "error" });
+      }
+    });
+    showToast("上一轮面试分析生成中…");
     endSession();
     send({ type: "END_SESSION" });
-  }, [endSession, send]);
+    navigate("/");
+  }, [sessionId, markAnalyzing, markReady, endSession, send, navigate]);
 
   // Suspend the keymap once the session has wrapped — pressing Esc on a
   // navigated-away page would otherwise reopen the dialog.
@@ -715,11 +750,7 @@ export function InterviewPage(): JSX.Element {
   }, [state]);
 
   if (!sessionId) {
-    return (
-      <Center>
-        <p style={{ color: "var(--ink-500)" }}>缺少 session_id,请从「面试配置」开始。</p>
-      </Center>
-    );
+    return <NoSessionPlaceholder />;
   }
 
   const isUserAnswering = state.matches("user_answering");
@@ -748,8 +779,9 @@ export function InterviewPage(): JSX.Element {
         />
         {/* 暂停: stops the active recording (no-op when not recording).
             design-reference/page-live.jsx places this between REC and
-            结束面试. For hold-to-talk mode the button mostly acts as a
-            quick-release affordance; in text mode it simply disables. */}
+            结束面试. With the click-to-toggle voice button this is a
+            redundant secondary stop affordance; in text mode it simply
+            disables. */}
         <button
           type="button"
           className="btn btn-sm"
@@ -863,7 +895,7 @@ export function InterviewPage(): JSX.Element {
                   aria-label="重听问题"
                   onClick={() => {
                     if (state.context.currentQuestion?.question) {
-                      speakInterviewerLine(state.context.currentQuestion.question);
+                      void speakInterviewerLine(state.context.currentQuestion.question, sessionMeta.style);
                     }
                   }}
                   style={{ padding: "4px 8px" }}
@@ -969,7 +1001,7 @@ export function InterviewPage(): JSX.Element {
                 ? "正在录音 · 实时转写中"
                 : isUserAnswering
                   ? inputMode === "voice"
-                    ? "按下「按住说话」开始"
+                    ? "点击「开始录音」开始,再次点击停止"
                     : "在下方输入你的回答"
                   : "等待问题加载"}
             </div>
@@ -1358,6 +1390,116 @@ function Center({ children }: { children: React.ReactNode }): JSX.Element {
       }}
     >
       {children}
+    </div>
+  );
+}
+
+// Statuses that mean the interview is unfinished and can be resumed.
+// Statuses NOT in this list (ended / exited_early / report_generating /
+// report_ready / failed) are terminal and shouldn't show a "继续" CTA.
+const RESUMABLE_STATUSES: ReadonlySet<InterviewSessionStatus> = new Set<InterviewSessionStatus>([
+  "created",
+  "session_started",
+  "turn_recording",
+  "turn_transcribing",
+  "turn_evaluating",
+  "turn_compressing",
+  "next_question_ready",
+  "paused",
+]);
+
+function NoSessionPlaceholder(): JSX.Element {
+  const navigate = useNavigate();
+  const [resumableId, setResumableId] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const list = await getSessionList({ page: 1, page_size: 5 });
+        if (cancelled) return;
+        // Only consider THE most recent session — if it's resumable AND was
+        // created within the last hour, offer to continue. Otherwise treat
+        // as "no active session" (older bootstrap_failed / abandoned attempts
+        // are dead, surfacing them is user-hostile).
+        const newest = [...list.items].sort((a, b) =>
+          b.created_at.localeCompare(a.created_at),
+        )[0];
+        const ONE_HOUR_MS = 60 * 60 * 1000;
+        const ageMs = newest ? Date.now() - new Date(newest.created_at).getTime() : Infinity;
+        if (newest && RESUMABLE_STATUSES.has(newest.status) && ageMs <= ONE_HOUR_MS) {
+          setResumableId(newest.id);
+        } else {
+          setResumableId(null);
+        }
+      } catch {
+        /* soft-fail: just show no-resume state */
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <div
+      style={{
+        minHeight: 480,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 18,
+      }}
+    >
+      <img
+        src="/no-session.png"
+        alt=""
+        width={200}
+        height={200}
+        style={{ opacity: 0.85 }}
+      />
+      {!loaded ? (
+        <p style={{ color: "var(--ink-400)", fontSize: 13 }}>加载中...</p>
+      ) : resumableId ? (
+        <>
+          <p style={{ color: "var(--ink-700)", fontSize: 14, margin: 0 }}>
+            上一场面试还没结束,要继续吗?
+          </p>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              type="button"
+              className="btn btn-brand"
+              onClick={() => navigate(`/interview/${resumableId}`)}
+            >
+              继续上一场面试
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => navigate("/config")}
+            >
+              开新面试
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p style={{ color: "var(--ink-500)", fontSize: 14, margin: 0 }}>
+            还没有进行中的面试,先去「面试配置」开一场。
+          </p>
+          <button
+            type="button"
+            className="btn btn-brand"
+            onClick={() => navigate("/config")}
+          >
+            去面试配置
+          </button>
+        </>
+      )}
     </div>
   );
 }

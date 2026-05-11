@@ -5,10 +5,8 @@ import {
   Mic,
   Settings,
   Sliders,
-  TrendingUp,
 } from "lucide-react";
-
-import { SidebarQuotaCard } from "@/components/SidebarQuotaCard";
+import { useSessionStatusStore } from "@/stores/sessionStatus-store";
 
 const FLOW = [
   { to: "/upload", label: "上传与解析", Icon: FileText },
@@ -18,11 +16,11 @@ const FLOW = [
 
 const DATA = [
   { to: "/history", label: "面试记录", Icon: History },
-  { to: "/report", label: "评估报告", Icon: FileText },
-  { to: "/meta-reports", label: "综合分析", Icon: TrendingUp },
 ];
 
 export function Sidebar(): JSX.Element {
+  const unreadCount = useSessionStatusStore((s) => s.unreadReports.size);
+
   return (
     <aside
       style={{
@@ -46,7 +44,13 @@ export function Sidebar(): JSX.Element {
 
       <NavLabel>我的数据</NavLabel>
       {DATA.map((n) => (
-        <NavItem key={n.to} to={n.to} label={n.label} Icon={n.Icon} />
+        <NavItem
+          key={n.to}
+          to={n.to}
+          label={n.label}
+          Icon={n.Icon}
+          badge={n.to === "/history" ? unreadCount : 0}
+        />
       ))}
 
       <SidebarFooter />
@@ -120,10 +124,12 @@ function NavItem({
   to,
   label,
   Icon,
+  badge = 0,
 }: {
   to: string;
   label: string;
   Icon: React.ComponentType<{ size?: number }>;
+  badge?: number;
 }): JSX.Element {
   return (
     <NavLink
@@ -143,14 +149,29 @@ function NavItem({
         transition: "background 120ms ease",
       })}
     >
-      {({ isActive }) => (
+      {({ isActive: _isActive }) => (
         <>
-          <Icon
-            size={16}
-            // lucide icons are styled via CSS currentColor/stroke
-          />
-          <span>{label}</span>
-          {isActive ? null : null}
+          <Icon size={16} />
+          <span style={{ flex: 1 }}>{label}</span>
+          {badge > 0 ? (
+            <span
+              data-testid="nav-unread-badge"
+              style={{
+                minWidth: 16,
+                height: 16,
+                padding: "0 4px",
+                borderRadius: "var(--r-pill)",
+                background: "var(--brand)",
+                color: "white",
+                fontSize: 10,
+                fontWeight: 600,
+                lineHeight: "16px",
+                textAlign: "center",
+              }}
+            >
+              {badge > 99 ? "99+" : badge}
+            </span>
+          ) : null}
         </>
       )}
     </NavLink>
@@ -185,7 +206,6 @@ function SidebarFooter(): JSX.Element {
         <Settings size={16} />
         <span>设置</span>
       </NavLink>
-      <SidebarQuotaCard />
       <div
         style={{
           display: "inline-flex",

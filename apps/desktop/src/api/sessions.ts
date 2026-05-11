@@ -314,6 +314,21 @@ export const generateReport = async (
     { llm },
   );
 
+  // Post-fill round_reviews_v2[].raw_answer from interview_turns.answer_text.
+  // LLM is instructed to emit "" so we can authoritatively inject the verbatim user
+  // utterance — LLM token-copy of long answers is unreliable for the "原始回答" UI block.
+  if (reportOutput.round_reviews_v2 && reportOutput.round_reviews_v2.length > 0) {
+    const turnByIndex = new Map<number, string>();
+    turnRows.forEach((row) => {
+      const idx = row.turn_index as number;
+      turnByIndex.set(idx, (row.answer_text as string | null) ?? "");
+    });
+    reportOutput.round_reviews_v2 = reportOutput.round_reviews_v2.map((rr) => ({
+      ...rr,
+      raw_answer: turnByIndex.get(rr.turn_index) ?? rr.raw_answer ?? "",
+    }));
+  }
+
   // 6) Upsert interview_reports via ON CONFLICT(session_id) DO UPDATE.
   const generatedAt = new Date().toISOString();
   await db.exec(
@@ -361,6 +376,24 @@ export const generateReport = async (
     status: "ready",
     requested_at: requestedAt,
   };
+};
+
+/**
+ * Combines endSession + generateReport into a single async operation.
+ * Designed to be called fire-and-forget from InterviewPage:
+ *   void finalizeSession(sid).then(() => { ... })
+ * Returns "ready" on success, "failed" on any error (caller decides how to notify).
+ */
+export const finalizeSession = async (
+  sessionId: string,
+): Promise<{ session_id: string; status: "ready" | "failed" }> => {
+  try {
+    await endSession(sessionId);
+    await generateReport(sessionId);
+    return { session_id: sessionId, status: "ready" };
+  } catch {
+    return { session_id: sessionId, status: "failed" };
+  }
 };
 
 // §A0.4: read-only path; no secret bind values.

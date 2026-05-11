@@ -9,6 +9,8 @@ export interface Toast {
   message?: string;
   requestId?: string;
   ttlMs: number;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 interface ToastStore {
@@ -45,6 +47,8 @@ export const useToastStore = create<ToastStore>((set, get) => ({
       message: toast.message,
       requestId: toast.requestId,
       ttlMs,
+      actionLabel: toast.actionLabel,
+      onAction: toast.onAction,
     };
     set((state) => ({ toasts: [...state.toasts, entry] }));
     if (ttlMs > 0 && typeof window !== "undefined") {

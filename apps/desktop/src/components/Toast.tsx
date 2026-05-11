@@ -1,6 +1,28 @@
 import { X } from "lucide-react";
 import type { Toast as ToastEntry, ToastTone } from "@/stores/toast-store";
-import { useToastStore } from "@/stores/toast-store";
+import { useToastStore, pushToast } from "@/stores/toast-store";
+
+/**
+ * Fire-and-forget helper. Call from any non-React context (api/, agents/)
+ * to surface a notification in the bottom-right rail.
+ */
+export function showToast(
+  message: string,
+  opts?: {
+    actionLabel?: string;
+    onAction?: () => void;
+    durationMs?: number;
+    tone?: ToastTone;
+  },
+): void {
+  pushToast({
+    title: message,
+    tone: opts?.tone ?? "info",
+    ttlMs: opts?.durationMs ?? (opts?.actionLabel ? 0 : 5000),
+    actionLabel: opts?.actionLabel,
+    onAction: opts?.onAction,
+  });
+}
 
 /**
  * Bottom-right toast rail. Renders `useToastStore.toasts` as a stack.
@@ -71,6 +93,29 @@ function ToastCard({
           >
             request_id: {toast.requestId}
           </div>
+        ) : null}
+        {toast.actionLabel ? (
+          <button
+            type="button"
+            onClick={() => {
+              toast.onAction?.();
+              onClose();
+            }}
+            style={{
+              alignSelf: "flex-start",
+              marginTop: 4,
+              padding: "3px 10px",
+              borderRadius: "var(--r-sm)",
+              border: `1px solid ${palette.border}`,
+              background: "transparent",
+              color: palette.ink,
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: "pointer",
+            }}
+          >
+            {toast.actionLabel}
+          </button>
         ) : null}
       </div>
       <button

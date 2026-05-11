@@ -1,25 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Printer } from "lucide-react";
-import type {
-  InterviewDirectionV32,
-  InterviewDurationV32,
-  InterviewReportResponse,
-  InterviewStyleV32,
-} from "@eatit/shared-types";
+import type { InterviewReportResponse } from "@eatit/shared-types";
 import { generateReport, getSessionReport } from "@/api/sessions";
-import { DarkActionCard } from "@/pages/report/DarkActionCard";
-import { DimensionRow } from "@/pages/report/DimensionRow";
+import { useSessionStatusStore } from "@/stores/sessionStatus-store";
 import { HeroScoreCard } from "@/pages/report/HeroScoreCard";
+import { DimensionsSummaryCard } from "@/pages/report/DimensionsSummaryCard";
 import { QuestionReview } from "@/pages/report/QuestionReview";
-import { ReasonRow } from "@/pages/report/ReasonRow";
-import { ReflectionView } from "@/pages/report/ReflectionView";
-import { SegmentTabs, type SegmentTab } from "@/pages/report/SegmentTabs";
 import { TipsCarousel } from "@/components/TipsCarousel";
 import { selectTips } from "@/lib/tips";
-import { useAppStore } from "@/stores/app-store";
-// Side-effect stylesheet: adds @media print rules that hide chrome
-// and paginate ReasonRow entries cleanly. See print.css for details.
+// Side-effect stylesheet: adds @media print rules that hide chrome.
 import "@/pages/report/print.css";
 
 type ReportState =
@@ -28,19 +18,6 @@ type ReportState =
   | { kind: "ready"; data: InterviewReportResponse }
   | { kind: "error"; message: string };
 
-// F-322 V32.M3.2.3 — top-level segment tab on the ready state. The
-// "评估" view is the existing v3.2 report content; "复盘" pulls in the
-// teaching-tone Reflection via Bridge → DatabaseService.
-type ReportTab = "evaluation" | "reflection";
-
-const REPORT_TABS: SegmentTab<ReportTab>[] = [
-  { value: "evaluation", label: "评估报告" },
-  { value: "reflection", label: "详细复盘" },
-];
-
-const POLL_INTERVAL_MS = 1500;
-const POLL_TIMEOUT_MS = 120_000;
-
 function extractError(err: unknown): string {
   return err instanceof Error ? err.message : "请求失败";
 }
@@ -48,31 +25,40 @@ function extractError(err: unknown): string {
 export function ReportPage(): JSX.Element {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const setPresetConfig = useAppStore((s) => s.setPresetConfig);
   const [state, setState] = useState<ReportState>({ kind: "loading" });
-  const [activeTab, setActiveTab] = useState<ReportTab>("evaluation");
   const reportTips = useMemo(() => selectTips("report_generating", 0), []);
+  const markRead = useSessionStatusStore((s) => s.markRead);
+
+  // M8.1: clear the sidebar unread badge when the user arrives on this page.
+  useEffect(() => {
+    if (sessionId) markRead(sessionId);
+  }, [sessionId, markRead]);
 
   useEffect(() => {
     if (!sessionId) return;
     let cancelled = false;
-    const started = Date.now();
 
-    async function ensureAndPoll() {
+    // v3.4: generateReport is synchronous — it awaits the LLM call inline
+    // and writes the report row before returning.  The legacy v3.3 polling
+    // loop had a 120s budget that *included* the LLM wait, which produced
+    // a misleading "报告生成超时" while the report was still in flight —
+    // especially with thinking models like doubao-seed-1-8 that routinely
+    // take 60-90s per call.  The bound on wait time now lives at Swift-side
+    // URLSession.timeoutIntervalForRequest (180s, see
+    // LLMGateway.makeProductionSession); JS just awaits.
+    async function ensureAndLoad() {
       setState({ kind: "loading" });
-      // First attempt: fetch existing report. If it succeeds, render it.
-      // Any error means the report has not been generated yet — fall through
-      // unconditionally to generateReport.
-      // (v3.3 axios path discriminated 404 vs 409; v3.4 has no HTTP status —
-      //  fall through unconditionally.)
+
+      // Existing report already in DB? Render and bail.
       try {
         const existing = await getSessionReport(sessionId!);
-        if (cancelled) return;
-        setState({ kind: "ready", data: existing });
+        if (!cancelled) setState({ kind: "ready", data: existing });
         return;
       } catch {
-        // v3.4: any error here means "report not yet generated" — fall through to generateReport.
+        // No row yet — fall through to generateReport.
       }
+
+      setState({ kind: "generating" });
 
       try {
         await generateReport(sessionId!);
@@ -80,30 +66,17 @@ export function ReportPage(): JSX.Element {
         if (!cancelled) setState({ kind: "error", message: extractError(err) });
         return;
       }
-
       if (cancelled) return;
-      setState({ kind: "generating" });
 
-      while (!cancelled) {
-        if (Date.now() - started > POLL_TIMEOUT_MS) {
-          setState({ kind: "error", message: "报告生成超时,请稍后重试。" });
-          return;
-        }
-        try {
-          const response = await getSessionReport(sessionId!);
-          if (cancelled) return;
-          setState({ kind: "ready", data: response });
-          return;
-        } catch (err) {
-          // v3.4: generateReport is synchronous; polling loop should not normally hit a transient error.
-          // Any error here is treated as terminal.
-          if (!cancelled) setState({ kind: "error", message: extractError(err) });
-          return;
-        }
+      try {
+        const response = await getSessionReport(sessionId!);
+        if (!cancelled) setState({ kind: "ready", data: response });
+      } catch (err) {
+        if (!cancelled) setState({ kind: "error", message: extractError(err) });
       }
     }
 
-    void ensureAndPoll();
+    void ensureAndLoad();
 
     return () => {
       cancelled = true;
@@ -249,70 +222,37 @@ export function ReportPage(): JSX.Element {
         </button>
       </div>
 
-      <div className="report-page__print-hide">
-        <SegmentTabs
-          tabs={REPORT_TABS}
-          active={activeTab}
-          onChange={setActiveTab}
-          ariaLabel="评估报告 / 详细复盘"
+      <section
+        className="ds-card"
+        style={{
+          padding: 22,
+          display: "flex",
+          flexDirection: "column",
+          gap: 18,
+        }}
+      >
+        <HeroScoreCard
+          overallScore={payload.overall_score ?? null}
+          passLikelihood={payload.pass_likelihood ?? null}
+          rightSlot={
+            payload.dimensions && payload.dimensions.length > 0 ? (
+              <DimensionsSummaryCard dimensions={payload.dimensions} />
+            ) : undefined
+          }
         />
-      </div>
-
-      {activeTab === "reflection" ? (
-        <ReflectionView sessionId={sessionId} />
-      ) : null}
-
-      {activeTab === "evaluation" ? (
-        <section
-          className="ds-card"
+        <div
           style={{
-            padding: 22,
-            display: "flex",
-            flexDirection: "column",
-            gap: 18,
+            fontSize: 14,
+            lineHeight: 1.7,
+            color: "var(--ink-900)",
           }}
         >
-          <HeroScoreCard
-            overallScore={payload.overall_score ?? null}
-            passLikelihood={payload.pass_likelihood ?? null}
-          />
-          <div
-            style={{
-              fontSize: 14,
-              lineHeight: 1.7,
-              color: "var(--ink-900)",
-            }}
-          >
-            {payload.overall_summary}
-          </div>
-        </section>
-      ) : null}
+          {payload.overall_summary}
+        </div>
+      </section>
 
-      {/* F-312 维度分析卡 (M1.3). 严格 5 项 (post-normalize) 或空 (v3.1
-          legacy report);非空时整段渲染,空时整段隐藏避免 v3.1 报告
-          崩溃。M3.2.3 后这些块只在 evaluation tab 下渲染。 */}
-      {activeTab === "evaluation" && payload.dimensions && payload.dimensions.length > 0 ? (
-        <section className="card card-pad">
-          <div className="eyebrow" style={{ marginBottom: 10 }}>
-            维度分析
-          </div>
-          <div>
-            {payload.dimensions.map((d) => (
-              <DimensionRow
-                key={d.name}
-                name={d.name}
-                description={d.description}
-                score={d.score}
-                evidenceChips={d.evidence_chips}
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {/* F-313 逐题复盘卡 (M1.3). v3.1 legacy report → round_reviews_v2
-          为空,整段隐藏。第一题默认展开,其余折叠。 */}
-      {activeTab === "evaluation" && payload.round_reviews_v2 && payload.round_reviews_v2.length > 0 ? (
+      {/* 逐题复盘 — 4 字段:问题 / 原始回答 / AI 建议回答 / AI 总结及建议 */}
+      {payload.round_reviews_v2 && payload.round_reviews_v2.length > 0 ? (
         <section className="card">
           <div
             className="eyebrow"
@@ -329,7 +269,8 @@ export function ReportPage(): JSX.Element {
                 questionText={r.question_text}
                 score={r.score}
                 tone={r.tone}
-                answerSummary={r.answer_summary}
+                rawAnswer={r.raw_answer ?? ""}
+                aiSuggestedAnswer={r.ai_suggested_answer ?? ""}
                 aiFeedback={r.ai_feedback}
                 defaultExpanded={idx === 0}
               />
@@ -337,98 +278,6 @@ export function ReportPage(): JSX.Element {
           </div>
         </section>
       ) : null}
-
-      {activeTab === "evaluation" && payload.reasons.length > 0 ? (
-        <section>
-          <div
-            className="eyebrow"
-            style={{ marginBottom: 10 }}
-          >
-            证据绑定的维度评价
-          </div>
-          <ul
-            style={{
-              listStyle: "none",
-              padding: 0,
-              margin: 0,
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-            }}
-          >
-            {payload.reasons.map((reason, idx) => (
-              <ReasonRow
-                key={`${reason.aspect}-${idx}`}
-                reason={reason}
-              />
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {activeTab === "evaluation" && payload.next_actions.length > 0 ? (
-        <section
-          className="ds-card"
-          style={{ padding: 20, display: "flex", flexDirection: "column", gap: 10 }}
-        >
-          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "var(--ink-900)" }}>
-            下一场面试前可以做的事
-          </h2>
-          <ol
-            style={{
-              margin: 0,
-              paddingLeft: 20,
-              display: "flex",
-              flexDirection: "column",
-              gap: 6,
-              color: "var(--ink-700)",
-              fontSize: 13.5,
-              lineHeight: 1.6,
-            }}
-          >
-            {payload.next_actions.map((action, idx) => (
-              <li key={`${action}-${idx}`}>{action}</li>
-            ))}
-          </ol>
-        </section>
-      ) : null}
-
-      {activeTab === "evaluation" && payload.next_actions_v2
-        ? (() => {
-            // F-317 V32.M1.5 — preset-driven 专项训练 dark CTA. Hidden
-            // when backend's derive_preset_config returned null (every
-            // dimension ≥ 80, or v3.1 legacy report with no dimensions).
-            const next = payload.next_actions_v2;
-            // Backend's `derive_preset_config` always emits v3.2-palette
-            // strings, but the shared `InterviewConfigRequest` type
-            // unions them with the legacy v3.1 enum values for L0
-            // back-compat. Cast through `unknown` so the prefill matches
-            // the desktop store's stricter v3.2-only shape.
-            const apply = () => {
-              setPresetConfig({
-                style: next.preset_config.style as InterviewStyleV32,
-                directions:
-                  next.preset_config.directions as InterviewDirectionV32[],
-                durationMinutes:
-                  next.preset_config.duration_minutes as InterviewDurationV32,
-              });
-            };
-            return (
-              <DarkActionCard
-                headline={next.headline}
-                reason={next.reason}
-                onPrimaryClick={() => {
-                  apply();
-                  navigate("/config");
-                }}
-                onSecondaryClick={() => {
-                  apply();
-                  navigate("/config");
-                }}
-              />
-            );
-          })()
-        : null}
     </div>
   );
 }
