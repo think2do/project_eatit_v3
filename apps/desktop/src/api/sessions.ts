@@ -23,6 +23,7 @@ import { runFrameworkAgent } from "@/core/agents/framework";
 import { runReportAgent } from "@/core/agents/report";
 import { buildPostReportGraph } from "@/core/graphs/postReportGraph";
 import { llm } from "@/core/llm";
+import { registerSessionPrefetch } from "@/core/sessions/QuestionQueue";
 
 // §A0.4 §A11 §B9: createSession runs FrameworkAgent inline and writes 2 rows in a single tx.
 export const createSession = async (
@@ -101,6 +102,18 @@ export const createSession = async (
       params: [fwId, sessionId, JSON.stringify(directionFramework), now, now],
     },
   ]);
+
+  // Fire-and-forget prefetch: Q0/Q1/Q2 start generating while the user transitions
+  // from ConfigPage to InterviewPage. By the time InterviewPage mounts and calls
+  // runInterviewSession, Q0 is typically already ready → < 200ms first-question display.
+  // §A0.4: llm singleton — no api_key in JS; Bridge reads from Swift Keychain.
+  registerSessionPrefetch({
+    sessionId,
+    totalTurns: Math.ceil(totalMinutes * 0.4) + 2,
+    llm,
+    frameworkJson: JSON.stringify(fwOutput),
+    durationMinutes: totalMinutes,
+  });
 
   return {
     session_id: sessionId,

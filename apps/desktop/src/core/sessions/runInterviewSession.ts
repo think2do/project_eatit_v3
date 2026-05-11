@@ -13,12 +13,16 @@
 
 import { llm } from "@/core/llm";
 import { db } from "@/services/db";
-import { runInterviewerAgent } from "@/core/agents/interviewer";
 import { runObserverAgent } from "@/core/agents/observer";
 import { runReferenceAgent } from "@/core/agents/reference";
 import { streamDraftReadableAnswer } from "@/core/agents/coach";
 import { buildTurnGraph } from "@/core/graphs/turnGraph";
 import { buildPostReportGraph } from "@/core/graphs/postReportGraph";
+import {
+  getSessionQueue,
+  registerSessionPrefetch,
+  releaseSession,
+} from "@/core/sessions/QuestionQueue";
 import type { InterviewerAgentOutput, TurnAssessment, TurnRecord } from "@/core/schemas/turns";
 import type { ObserverAgentOutput } from "@/core/schemas/turns";
 import type { ReferenceAgentOutput } from "@/core/schemas/turns";
@@ -252,20 +256,27 @@ export async function* runInterviewSession(
     let turnIndex = 0;
     let previousSummary: string | null = null;
 
-    // 1) Bootstrap: first question — no prior turn available yet
+    // 1) Bootstrap: first question from prefetch pipeline.
+    //    getSessionQueue returns the queue registered in createSession (ConfigPage path).
+    //    Falls back to a new queue with prefetch for test path / late arrivals.
+    const queue =
+      getSessionQueue(input.sessionId) ??
+      registerSessionPrefetch({
+        sessionId: input.sessionId,
+        totalTurns: Math.ceil(input.durationMinutes * 0.4) + 2,
+        llm,
+        frameworkJson: input.frameworkJson,
+        durationMinutes: input.durationMinutes,
+      });
+
     try {
-      const bootstrap = await runInterviewerAgent(
-        {
-          framework_json: input.frameworkJson,
-          recent_turns: [],
-          remaining_minutes: input.durationMinutes,
-        },
-        { llm },
-      );
+      const bootstrap = await queue.next(0);
       lastQuestion = bootstrap.question;
       events.push({ type: "question.generated", payload: bootstrap });
       startReference(lastQuestion, turnIndex);
       startStreamingDraft(lastQuestion, turnIndex);
+      // Eagerly schedule N+LOOKAHEAD after consuming Q0
+      queue.scheduleNext(0, []);
     } catch (err) {
       events.push({
         type: "error",
@@ -283,6 +294,8 @@ export async function* runInterviewSession(
           ctrl.abort();
         }
         draftAbortControllers.clear();
+        // Release prefetch queue from module registry to free memory
+        releaseSession(input.sessionId);
         void buildPostReportGraph({ llm })
           .invoke({
             user_id: "local",
@@ -401,17 +414,35 @@ export async function* runInterviewSession(
           /* soft-fail */
         }
 
-        // Next question (turn_graph already computed it in the next_question node)
-        if (result.next_question_out) {
-          lastQuestion = result.next_question_out.question;
-          turnIndex += 1;
-          events.push({
-            type: "question.generated",
-            payload: result.next_question_out,
-          });
+        // L0 #13 NOTE: next_question node in turnGraph still executes (node-name lock preserved).
+        // Its output (result.next_question_out) is intentionally discarded here — questions
+        // now come from the prefetch pipeline (QuestionQueue) to eliminate per-turn LLM wait.
+        // This matches the "concurrency implemented OUTSIDE LangGraph" pattern from M8.3.
+        turnIndex += 1;
+        try {
+          const nextOut = await queue.next(turnIndex);
+          lastQuestion = nextOut.question;
+          events.push({ type: "question.generated", payload: nextOut });
           startReference(lastQuestion, turnIndex);
           // M8.3: startStreamingDraft cancels any prior-turn draft before starting new one
           startStreamingDraft(lastQuestion, turnIndex);
+          // Schedule N+LOOKAHEAD using the accumulated turn history
+          queue.scheduleNext(turnIndex, turns);
+        } catch (nextErr) {
+          // Fallback: if pipeline broken (e.g. prefetch failed), use turnGraph result
+          if (result.next_question_out) {
+            lastQuestion = result.next_question_out.question;
+            events.push({ type: "question.generated", payload: result.next_question_out });
+            startReference(lastQuestion, turnIndex);
+            startStreamingDraft(lastQuestion, turnIndex);
+          } else {
+            events.push({
+              type: "error",
+              payload: { code: "next_question_failed", message: errorMessage(nextErr) },
+            });
+            events.close();
+            return;
+          }
         }
       } catch (err) {
         events.push({

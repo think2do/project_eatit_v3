@@ -125,6 +125,11 @@ export function userPrompt(
   input: InterviewerAgentInput,
   predictedQuestions: PredictedQuestion[],
 ): string {
+  // M8.6: open-question hint for Q1/Q2 (no prior turns context)
+  const openingHint =
+    input.recent_turns.length === 0
+      ? "\n\n这是面试的开场题，请提一个开放性问题，不要假设候选人已经回答过任何具体内容。"
+      : "";
   const predictedSection =
     predictedQuestions.length > 0
       ? `\n=== 预测题库(F-321,优先采用其中与当前方向匹配的题)===\n本场已有 FrameworkAgent 产出的预测题。**当且仅当**满足以下条件,优先从中挑选:\n\n- 候选人前一轮回答没有打开新的深挖路径\n- 当前剩余时间充裕\n- 题目与当前 direction / focus_competencies 一致\n\n否则按已有的对话节奏自然出题,不要为了用预测题而打断深挖。\n\n${predictedQuestions.map((q) => `- [${q.category}] ${q.question} (why: ${q.why_likely})`).join("\n")}\n`
@@ -148,7 +153,7 @@ export function userPrompt(
       ? `\n=== 剩余时间 ===\n约 ${input.remaining_minutes} 分钟`
       : "";
 
-  return `请基于以下状态,决定下一个面试问题。
+  return `请基于以下状态,决定下一个面试问题。${openingHint}
 
 === 面试方向框架(JSON) ===
 ${input.framework_json}
