@@ -1,14 +1,16 @@
 /**
- * F-313 V32.M1.3 — QuestionReview (collapsible per-question card).
+ * QuestionReview — M8.4 simplified layout.
  *
- * Renders one row of the report's "逐题复盘" card. Default-collapsed
- * with a chevron toggle; the first question can be passed
- * `defaultExpanded={true}` so the user lands on the most recent answer
- * already open. Tone tags drive the icon colour without affecting the
- * numeric score.
+ * Each round is rendered as:
+ *   1. question-line (Q{n} + tag + tone + score)
+ *   2. ai-answer-main: persona 这样回答 + AI answer text (primary content)
+ *   3. raw-answer-fold: <details> wrapping the user's original answer
+ *      (collapsed by default)
+ *
+ * Rendering note: M8.5 will introduce <MarkdownStream /> for the AI answer.
+ * Until then we use whiteSpace: "pre-wrap" plain text.
+ * TODO M8.5: swap in <MarkdownStream text={aiAnswer} />
  */
-import { useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
 import type { RoundReviewTone } from "@eatit/shared-types";
 
 interface QuestionReviewProps {
@@ -17,9 +19,13 @@ interface QuestionReviewProps {
   questionText: string;
   score: number;
   tone: RoundReviewTone;
-  answerSummary: string;
+  rawAnswer: string;
+  aiSuggestedAnswer: string;
+  /** M8.2 field — preferred when non-empty; falls back to aiSuggestedAnswer. */
+  aiSuggestedAnswerMarkdown?: string;
   aiFeedback: string;
-  defaultExpanded?: boolean;
+  /** Name of the interviewer persona (e.g. "Sarah"). */
+  personaName: string;
 }
 
 const TONE_LABELS: Record<RoundReviewTone, string> = {
@@ -35,114 +41,159 @@ const TONE_TAG_CLASS: Record<RoundReviewTone, string> = {
 };
 
 export function QuestionReview(props: QuestionReviewProps): JSX.Element {
-  const [expanded, setExpanded] = useState(props.defaultExpanded ?? false);
-  const colorVar =
+  const scoreColor =
     props.score >= 80
       ? "var(--brand)"
       : props.score >= 65
         ? "var(--ink-700)"
         : "var(--warn)";
 
+  // Prefer the markdown field (M8.2+); fall back to the legacy plain-text field.
+  const aiAnswer =
+    (props.aiSuggestedAnswerMarkdown ?? "").trim() ||
+    (props.aiSuggestedAnswer ?? "") ||
+    "";
+
+  const rawAnswer = (props.rawAnswer ?? "").trim();
+
   return (
-    <div style={{ borderBottom: "1px solid var(--line)" }}>
-      <button
-        className="row between"
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
+    <section
+      className="round-review"
+      style={{
+        borderBottom: "1px solid var(--line)",
+        padding: "20px 24px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+      }}
+    >
+      {/* question-line */}
+      <div className="question-line" style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+        <span className="mono muted" style={{ fontSize: 12, minWidth: 20, paddingTop: 2 }}>
+          Q{props.index}
+        </span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink-900)", lineHeight: 1.5 }}>
+            {props.questionText}
+          </div>
+          <div className="row" style={{ gap: 6, marginTop: 6 }}>
+            <span className="tag tag-line" style={{ fontSize: 10.5 }}>
+              {props.questionTag}
+            </span>
+            <span className={TONE_TAG_CLASS[props.tone]} style={{ fontSize: 10.5 }}>
+              {TONE_LABELS[props.tone]}
+            </span>
+          </div>
+        </div>
+        <span
+          className="mono"
+          style={{
+            fontSize: 15,
+            fontWeight: 700,
+            color: scoreColor,
+            minWidth: 26,
+            textAlign: "right",
+            flexShrink: 0,
+          }}
+        >
+          {props.score}
+        </span>
+      </div>
+
+      {/* ai-answer-main — primary content block */}
+      <div
+        className="ai-answer-main"
         style={{
-          width: "100%",
-          padding: "16px 24px",
-          cursor: "pointer",
-          background: "transparent",
-          border: "none",
-          textAlign: "left",
+          padding: 16,
+          borderRadius: "var(--r-md)",
+          background: "var(--brand-softer)",
+          border: "1px solid var(--line)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
         }}
       >
-        <div className="row" style={{ gap: 14 }}>
-          <span
-            className="mono muted"
-            style={{ fontSize: 12, minWidth: 20 }}
-          >
-            Q{props.index}
-          </span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink-900)" }}>
-              {props.questionText}
-            </div>
-            <div
-              className="row"
-              style={{ gap: 6, marginTop: 4 }}
-            >
-              <span className="tag tag-line" style={{ fontSize: 10.5 }}>
-                {props.questionTag}
-              </span>
-              <span
-                className={TONE_TAG_CLASS[props.tone]}
-                style={{ fontSize: 10.5 }}
-              >
-                {TONE_LABELS[props.tone]}
-              </span>
-            </div>
-          </div>
+        <h3
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: "var(--brand)",
+            margin: 0,
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+          }}
+        >
+          {props.personaName} 这样回答
+        </h3>
+        {/* TODO M8.5: swap in <MarkdownStream text={aiAnswer} /> */}
+        <div
+          style={{
+            fontSize: 13.5,
+            lineHeight: 1.8,
+            color: aiAnswer.length > 0 ? "var(--ink-900)" : "var(--ink-400)",
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {aiAnswer.length > 0 ? aiAnswer : "（暂无范例答）"}
         </div>
-        <div className="row" style={{ gap: 10 }}>
-          <span
-            className="mono"
-            style={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: colorVar,
-              minWidth: 26,
-              textAlign: "right",
-            }}
-          >
-            {props.score}
-          </span>
-          {expanded ? (
-            <ChevronDown size={16} color="var(--ink-500)" />
-          ) : (
-            <ChevronRight size={16} color="var(--ink-500)" />
-          )}
-        </div>
-      </button>
 
-      {expanded ? (
-        <div style={{ padding: "0 24px 20px 58px", display: "flex", flexDirection: "column", gap: 10 }}>
+        {props.aiFeedback.trim().length > 0 && (
           <div
             style={{
-              padding: 14,
-              borderRadius: "var(--r-md)",
-              background: "var(--bg-warm)",
-              border: "1px solid var(--line)",
+              marginTop: 4,
+              paddingTop: 10,
+              borderTop: "1px solid var(--line)",
+              fontSize: 12.5,
+              color: "var(--ink-700)",
+              lineHeight: 1.7,
+              whiteSpace: "pre-wrap",
             }}
           >
-            <div className="muted" style={{ fontSize: 11.5, marginBottom: 6 }}>
-              你的回答 · 摘要
-            </div>
-            <div style={{ fontSize: 13, color: "var(--ink-900)", lineHeight: 1.6 }}>
-              {props.answerSummary}
-            </div>
+            <span className="muted" style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+              AI 总结及建议
+            </span>
+            {props.aiFeedback}
           </div>
-          <div
-            style={{
-              padding: 14,
-              borderRadius: "var(--r-md)",
-              background:
-                props.tone === "warn"
-                  ? "var(--warn-softer)"
-                  : "var(--brand-softer)",
-              border: "1px solid var(--line)",
-            }}
-          >
-            <div className="muted" style={{ fontSize: 11.5, marginBottom: 6 }}>
-              AI 反馈
-            </div>
-            <div style={{ fontSize: 13, color: "var(--ink-900)", lineHeight: 1.6 }}>
-              {props.aiFeedback}
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </div>
+        )}
+      </div>
+
+      {/* raw-answer-fold — collapsed by default */}
+      <details
+        className="raw-answer-fold"
+        style={{ fontSize: 13, color: "var(--ink-700)" }}
+      >
+        <summary
+          style={{
+            cursor: "pointer",
+            fontSize: 12,
+            color: "var(--ink-500)",
+            userSelect: "none",
+            listStyle: "none",
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
+          我的原始作答
+        </summary>
+        <pre
+          style={{
+            marginTop: 10,
+            padding: 14,
+            borderRadius: "var(--r-md)",
+            background: "var(--bg-warm)",
+            border: "1px solid var(--line)",
+            fontSize: 12.5,
+            color: rawAnswer.length > 0 ? "var(--ink-900)" : "var(--ink-400)",
+            lineHeight: 1.7,
+            whiteSpace: "pre-wrap",
+            fontFamily: "inherit",
+            margin: "10px 0 0",
+          }}
+        >
+          {rawAnswer.length > 0 ? rawAnswer : "（无作答记录）"}
+        </pre>
+      </details>
+    </section>
   );
 }

@@ -1,16 +1,32 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Printer } from "lucide-react";
-import type { InterviewReportResponse } from "@eatit/shared-types";
-import { generateReport, getSessionReport } from "@/api/sessions";
+import type { InterviewReportResponse } from "@/core/schemas/reports";
+import { generateReport, getSession, getSessionReport } from "@/api/sessions";
 import { useSessionStatusStore } from "@/stores/sessionStatus-store";
 import { HeroScoreCard } from "@/pages/report/HeroScoreCard";
-import { DimensionsSummaryCard } from "@/pages/report/DimensionsSummaryCard";
 import { QuestionReview } from "@/pages/report/QuestionReview";
+import { DimensionSidebar } from "@/pages/report/DimensionSidebar";
 import { TipsCarousel } from "@/components/TipsCarousel";
 import { selectTips } from "@/lib/tips";
 // Side-effect stylesheet: adds @media print rules that hide chrome.
 import "@/pages/report/print.css";
+
+// F-308 personas — mirrors InterviewPage.tsx PERSONA_NAME_BY_STYLE.
+// Kept local to avoid circular imports across page modules.
+const PERSONA_NAME_BY_STYLE: Record<string, string> = {
+  structured: "Sarah",
+  pressure: "Marcus",
+  friendly: "Lin",
+  expert: "Daniel",
+  // legacy v3.1 style aliases
+  friendly_guided: "Lin",
+  standard_professional: "Sarah",
+  high_pressure_followup: "Marcus",
+};
+
+// Breakpoint at which the sidebar collapses into single-column flow.
+const SIDEBAR_BREAKPOINT_PX = 1100;
 
 type ReportState =
   | { kind: "loading" }
@@ -26,6 +42,10 @@ export function ReportPage(): JSX.Element {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const [state, setState] = useState<ReportState>({ kind: "loading" });
+  const [personaName, setPersonaName] = useState<string>("Sarah");
+  const [wideLayout, setWideLayout] = useState(
+    typeof window !== "undefined" ? window.innerWidth >= SIDEBAR_BREAKPOINT_PX : true,
+  );
   const reportTips = useMemo(() => selectTips("report_generating", 0), []);
   const markRead = useSessionStatusStore((s) => s.markRead);
 
@@ -34,16 +54,25 @@ export function ReportPage(): JSX.Element {
     if (sessionId) markRead(sessionId);
   }, [sessionId, markRead]);
 
+  // Responsive: track viewport width so sidebar collapses below 1100 px.
+  useEffect(() => {
+    function onResize() {
+      setWideLayout(window.innerWidth >= SIDEBAR_BREAKPOINT_PX);
+    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   useEffect(() => {
     if (!sessionId) return;
     let cancelled = false;
 
     // v3.4: generateReport is synchronous — it awaits the LLM call inline
-    // and writes the report row before returning.  The legacy v3.3 polling
+    // and writes the report row before returning. The legacy v3.3 polling
     // loop had a 120s budget that *included* the LLM wait, which produced
     // a misleading "报告生成超时" while the report was still in flight —
     // especially with thinking models like doubao-seed-1-8 that routinely
-    // take 60-90s per call.  The bound on wait time now lives at Swift-side
+    // take 60-90s per call. The bound on wait time now lives at Swift-side
     // URLSession.timeoutIntervalForRequest (180s, see
     // LLMGateway.makeProductionSession); JS just awaits.
     async function ensureAndLoad() {
@@ -51,7 +80,7 @@ export function ReportPage(): JSX.Element {
 
       // Existing report already in DB? Render and bail.
       try {
-        const existing = await getSessionReport(sessionId!);
+        const existing = await getSessionReport(sessionId!) as InterviewReportResponse;
         if (!cancelled) setState({ kind: "ready", data: existing });
         return;
       } catch {
@@ -69,7 +98,7 @@ export function ReportPage(): JSX.Element {
       if (cancelled) return;
 
       try {
-        const response = await getSessionReport(sessionId!);
+        const response = await getSessionReport(sessionId!) as InterviewReportResponse;
         if (!cancelled) setState({ kind: "ready", data: response });
       } catch (err) {
         if (!cancelled) setState({ kind: "error", message: extractError(err) });
@@ -78,6 +107,25 @@ export function ReportPage(): JSX.Element {
 
     void ensureAndLoad();
 
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
+
+  // Fetch session to derive persona name from config_snapshot.style.
+  // Non-blocking: if the fetch fails we fall back to "Sarah" (default style).
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+    getSession(sessionId)
+      .then((session) => {
+        if (cancelled) return;
+        const style = (session.config_snapshot?.style as string | undefined) ?? "structured";
+        setPersonaName(PERSONA_NAME_BY_STYLE[style] ?? "Sarah");
+      })
+      .catch(() => {
+        // Session fetch failure is non-fatal — keep default "Sarah".
+      });
     return () => {
       cancelled = true;
     };
@@ -185,6 +233,8 @@ export function ReportPage(): JSX.Element {
     }
   };
 
+  const hasDimensions = payload.dimensions && payload.dimensions.length > 0;
+
   return (
     <div
       className="report-page"
@@ -222,6 +272,7 @@ export function ReportPage(): JSX.Element {
         </button>
       </div>
 
+      {/* Hero summary card — overall score + pass likelihood */}
       <section
         className="ds-card"
         style={{
@@ -234,11 +285,6 @@ export function ReportPage(): JSX.Element {
         <HeroScoreCard
           overallScore={payload.overall_score ?? null}
           passLikelihood={payload.pass_likelihood ?? null}
-          rightSlot={
-            payload.dimensions && payload.dimensions.length > 0 ? (
-              <DimensionsSummaryCard dimensions={payload.dimensions} />
-            ) : undefined
-          }
         />
         <div
           style={{
@@ -251,33 +297,68 @@ export function ReportPage(): JSX.Element {
         </div>
       </section>
 
-      {/* 逐题复盘 — 4 字段:问题 / 原始回答 / AI 建议回答 / AI 总结及建议 */}
-      {payload.round_reviews_v2 && payload.round_reviews_v2.length > 0 ? (
-        <section className="card">
-          <div
-            className="eyebrow"
-            style={{ padding: "16px 24px 0", marginBottom: 0 }}
+      {/* report-layout: main rounds + dimension sidebar */}
+      <div
+        className="report-layout"
+        style={
+          wideLayout
+            ? {
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) 280px",
+                gap: 20,
+                alignItems: "start",
+              }
+            : {
+                display: "flex",
+                flexDirection: "column",
+                gap: 20,
+              }
+        }
+      >
+        {/* main: per-round question reviews */}
+        <main className="rounds">
+          {payload.round_reviews_v2 && payload.round_reviews_v2.length > 0 ? (
+            <section className="card">
+              <div
+                className="eyebrow"
+                style={{ padding: "16px 24px 0", marginBottom: 0 }}
+              >
+                逐题复盘
+              </div>
+              <div>
+                {payload.round_reviews_v2.map((r, idx) => (
+                  <QuestionReview
+                    key={r.turn_index}
+                    index={idx + 1}
+                    questionTag={r.question_tag}
+                    questionText={r.question_text}
+                    score={r.score}
+                    tone={r.tone}
+                    rawAnswer={r.raw_answer ?? ""}
+                    aiSuggestedAnswer={r.ai_suggested_answer ?? ""}
+                    aiSuggestedAnswerMarkdown={r.ai_suggested_answer_markdown ?? ""}
+                    aiFeedback={r.ai_feedback}
+                    personaName={personaName}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </main>
+
+        {/* aside: dimension sidebar — hidden when no dimensions or when printing */}
+        {hasDimensions ? (
+          <aside
+            className="dimension-sidebar report-page__print-hide"
+            style={{ minWidth: 0 }}
           >
-            逐题复盘
-          </div>
-          <div>
-            {payload.round_reviews_v2.map((r, idx) => (
-              <QuestionReview
-                key={r.turn_index}
-                index={idx + 1}
-                questionTag={r.question_tag}
-                questionText={r.question_text}
-                score={r.score}
-                tone={r.tone}
-                rawAnswer={r.raw_answer ?? ""}
-                aiSuggestedAnswer={r.ai_suggested_answer ?? ""}
-                aiFeedback={r.ai_feedback}
-                defaultExpanded={idx === 0}
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
+            <DimensionSidebar
+              dimensions={payload.dimensions}
+              overallScore={payload.overall_score ?? null}
+            />
+          </aside>
+        ) : null}
+      </div>
     </div>
   );
 }
