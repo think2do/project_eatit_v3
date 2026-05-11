@@ -150,7 +150,7 @@ Match the section prefix(`V34.M*.*`)to 当前 spec 文件即可。
 > **优先级硬性约束**:M8 全部 [x] 之前**不要碰 M6.5**(2026-05-12 用户当面盲测后定的口径:体验不稳就不上架)。
 > Ralph 按 top-down 第一个未勾消费,本里程碑 6 节点放在 M6.5 之前确保先做 M8。
 
-- [ ] M8.1 面试结束跳主页 + Toast + 后台分析(developer)— InterviewPage.handleEndSession 改 fire-and-forget,新增 sessionStatus-store + Toast 组件 + Sidebar unread badge。Acceptance:点结束 < 200ms 跳主页,后台完成弹 toast。详 spec `## M8.1`
+- [x] M8.1 面试结束跳主页 + Toast + 后台分析(developer)— InterviewPage.handleEndSession 改 fire-and-forget,新增 sessionStatus-store + Toast 组件 + Sidebar unread badge。Acceptance:点结束 < 200ms 跳主页,后台完成弹 toast。详 spec `## M8.1` (55aa2449, 2026-05-12)
 - [ ] M8.2 Coach prompt 重写为纯可朗读答案 + Markdown(developer,**Parallel-safe**)— 删"建议你/可以从/注意"等元话,锁定输出为第一人称可朗读答案 + `**加粗**` 关键词,fuzz test 禁词 0 命中。详 spec `## M8.2`
 - [ ] M8.3 参考答案题目一出立即并发生成 + 切题取消(developer,Deps: M8.2)— turn_graph 加 `reference_drafter` 并发节点,问题 ready 后 < 500ms 流式渲染到 ReferencePanel;切下一题用 AbortController 中断未完流。详 spec `## M8.3`
 - [ ] M8.4 ReportPage 简化(纯 AI 答案 + 折叠原始作答 + 维度侧栏)(developer,**Parallel-safe**)— 主体改 AI-answer-first,原始作答放 `<details>` 折叠,5 维评分挪侧栏。详 spec `## M8.4`
