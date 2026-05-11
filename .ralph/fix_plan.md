@@ -153,7 +153,7 @@ Match the section prefix(`V34.M*.*`)to 当前 spec 文件即可。
 - [x] M8.1 面试结束跳主页 + Toast + 后台分析(developer)— InterviewPage.handleEndSession 改 fire-and-forget,新增 sessionStatus-store + Toast 组件 + Sidebar unread badge。Acceptance:点结束 < 200ms 跳主页,后台完成弹 toast。详 spec `## M8.1` (55aa2449, 2026-05-12)
 - [x] M8.2 Coach prompt 重写为纯可朗读答案 + Markdown(developer,**Parallel-safe**)— 删"建议你/可以从/注意"等元话,锁定输出为第一人称可朗读答案 + `**加粗**` 关键词,fuzz test 禁词 0 命中。详 spec `## M8.2` (b9d43062, 2026-05-12)
 - [x] M8.3 参考答案题目一出立即并发生成 + 切题取消(developer,Deps: M8.2)— turn_graph 加 `reference_drafter` 并发节点,问题 ready 后 < 500ms 流式渲染到 ReferencePanel;切下一题用 AbortController 中断未完流。详 spec `## M8.3` (7662a13b, 2026-05-12; concurrency implemented OUTSIDE LangGraph to preserve L0 #13 node-name lock — see bd7267f5+7662a13b)
-- [ ] M8.4 ReportPage 简化(纯 AI 答案 + 折叠原始作答 + 维度侧栏)(developer,**Parallel-safe**)— 主体改 AI-answer-first,原始作答放 `<details>` 折叠,5 维评分挪侧栏。详 spec `## M8.4`
+- [x] M8.4 ReportPage 简化(纯 AI 答案 + 折叠原始作答 + 维度侧栏)(developer,**Parallel-safe**)— 主体改 AI-answer-first,原始作答放 `<details>` 折叠,5 维评分挪侧栏。详 spec `## M8.4` (79da7ecc, 2026-05-12)
 - [ ] M8.5 流式 Markdown 加粗实时渲染(developer,Deps: M8.2)— 新增 MarkdownStream 组件,只解析 `**bold**`,token 边界不闪烁;ReferencePanel + ReportPage 两处接入。详 spec `## M8.5`
 - [ ] M8.6 题目预加载流水线(Q3 看 Q1, Q4 看 Q2+Q3 滑窗)(developer,Deps: M8.3)— 新增 QuestionQueue 抽象,ConfigPage 创建 session 后立即并发 Q1/Q2/Q3 prefetch,每答完一题预热 N+3;第 3 轮起 context 滚动用紧邻前 2 轮。详 spec `## M8.6`
 
