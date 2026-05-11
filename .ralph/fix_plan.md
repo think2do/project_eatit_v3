@@ -144,7 +144,20 @@ Match the section prefix(`V34.M*.*`)to 当前 spec 文件即可。
 - [x] **M6.X tester + product-manager 双审**(tester+product-manager)— 单 loop 内并行 dispatch 2 个 subagents,合并产出 `.ralph/logs/M6.X-dual-audit.md`(326 LOC)。**Tester 段**(scope:技术 + sandbox + entitlements + privacy manifest + 回归):**10/10 PASS**,0 🔴,3 🟡(spec doc 用 -workspace 但实际只 .xcodeproj / Verify Embedded Binary Team ID 缺 outputs / Swift test files 含生产 host URL 但不打包不构成合规风险)。tsc clean / vitest 1730/1730 / xcodebuild BUILD SUCCEEDED / entitlements 4 项白名单无红线 / PrivacyInfo plutil OK / TS source 0 outbound host 命中。**PM 段**(scope:metadata/privacy/review-notes/captions vs 产品行为一致):**7.5/10 BLOCKED**,**2 🔴 阻塞 M6.5**:① 5 张 PNG 截图缺失(Apple ASC 必填) ② zh metadata Description "AI 同步抓取联网情报" 措辞与代码默认值矛盾(联网检索 default-off opt-in,en 版正确写"optional");5 🟡(zh subtitle 自检字符数误差 1 / DashScope URL zh-en 不一致 / privacy-policy ASR Provider 措辞 vs 实际 Volcengine 锁定 / Privacy Policy URL placeholder 待 deploy / review-notes "Tap" → "Click")。**Combined verdict 8.5/10 BLOCKED**(PM 2 🔴 dominate)。**Ralph 5.4 自动加 audit-fix 节点**:见下面 M6.X.audit-fix.a + .b。(8a4d_pending, 2026-05-05)
     - [ ] **M6.X.audit-fix.a** 拍 5 张 PNG screenshots(developer Helper)— 按 SHOOT_GUIDE.md 完整拍摄流程:build → seed demo data → screencapture → sips 1280×800 → commit `chore(v34): add app store screenshots (captured)`。前提:M5.3 baseline build 可运行。估 1-2 小时工时。**🔴 阻塞 M6.5 — 必须在 archive 前完成**。**★ BLOCKED-ON-HUMAN-OPERATOR**:agent 无 macOS GUI 能力(screencapture / sips / 路由导航 / demo data 手动 seed),需用户在物理 Mac 上完成拍摄后将 PNG drop 进 `apps/macos/AppStore/screenshots/` 并 commit。Loop 跳过此节点继续推进非阻塞节点;拍摄完成后,人工把此行 `[ ]` 改 `[x]` + commit hash 即可
     - [x] **M6.X.audit-fix.b** zh metadata 联网检索措辞 + 5 项 minor 文案修正(product-manager)— 6 修复:① **🔴 已清** metadata.zh.md Description 「核心能力」第 1 条 "AI 同步抓取联网情报" → "AI **可选**联网情报检索(默认关闭)" 与 en 版 "optional" 1:1 对齐,清 Apple Review feature-mismatch 拒审风险 ② zh metadata Subtitle 自检字符数 12→13(实测)③ zh metadata DEPLOYER NOTE 加 "以 ASC 验证为准" 注 ④ privacy-policy.en.md DashScope URL 统一 `bailian.console.aliyun.com`(原 `aliyun.com/product/bailian`)⑤ privacy-policy §4.2 zh+en ASR Provider 措辞锁定 Volcengine SAUC 并加 forward-looking "may be configurable" 注 ⑥ review-notes.md DEMO STEPS "Tap" → "Click" 6 处(replace_all,macOS UI 用语)。**Acceptance**(7 grep gates 全绿):AI **可选**联网检索 1 / Subtitle 13|30 1 / Volcengine SAUC zh 1 / Volcengine SAUC en 2 / bailian.console.aliyun.com en 1 / Tap " review-notes 0 / Click " review-notes 6 / forbidden tone words 0。M6.X PM 段 5 🟡 + 1 🔴 全部清完;M6.5 阻塞仅剩 .a screenshots。(94fcc39, 2026-05-05)
-- [ ] M6.5 第一次 Archive + 上传 App Store Connect(developer)— `archive-and-upload.sh`
+### M8 — v3.4 上架前 UX 优化(1 周,6 节点) — ★ 排在 M6.5 之前 ★
+
+> spec: [`.ralph/specs/v34-ux-improvements-sections.md`](specs/v34-ux-improvements-sections.md)
+> **优先级硬性约束**:M8 全部 [x] 之前**不要碰 M6.5**(2026-05-12 用户当面盲测后定的口径:体验不稳就不上架)。
+> Ralph 按 top-down 第一个未勾消费,本里程碑 6 节点放在 M6.5 之前确保先做 M8。
+
+- [ ] M8.1 面试结束跳主页 + Toast + 后台分析(developer)— InterviewPage.handleEndSession 改 fire-and-forget,新增 sessionStatus-store + Toast 组件 + Sidebar unread badge。Acceptance:点结束 < 200ms 跳主页,后台完成弹 toast。详 spec `## M8.1`
+- [ ] M8.2 Coach prompt 重写为纯可朗读答案 + Markdown(developer,**Parallel-safe**)— 删"建议你/可以从/注意"等元话,锁定输出为第一人称可朗读答案 + `**加粗**` 关键词,fuzz test 禁词 0 命中。详 spec `## M8.2`
+- [ ] M8.3 参考答案题目一出立即并发生成 + 切题取消(developer,Deps: M8.2)— turn_graph 加 `reference_drafter` 并发节点,问题 ready 后 < 500ms 流式渲染到 ReferencePanel;切下一题用 AbortController 中断未完流。详 spec `## M8.3`
+- [ ] M8.4 ReportPage 简化(纯 AI 答案 + 折叠原始作答 + 维度侧栏)(developer,**Parallel-safe**)— 主体改 AI-answer-first,原始作答放 `<details>` 折叠,5 维评分挪侧栏。详 spec `## M8.4`
+- [ ] M8.5 流式 Markdown 加粗实时渲染(developer,Deps: M8.2)— 新增 MarkdownStream 组件,只解析 `**bold**`,token 边界不闪烁;ReferencePanel + ReportPage 两处接入。详 spec `## M8.5`
+- [ ] M8.6 题目预加载流水线(Q3 看 Q1, Q4 看 Q2+Q3 滑窗)(developer,Deps: M8.3)— 新增 QuestionQueue 抽象,ConfigPage 创建 session 后立即并发 Q1/Q2/Q3 prefetch,每答完一题预热 N+3;第 3 轮起 context 滚动用紧邻前 2 轮。详 spec `## M8.6`
+
+- [ ] M6.5 第一次 Archive + 上传 App Store Connect(developer,**Deps: M8.1~M8.6 全部 [x]**)— `archive-and-upload.sh`
 
 ### M7 — Review 处理 + 上架(反应式,1+ 节点)
 
