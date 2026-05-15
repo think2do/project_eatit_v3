@@ -157,7 +157,19 @@ Match the section prefix(`V34.M*.*`)to 当前 spec 文件即可。
 - [x] M8.5 流式 Markdown 加粗实时渲染(developer,Deps: M8.2)— 新增 MarkdownStream 组件,只解析 `**bold**`,token 边界不闪烁;ReferencePanel + ReportPage 两处接入。详 spec `## M8.5` (26989be7+8e35c033, 2026-05-12; 16 unit tests, tsc clean)
 - [x] M8.6 题目预加载流水线(Q3 看 Q1, Q4 看 Q2+Q3 滑窗)(developer,Deps: M8.3)— 新增 QuestionQueue 抽象,createSession 内 fire Q0/Q1/Q2 prefetch,每答完一题预热 N+3;第 3 轮起 context 用紧邻前 2 轮。turnGraph next_question 节点保留(L0 #13),输出在新 pipeline 下被丢弃。详 spec `## M8.6` (877fabba, 2026-05-12; 12 contract tests, turnGraph 25 tests 无回归)
 
-- [ ] M6.5 第一次 Archive + 上传 App Store Connect(developer,**Deps: M8.1~M8.6 全部 [x]**)— `archive-and-upload.sh`
+### M9 — 演示反馈 UX 优化(1-1.5 天,4 节点) — ★ 排在 M6.5 之前 ★
+
+> spec: [`.ralph/specs/v34-ux-round2-sections.md`](specs/v34-ux-round2-sections.md)
+> **来源**:2026-05-15 内部演示会议(`会议记录/05-15 内部会议_ AI面试系统开发与优化.txt`)
+> **优先级**:M9.1~M9.4 全部 [x] 之前**不要碰 M6.5**(体验不稳就不上架)
+> Ralph 按 top-down 第一个未勾消费,本里程碑 4 节点放在 M6.5 之前确保先做 M9
+
+- [ ] M9.1 答题中冻结参考答案 ★ 致命 bug ★(developer,**Parallel-safe**)— 老板原话"回答的过程不允许改变状态"。用户开始打字/录音(进 user_answering 状态)后,右侧 reference 面板冻结,后续 stream chunk 不再覆盖。state machine `SERVER_REFERENCE` action 加 user_answering guard;InterviewPage 用 frozenTurnIndex 拦截。详 spec `## M9.1`
+- [ ] M9.2 前两题静态预热(零 LLM 延迟)(developer,**Parallel-safe**)— 老板原话"开场介绍和项目介绍这两个问题必问。这两条做提前的预热缓存"。新增 staticOpeningQuestions.ts(4 persona × 2 题 = 8 个预设),QuestionQueue.gen 对 idx ∈ {0,1} 短路不调 LLM。详 spec `## M9.2`
+- [ ] M9.3 结束态卡片正中央放大(developer,**Parallel-safe**)— 老板原话"在面试结束后的那个状态,把它给放在正中间,稍微大一点"。新增 `AnalyzingHeroCard`(560px 宽居中,标题 20px,带 spinner)挂在 HomePage 顶部;隐藏重复的右下角 toast。详 spec `## M9.3`
+- [ ] M9.4 History list 加生成中状态(developer,**Parallel-safe**)— 老板原话"在 list 里面去加一个生成缓存中的一个状态"。HistoryPage list item 渲染时检查 sessionStatus-store.analyzing,是则显示 `生成中` chip + spinner;`unreadReports` 则显示 `新` chip。详 spec `## M9.4`
+
+- [ ] M6.5 第一次 Archive + 上传 App Store Connect(developer,**Deps: M8.1~M8.6 + M9.1~M9.4 全部 [x]**)— `archive-and-upload.sh`
 
 ### M7 — Review 处理 + 上架(反应式,1+ 节点)
 
