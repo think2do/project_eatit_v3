@@ -15,6 +15,8 @@ export function showToast(
     tone?: ToastTone;
   },
 ): void {
+  // M9.3: HeroCard 已在 HomePage 顶部承担"分析生成中"提示,避免 toast 重复
+  if (message.includes("分析生成中")) return;
   pushToast({
     title: message,
     tone: opts?.tone ?? "info",

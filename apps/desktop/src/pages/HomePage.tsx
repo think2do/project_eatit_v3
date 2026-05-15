@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
+import { AnalyzingHeroCard } from "@/pages/home/AnalyzingHeroCard";
 
 export function HomePage(): JSX.Element {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <AnalyzingHeroCard />
       <div>
         <div className="eyebrow">01 · 首页</div>
         <h1
