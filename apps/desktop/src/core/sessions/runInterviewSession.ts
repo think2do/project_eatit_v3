@@ -304,6 +304,7 @@ export async function* runInterviewSession(
         llm,
         frameworkJson: input.frameworkJson,
         durationMinutes: input.durationMinutes,
+        persona: input.personaName,
       });
 
     try {

@@ -24,6 +24,7 @@ import { runReportAgent } from "@/core/agents/report";
 import { buildPostReportGraph } from "@/core/graphs/postReportGraph";
 import { llm } from "@/core/llm";
 import { registerSessionPrefetch } from "@/core/sessions/QuestionQueue";
+import { personaFromStyle } from "@/core/agents/coach/personaFromStyle";
 
 // §A0.4 §A11 §B9: createSession runs FrameworkAgent inline and writes 2 rows in a single tx.
 export const createSession = async (
@@ -113,6 +114,7 @@ export const createSession = async (
     llm,
     frameworkJson: JSON.stringify(fwOutput),
     durationMinutes: totalMinutes,
+    persona: personaFromStyle(request.config.style as string),
   });
 
   return {

@@ -14,6 +14,8 @@
 import { runInterviewerAgent } from "@/core/agents/interviewer";
 import type { InterviewerAgentOutput, TurnRecord } from "@/core/schemas/turns";
 import type { LLMProvider } from "@/core/llm/types";
+import type { ReadableAnswerPersona } from "@/core/agents/coach/prompts";
+import { staticOpeningQuestion } from "@/core/sessions/staticOpeningQuestions";
 
 export type QueueGenContext = TurnRecord[];
 
@@ -127,6 +129,7 @@ export interface RegisterSessionPrefetchArgs {
   llm: LLMProvider;
   frameworkJson: string;
   durationMinutes: number;
+  persona: ReadableAnswerPersona;  // M9.2: used to select static opening templates for Q0/Q1
 }
 
 /**
@@ -143,6 +146,13 @@ export function registerSessionPrefetch(args: RegisterSessionPrefetchArgs): Ques
   const queue = new QuestionQueue({
     totalTurns: args.totalTurns,
     gen: async (idx, context) => {
+      // M9.2 (F-508): Q0/Q1 are invariant opening questions — skip LLM entirely.
+      // Zero latency, zero failure risk for the two most critical session moments.
+      // 老板原话:"提前两条最最简单的开场介绍和项目介绍这两个问题必问"。
+      if (idx <= 1) {
+        return staticOpeningQuestion(idx as 0 | 1, args.persona);
+      }
+
       const out = await withRetryAndTimeout(
         () =>
           runInterviewerAgent(

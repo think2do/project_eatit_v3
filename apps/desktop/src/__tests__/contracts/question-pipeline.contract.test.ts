@@ -192,6 +192,7 @@ describe("QuestionQueue registry — session lifecycle", () => {
       llm: { generateObject: vi.fn(), chat: vi.fn(), chatStream: vi.fn() } as never,
       frameworkJson: FRAMEWORK_JSON,
       durationMinutes: 30,
+      persona: "Sarah",
     });
 
     const retrieved = getSessionQueue("test-sess-registry");
@@ -209,6 +210,7 @@ describe("QuestionQueue registry — session lifecycle", () => {
       llm: fakeLlm,
       frameworkJson: FRAMEWORK_JSON,
       durationMinutes: 30,
+      persona: "Sarah",
     });
     const q2 = registerSessionPrefetch({
       sessionId: "test-sess-registry",
@@ -216,12 +218,13 @@ describe("QuestionQueue registry — session lifecycle", () => {
       llm: fakeLlm,
       frameworkJson: FRAMEWORK_JSON,
       durationMinutes: 30,
+      persona: "Sarah",
     });
 
     expect(q1).toBe(q2);
-    // runInterviewerAgent only fired once (for Q0/Q1/Q2 in first registration)
-    // second call is no-op
-    expect(mockRunInterviewerAgent).toHaveBeenCalledTimes(3); // Q0, Q1, Q2 only once
+    // M9.2 (F-508): Q0/Q1 now use static templates — runInterviewerAgent only fires for Q2.
+    // Second registerSessionPrefetch call is a no-op (idempotent), so still only 1 invocation.
+    expect(mockRunInterviewerAgent).toHaveBeenCalledTimes(1); // Q2 only (Q0/Q1 are static)
   });
 
   // Test 12: releaseSession removes from registry
@@ -234,6 +237,7 @@ describe("QuestionQueue registry — session lifecycle", () => {
       llm: { generateObject: vi.fn(), chat: vi.fn(), chatStream: vi.fn() } as never,
       frameworkJson: FRAMEWORK_JSON,
       durationMinutes: 30,
+      persona: "Sarah",
     });
 
     expect(getSessionQueue("test-sess-release")).toBeDefined();
