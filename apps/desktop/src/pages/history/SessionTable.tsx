@@ -5,6 +5,8 @@
 // hover / focus rings stay consistent with .tile / .card. Each row is a
 // keyboard-accessible button that routes to the per-session report.
 
+import { Spinner } from "@/components/Spinner";
+
 export type SessionTableRow = {
   id: string;
   // ``岗位·风格`` — pre-formatted by the page so this component stays
@@ -24,6 +26,10 @@ export type SessionTableRow = {
   // ``starred`` lights the row's right edge so users can scan pinned
   // sessions at a glance. Pin action lands in M4.
   starred: boolean;
+  // M9.4 — sessionStatus-store.analyzing.has(id): show spinner badge
+  generating?: boolean;
+  // M9.4 — sessionStatus-store.unreadReports.has(id): show "新" badge
+  unread?: boolean;
 };
 
 export type SessionTableProps = {
@@ -34,7 +40,7 @@ export type SessionTableProps = {
 };
 
 const COLUMN_TEMPLATE =
-  "minmax(180px, 1.5fr) 120px 80px 80px minmax(160px, 1fr) 36px";
+  "minmax(180px, 1.5fr) 120px 80px 80px minmax(160px, 1fr) minmax(36px, 72px)";
 
 export function SessionTable({
   rows,
@@ -165,7 +171,29 @@ export function SessionTable({
                 ))
               )}
             </div>
-            <div />
+            <div
+              data-testid={`session-row-${row.id}-status-badge`}
+              style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}
+            >
+              {row.generating ? (
+                <span
+                  className="tag"
+                  data-testid={`session-row-${row.id}-generating`}
+                  style={{ fontSize: 10.5, display: "inline-flex", alignItems: "center", gap: 4, background: "var(--bg-sunken)", color: "var(--ink-700)" }}
+                >
+                  <Spinner size={10} />
+                  生成中
+                </span>
+              ) : row.unread ? (
+                <span
+                  className="tag"
+                  data-testid={`session-row-${row.id}-unread`}
+                  style={{ fontSize: 10.5, background: "var(--brand-softer)", color: "var(--brand)", border: "1px solid var(--brand)" }}
+                >
+                  新
+                </span>
+              ) : null}
+            </div>
           </div>
         ))
       )}

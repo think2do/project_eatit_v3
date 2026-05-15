@@ -24,6 +24,7 @@ import {
   HistoryFooterCTA,
   pickLastReusableConfig,
 } from "@/pages/history/HistoryFooterCTA";
+import { useSessionStatusStore } from "@/stores/sessionStatus-store";
 
 // V32.M3.1.4 — PRD §6.4 Dashboard rewrite (F-316 + F-318).
 //
@@ -116,7 +117,11 @@ function buildDuration(snapshot: Record<string, unknown> | undefined): string {
   return raw == null ? "—" : `${raw} 分钟`;
 }
 
-function toTableRows(items: SessionSummary[]): SessionTableRow[] {
+function toTableRows(
+  items: SessionSummary[],
+  analyzing: Set<string>,
+  unreadReports: Set<string>,
+): SessionTableRow[] {
   return items.map((item) => ({
     id: item.id,
     jobAndStyle: buildJobAndStyle(item.config_snapshot),
@@ -134,6 +139,9 @@ function toTableRows(items: SessionSummary[]): SessionTableRow[] {
     // a follow-up node alongside `eatit:starred:<sessionId>`
     // localStorage plumbing.
     starred: false,
+    // M9.4 — live status badges from sessionStatus-store
+    generating: analyzing.has(item.id),
+    unread: unreadReports.has(item.id),
   }));
 }
 
@@ -155,6 +163,9 @@ export function HistoryPage(): JSX.Element {
   const setInsights = useAppStore((s) => s.setInsights);
   const insights = useAppStore((s) => s.insights);
   const reuseLastConfig = useAppStore((s) => s.reuseLastConfig);
+
+  const analyzing = useSessionStatusStore((s) => s.analyzing);
+  const unreadReports = useSessionStatusStore((s) => s.unreadReports);
 
   const sessionsQuery = useQuery<SessionListResponse>({
     queryKey: ["sessions", "list"],
@@ -230,7 +241,10 @@ export function HistoryPage(): JSX.Element {
     }
   }, [activeTab, allItems, completedItems, incompleteItems]);
 
-  const tableRows = useMemo(() => toTableRows(visibleItems), [visibleItems]);
+  const tableRows = useMemo(
+    () => toTableRows(visibleItems, analyzing, unreadReports),
+    [visibleItems, analyzing, unreadReports],
+  );
 
   const insightOk = insights?.status === "ok";
   const sessionsForCoach = insights?.based_on_session_count ?? completedItems.length;
