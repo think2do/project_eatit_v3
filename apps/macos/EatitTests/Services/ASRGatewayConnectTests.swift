@@ -64,8 +64,8 @@ private func makeMinimalParams(streamId: String = "stream-001") -> ASRStartParam
     ASRStartParams(streamId: streamId, enableITN: nil, enablePunc: nil)
 }
 
-private let validEndpoint = URL(string: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel")!
-private let badHostEndpoint = URL(string: "wss://evil.example.com/api/v3/sauc/bigmodel")!
+private let validEndpoint = URL(string: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async")!
+private let badHostEndpoint = URL(string: "wss://evil.example.com/api/v3/sauc/bigmodel_async")!
 
 // MARK: - ASRGatewayConnectTests
 
@@ -107,7 +107,7 @@ final class ASRGatewayConnectTests: XCTestCase {
 
         XCTAssertEqual(req.value(forHTTPHeaderField: "X-Api-App-Key"), "test-app")
         XCTAssertEqual(req.value(forHTTPHeaderField: "X-Api-Access-Key"), "test-token")
-        XCTAssertEqual(req.value(forHTTPHeaderField: "X-Api-Resource-Id"), "volc.bigasr.sauc.duration")
+        XCTAssertEqual(req.value(forHTTPHeaderField: "X-Api-Resource-Id"), "volc.seedasr.sauc.duration")
 
         let connectId = req.value(forHTTPHeaderField: "X-Api-Connect-Id")
         XCTAssertNotNil(connectId, "X-Api-Connect-Id must be set")
@@ -128,15 +128,25 @@ final class ASRGatewayConnectTests: XCTestCase {
 
         // Build the expected first-frame bytes using the same path
         let expectedConfig = ASRConfigPayload(
-            audio: ASRAudioConfig(format: "pcm", rate: 16000, channels: 1, codec: "raw"),
+            user: ASRUserConfig(uid: "eatit"),
+            audio: ASRAudioConfig(
+                format: "pcm",
+                codec: "raw",
+                rate: 16000,
+                bits: 16,
+                channel: 1
+            ),
             request: ASRRequestConfig(
                 modelName: "bigmodel",
                 enableITN: true,
                 enablePunc: true,
-                enableSpeakerInfo: nil
+                enableDDC: false,
+                enableNonstream: false,
+                resultType: "full",
+                showUtterances: true
             )
         )
-        let expectedBytes = try packFirstFrame(config: expectedConfig, gzip: false)
+        let expectedBytes = try packFirstFrame(config: expectedConfig)
 
         XCTAssertEqual(mockTask.sentFrames[0], expectedBytes,
                        "First frame bytes must match packFirstFrame output byte-for-byte")
@@ -207,24 +217,27 @@ final class ASRGatewayConnectTests: XCTestCase {
         XCTAssertEqual(mockFactory.capturedRequests.count, 0, "factory must never be called on bad host")
     }
 
-    // MARK: - Case 7: Already connected → second connect throws already-connected
+    // MARK: - Case 7: Already connected → second connect auto-recovers
+    //
+    // Updated semantics: rather than throwing `asr.already-connected` and
+    // forcing the user to manually retry (hostile when the stale task came
+    // from a SettingsPage testASRConnection probe or an InterviewPage
+    // re-mount), connect() now abruptly closes the stale task and proceeds
+    // with the new stream.
 
-    func testConnect_AlreadyConnected_ThrowsAlreadyConnected() async throws {
+    func testConnect_AlreadyConnected_AutoRecoversBySupersedingOldStream() async throws {
         mockKeychain.mockKey = String(data: makeValidCredsData(), encoding: .utf8)!
         let gw = makeGateway()
 
         try await gw.connect(streamId: "s5", params: makeMinimalParams(streamId: "s5"))
-
-        // Second connect attempt without disconnect
-        do {
-            try await gw.connect(streamId: "s5b", params: makeMinimalParams(streamId: "s5b"))
-            XCTFail("Expected BridgeError to be thrown")
-        } catch let err as BridgeError {
-            XCTAssertEqual(err.code, "asr.already-connected")
-        }
-
-        // factory was only called once (for the first connect)
         XCTAssertEqual(mockFactory.capturedRequests.count, 1)
+
+        // Second connect MUST NOT throw — it silently supersedes the first
+        // stream and opens a fresh WS task.
+        try await gw.connect(streamId: "s5b", params: makeMinimalParams(streamId: "s5b"))
+
+        XCTAssertEqual(mockFactory.capturedRequests.count, 2,
+                       "Second connect should open a new WS task after auto-disconnect of the first")
     }
 
     // MARK: - Case 8: disconnect clears state; second connect succeeds

@@ -85,65 +85,10 @@ export function StepLLM({ onNext, onBack }: Props): JSX.Element {
         </p>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-          gap: 16,
-        }}
-      >
-        <ProviderSelect
-          value={config.provider}
-          onChange={(next) =>
-            setConfig((prev) => ({
-              provider: next.id,
-              api_key: prev.api_key,
-              model: next.models[0] ?? prev.model,
-              base_url: next.baseUrl || null,
-            }))
-          }
-        />
-
-        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--ink-700)" }}>
-            Base URL {config.provider === "custom" ? "(必填)" : "(可选覆盖)"}
-          </span>
-          <input
-            type="text"
-            value={config.base_url ?? ""}
-            onChange={(e) =>
-              setConfig((c) => ({ ...c, base_url: e.target.value || null }))
-            }
-            placeholder={preset.baseUrl || "https://api.example.com/v1"}
-            style={fieldStyle}
-          />
-        </label>
-
-        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--ink-700)" }}>
-            模型名称
-          </span>
-          <input
-            type="text"
-            list="step-llm-model-suggestions"
-            value={config.model}
-            onChange={(e) => setConfig((c) => ({ ...c, model: e.target.value }))}
-            placeholder="例如 doubao-seed-1-6-250615"
-            style={fieldStyle}
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-          />
-          <datalist id="step-llm-model-suggestions">
-            {suggestedModels.map((m) => (
-              <option key={m} value={m} />
-            ))}
-          </datalist>
-          <span style={{ fontSize: 11, color: "var(--ink-500)" }}>
-            可自由输入任何已开通的模型 ID(如 doubao-1-5-pro-32k-250115)。下拉为推荐建议,非限定。
-          </span>
-        </label>
-      </div>
+      {/* Provider / Base URL / 模型名称 三段在 onboarding UI 隐藏(后端 config
+          仍照常持久化:provider=volcengine, base_url=https://ark.cn-beijing.volces.com/api/v3,
+          model=doubao-seed-2-0-lite-260215 — initialConfig() 给的默认值)。
+          v3.4 出站 host 白名单只 ark.cn-beijing.volces.com,普通用户没必要改。 */}
 
       <KeyInput
         value={config.api_key}

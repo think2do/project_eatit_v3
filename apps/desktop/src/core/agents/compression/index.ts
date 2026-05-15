@@ -5,6 +5,7 @@ import {
   type CompressionAgentOutput,
 } from "@/core/schemas/turns";
 import type { LLMProvider, Message } from "@/core/llm/types";
+import { getConfiguredModel } from "@/core/llm/configuredModel";
 import { systemPrompt, userPrompt } from "./prompts";
 
 /** ★ Spec line 1684 ★ — 3s hard timeout per Python COMPRESSION_TIMEOUT_SECONDS = 3.0 */
@@ -74,7 +75,7 @@ export async function runCompressionAgent(
   const llmPromise = deps.llm.generateObject({
     schema: CompressionAgentOutputSchema,
     messages,
-    model: "doubao-seed-1-6-250615",
+    model: await getConfiguredModel(),
     // TODO M3.x: pass `signal: controller.signal` once LLMProvider.generateObject
     // supports AbortSignal — for now, AbortController only halts the timeoutPromise
     // side; the LLM call's result is dropped if it loses the race.

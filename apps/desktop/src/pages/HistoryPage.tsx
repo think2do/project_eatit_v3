@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Sparkles } from "lucide-react";
 import type {
@@ -9,7 +9,6 @@ import type {
   UserInsightCache,
 } from "@eatit/shared-types";
 import { getSessionList } from "@/api/sessions";
-import { triggerMetaReport } from "@/api/metaReports";
 import { getUserInsights } from "@/api/usersInsights";
 import { useAppStore } from "@/stores/app-store";
 import { StatCard } from "@/pages/history/StatCard";
@@ -34,9 +33,8 @@ import {
 //   3. AICoachCard — user insights via Bridge → DatabaseService
 //      — Hidden when insights == null OR status !== "ok"; falls back to
 //        progress card "已完成 N/3 场,再完成 M 场解锁 AI 成长洞察".
-//   4. FilterTabs (4 tabs) + 综合分析 trigger button
+//   4. FilterTabs (4 tabs)
 //   5. SessionTable (6-col grid)
-//   6. MetaReport modal (preserved from v3.1)
 
 const COMPLETED_STATUSES: ReadonlySet<InterviewSessionStatus> = new Set<InterviewSessionStatus>([
   "ended",
@@ -177,7 +175,6 @@ export function HistoryPage(): JSX.Element {
   }, [insightsQuery.data, setInsights]);
 
   const [activeTab, setActiveTab] = useState<FilterTabKey>("all");
-  const [modalOpen, setModalOpen] = useState(false);
 
   const allItems = useMemo(
     () => sessionsQuery.data?.items ?? [],
@@ -326,23 +323,11 @@ export function HistoryPage(): JSX.Element {
         </div>
       )}
 
-      <div className="row between">
-        <FilterTabs
-          tabs={tabs}
-          activeKey={activeTab}
-          onSelect={(k) => setActiveTab(k)}
-        />
-        <button
-          type="button"
-          className="btn btn-brand"
-          onClick={() => setModalOpen(true)}
-          disabled={readySessions.length === 0}
-          data-testid="open-meta-report-modal"
-        >
-          <Sparkles size={14} />
-          生成综合分析 ({readySessions.length} 场)
-        </button>
-      </div>
+      <FilterTabs
+        tabs={tabs}
+        activeKey={activeTab}
+        onSelect={(k) => setActiveTab(k)}
+      />
 
       {sessionsQuery.isLoading ? (
         <div
@@ -412,215 +397,6 @@ export function HistoryPage(): JSX.Element {
         onNewInterview={() => navigate("/upload")}
       />
 
-      {modalOpen ? (
-        <MetaReportModal
-          readySessions={readySessions}
-          onClose={() => setModalOpen(false)}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function MetaReportModal({
-  readySessions,
-  onClose,
-}: {
-  readySessions: SessionSummary[];
-  onClose: () => void;
-}): JSX.Element {
-  const navigate = useNavigate();
-  const [selected, setSelected] = useState<Set<string>>(
-    () => new Set(readySessions.map((s) => s.id)),
-  );
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const trigger = useMutation({
-    mutationFn: (sessionIds: string[]) =>
-      triggerMetaReport({ session_ids: sessionIds }),
-    onSuccess: (response) => {
-      navigate(`/meta-report/${response.id}`);
-    },
-    onError: (err) => {
-      setErrorMessage(err instanceof Error ? err.message : "请求失败");
-    },
-  });
-
-  const toggle = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  const handleConfirm = () => {
-    setErrorMessage(null);
-    const ids = Array.from(selected);
-    if (ids.length === 0) {
-      setErrorMessage("至少选择 1 场");
-      return;
-    }
-    trigger.mutate(ids);
-  };
-
-  const singleSession = selected.size === 1;
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="生成综合分析"
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(17, 24, 20, 0.35)",
-        display: "grid",
-        placeItems: "center",
-        zIndex: 50,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card card-pad-lg col"
-        style={{
-          width: 520,
-          maxWidth: "90vw",
-          maxHeight: "80vh",
-          gap: 14,
-        }}
-      >
-        <div>
-          <h2
-            className="h-serif"
-            style={{
-              margin: 0,
-              fontSize: 22,
-              fontWeight: 400,
-              color: "var(--ink-900)",
-            }}
-          >
-            生成综合分析
-          </h2>
-          <p
-            className="muted"
-            style={{ fontSize: 13, marginTop: 6, lineHeight: 1.6 }}
-          >
-            选择希望纳入分析的面试。只选 1 场时生成单场复盘,不会凭空凑出趋势。
-          </p>
-        </div>
-
-        <ul
-          style={{
-            listStyle: "none",
-            margin: 0,
-            padding: 0,
-            overflowY: "auto",
-            border: "1px solid var(--line)",
-            borderRadius: "var(--r-sm)",
-            maxHeight: 280,
-          }}
-        >
-          {readySessions.map((session) => {
-            const checked = selected.has(session.id);
-            return (
-              <li key={session.id}>
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "10px 14px",
-                    cursor: "pointer",
-                    borderBottom: "1px solid var(--line)",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggle(session.id)}
-                    style={{ cursor: "pointer" }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 500,
-                        color: "var(--ink-900)",
-                      }}
-                    >
-                      {formatDateShort(session.created_at)}
-                    </div>
-                    <div
-                      className="muted"
-                      style={{ fontSize: 11.5, marginTop: 2 }}
-                    >
-                      <span className="mono">{session.id.slice(0, 8)}</span>
-                      <span style={{ margin: "0 6px", color: "var(--ink-300)" }}>
-                        ·
-                      </span>
-                      {session.turn_count} 轮
-                    </div>
-                  </div>
-                </label>
-              </li>
-            );
-          })}
-        </ul>
-
-        {singleSession ? (
-          <div
-            style={{
-              fontSize: 12,
-              color: "var(--info)",
-              background: "var(--info-soft)",
-              padding: "8px 12px",
-              borderRadius: "var(--r-sm)",
-            }}
-          >
-            只选 1 场时生成单场复盘
-          </div>
-        ) : null}
-
-        {errorMessage ? (
-          <div
-            style={{
-              fontSize: 12,
-              color: "var(--warn)",
-              background: "var(--warn-soft)",
-              padding: "8px 12px",
-              borderRadius: "var(--r-sm)",
-            }}
-          >
-            {errorMessage}
-          </div>
-        ) : null}
-
-        <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
-          <button
-            type="button"
-            className="btn"
-            onClick={onClose}
-            disabled={trigger.isPending}
-          >
-            取消
-          </button>
-          <button
-            type="button"
-            className="btn btn-brand"
-            onClick={handleConfirm}
-            disabled={trigger.isPending || selected.size === 0}
-          >
-            {trigger.isPending ? <Loader2 size={14} className="spin" /> : null}
-            生成 ({selected.size} 场)
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

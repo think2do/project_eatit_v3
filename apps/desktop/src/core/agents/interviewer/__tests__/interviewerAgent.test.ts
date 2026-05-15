@@ -163,7 +163,7 @@ describe("runInterviewerAgent", () => {
     ).rejects.toThrow(ZodError);
   });
 
-  it("passes model doubao-seed-1-6-250615 to generateObject", async () => {
+  it("passes configured default model to generateObject", async () => {
     const capturedModel: { value?: string } = {};
     const llm: LLMProvider = {
       chat: vi.fn(),
@@ -174,7 +174,8 @@ describe("runInterviewerAgent", () => {
       }),
     };
     await runInterviewerAgent(VALID_INPUT, { llm });
-    expect(capturedModel.value).toBe("doubao-seed-1-6-250615");
+    // FALLBACK_MODEL from configuredModel.ts (no app_settings row in test → fallback path).
+    expect(capturedModel.value).toBe("doubao-seed-2-0-lite-260215");
   });
 });
 

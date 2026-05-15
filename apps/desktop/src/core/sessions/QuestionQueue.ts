@@ -17,6 +17,40 @@ import type { LLMProvider } from "@/core/llm/types";
 
 export type QueueGenContext = TurnRecord[];
 
+// L2(2026-05-14):LLM 调用的超时 + 重试封装。Q4+ 经常出现 prompt 超长 / ARK 429
+// rate-limit / 网络抖动 → prefetch 卡住或失败。包一层 race timeout + 指数退避,
+// 让短暂故障自愈,不让用户卡在"等待问题加载"。
+async function withRetryAndTimeout<T>(
+  fn: () => Promise<T>,
+  label: string,
+  opts: { timeoutMs: number; maxAttempts: number } = { timeoutMs: 30_000, maxAttempts: 3 },
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= opts.maxAttempts; attempt++) {
+    try {
+      return await Promise.race([
+        fn(),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`${label} timeout after ${opts.timeoutMs}ms`)),
+            opts.timeoutMs,
+          ),
+        ),
+      ]);
+    } catch (err) {
+      lastError = err;
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.warn(`[QQ-retry] ${label} attempt ${attempt}/${opts.maxAttempts} failed: ${errMsg}`);
+      if (attempt < opts.maxAttempts) {
+        // 指数退避:1s, 4s
+        const backoffMs = 1000 * Math.pow(4, attempt - 1);
+        await new Promise((res) => setTimeout(res, backoffMs));
+      }
+    }
+  }
+  throw lastError;
+}
+
 export interface QuestionQueueOptions {
   totalTurns: number;
   gen: (idx: number, context: QueueGenContext) => Promise<InterviewerAgentOutput>;
@@ -39,7 +73,17 @@ export class QuestionQueue {
    */
   prefetch(idx: number, context: QueueGenContext): void {
     if (this.cache.has(idx)) return;
-    this.cache.set(idx, this.gen(idx, context));
+    // DIAG-Q5: trace prefetch lifecycle
+    console.warn(`[QQ] prefetch Q${idx} fired, ctx_len=${context.length}`);
+    const promise = this.gen(idx, context);
+    promise
+      .then((result) => {
+        console.warn(`[QQ] prefetch Q${idx} resolved: should_end=${result.should_end} question="${result.question?.slice(0, 50)}..."`);
+      })
+      .catch((err) => {
+        console.error(`[QQ] prefetch Q${idx} REJECTED:`, err?.message ?? String(err), err?.stack ?? "");
+      });
+    this.cache.set(idx, promise);
   }
 
   /**
@@ -47,10 +91,18 @@ export class QuestionQueue {
    * Throws if prefetch was never called — indicates pipeline is broken.
    */
   async next(idx: number): Promise<InterviewerAgentOutput> {
+    console.warn(`[QQ] next(Q${idx}) called, has_cache=${this.cache.has(idx)}`);
     if (!this.cache.has(idx)) {
       throw new Error(`Q${idx} not prefetched — pipeline broken`);
     }
-    return this.cache.get(idx)!;
+    try {
+      const result = await this.cache.get(idx)!;
+      console.warn(`[QQ] next(Q${idx}) resolved, should_end=${result.should_end} question="${result.question?.slice(0, 50)}..."`);
+      return result;
+    } catch (err) {
+      console.error(`[QQ] next(Q${idx}) THREW:`, err);
+      throw err;
+    }
   }
 
   /**
@@ -91,14 +143,25 @@ export function registerSessionPrefetch(args: RegisterSessionPrefetchArgs): Ques
   const queue = new QuestionQueue({
     totalTurns: args.totalTurns,
     gen: async (idx, context) => {
-      return runInterviewerAgent(
-        {
-          framework_json: args.frameworkJson,
-          recent_turns: context,
-          remaining_minutes: args.durationMinutes,
-        },
-        { llm: args.llm },
+      const out = await withRetryAndTimeout(
+        () =>
+          runInterviewerAgent(
+            {
+              framework_json: args.frameworkJson,
+              recent_turns: context,
+              remaining_minutes: args.durationMinutes,
+              // M8.6 修复:idx 透传到 InterviewerAgent,prompt 按 idx 给不同 openingHint
+              // 让 Q0/Q1/Q2(空 context)能产出不同题目而不是 3 个一样的自我介绍。
+              target_turn_index: idx,
+            },
+            { llm: args.llm },
+          ),
+        `Q${idx} gen`,
       );
+      // 2026-05-14 修复:LLM 不该自行决定收尾(会导致状态机跳 ended 卡住),
+      // 是否结束由 QuestionQueue.totalTurns 上限和用户主动"结束面试"按钮决定。
+      // 强制覆盖 should_end → false。
+      return { ...out, should_end: false };
     },
   });
 

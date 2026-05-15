@@ -203,6 +203,15 @@ export function InterviewPage(): JSX.Element {
     };
   }, []);
 
+  // 2026-05-14 DIAG-state: track every state.value transition + currentQuestion turn_index.
+  // 帮助诊断"屏幕显示了问题但 UI 卡在 等待问题加载"这种状态机异常。
+  useEffect(() => {
+    const stateValue = typeof state.value === "string" ? state.value : JSON.stringify(state.value);
+    const qIdx = state.context.currentQuestion?.turn_index;
+    const cqIdx = state.context.currentTurnIndex;
+    console.warn(`[ST] state=${stateValue} currentQuestion.turn_index=${qIdx} currentTurnIndex=${cqIdx} hasError=${state.context.error != null}`);
+  }, [state.value, state.context.currentQuestion?.turn_index, state.context.currentTurnIndex, state.context.error]);
+
   // Pre-warm the OS mic permission as soon as the page mounts, so the
   // first "开始录音" click doesn't sit on a TCC prompt mid-answer.
   // Failures are silent: the user will see the actionable banner the
@@ -326,6 +335,7 @@ export function InterviewPage(): JSX.Element {
             case "question.generated":
               // Reset streaming text for the new turn
               setCurrentTurnStreamingText(null);
+              console.warn(`[IP] question.generated localTurnIndex=${localTurnIndex} should_end=${event.payload.should_end} question="${event.payload.question?.slice(0, 40)}"`);
               send({
                 type: "SERVER_QUESTION",
                 payload: {

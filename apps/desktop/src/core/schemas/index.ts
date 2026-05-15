@@ -8,4 +8,3 @@ export * from "./reports";
 export * from "./coach";
 export * from "./reflection";
 export * from "./research";
-export * from "./meta_reports";

@@ -9,6 +9,8 @@ import { createSession } from "@/api/sessions";
 import { PageStepIndicator } from "@/components/PageStepIndicator";
 import { TipsCarousel } from "@/components/TipsCarousel";
 import { SummarySidebar } from "@/pages/config/SummarySidebar";
+import { deriveJobTitle } from "@/lib/jobTitle";
+import { requestMicPermission } from "@/lib/mic";
 import { selectTips } from "@/lib/tips";
 import { useAppStore } from "@/stores/app-store";
 
@@ -129,6 +131,25 @@ export function ConfigPage(): JSX.Element {
       return;
     }
     setError(null);
+
+    // Pre-warm OS mic permission BEFORE the loading overlay covers the page,
+    // so the macOS TCC dialog appears on this clean ConfigPage rather than
+    // surprising the user mid-interview when they click 「开始录音」.
+    // Fire-and-forget on outcome:
+    //   - granted: the OS state is sticky, InterviewPage's pre-warm reuses it silently
+    //   - denied:  user can still continue in text mode (or grant later via 系统设置)
+    //   - prompt resolved as no-op when an earlier session already got Allow
+    // Stream is released immediately so we don't hold the mic during the
+    // 30-60s framework-agent wait that's about to start.
+    try {
+      const micResult = await requestMicPermission();
+      if (micResult.ok) {
+        micResult.stream.getTracks().forEach((t) => t.stop());
+      }
+    } catch {
+      /* non-fatal — proceed to interview either way */
+    }
+
     setSubmitting(true);
     try {
       const response = await createSession({
@@ -165,14 +186,11 @@ export function ConfigPage(): JSX.Element {
   };
 
   // V32.M1.1.X — derive sidebar inputs from current store state.
-  const jobTitle = (() => {
-    const payload = upload.parsePayload;
-    if (!payload) return null;
-    const company = payload.jd_company_name?.trim();
-    const role = payload.jd_role_title?.trim();
-    if (company && role) return `${company} · ${role}`;
-    return role ?? company ?? null;
-  })();
+  const jobTitle = deriveJobTitle({
+    company: upload.parsePayload?.jd_company_name,
+    role: upload.parsePayload?.jd_role_title,
+    jdFileName: upload.jdFileName,
+  });
   const styleLabel =
     STYLE_OPTIONS.find((opt) => opt.value === config.style)?.label ?? config.style;
   const directionDetail = config.directions.map((value) => ({
@@ -181,12 +199,17 @@ export function ConfigPage(): JSX.Element {
   }));
 
   return (
+    <>
     <div
       style={{
         display: "flex",
         gap: 24,
         alignItems: "flex-start",
+        opacity: submitting ? 0.45 : 1,
+        pointerEvents: submitting ? "none" : "auto",
+        transition: "opacity 180ms ease",
       }}
+      aria-hidden={submitting ? true : undefined}
     >
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 24, minWidth: 0 }}>
       <div>
@@ -340,25 +363,6 @@ export function ConfigPage(): JSX.Element {
         </div>
       ) : null}
 
-      {submitting ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div>
-            <div
-              style={{
-                fontSize: 14,
-                fontWeight: 600,
-                color: "var(--ink-900)",
-              }}
-            >
-              AI 正在为你定制面试框架...
-            </div>
-            <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 4 }}>
-              通常约 30-60 秒。在此期间可以看看面试技巧。
-            </div>
-          </div>
-          <TipsCarousel tips={submitTips} />
-        </div>
-      ) : null}
       </div>
 
       <SummarySidebar
@@ -371,6 +375,59 @@ export function ConfigPage(): JSX.Element {
         onStart={handleStart}
       />
     </div>
+
+    {submitting ? (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="AI 正在生成面试框架"
+        data-testid="config-framework-overlay"
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 50,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+          background: "rgba(15, 23, 42, 0.42)",
+          backdropFilter: "blur(2px)",
+          WebkitBackdropFilter: "blur(2px)",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 520,
+            background: "var(--bg-elev)",
+            borderRadius: "var(--r-lg)",
+            border: "1px solid var(--line)",
+            boxShadow: "var(--shadow-lg)",
+            padding: 28,
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: 16,
+                fontWeight: 600,
+                color: "var(--ink-900)",
+              }}
+            >
+              AI 正在为你定制面试框架...
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--ink-500)", marginTop: 4 }}>
+              通常约 30-60 秒。在此期间可以看看面试技巧。
+            </div>
+          </div>
+          <TipsCarousel tips={submitTips} />
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 }
 

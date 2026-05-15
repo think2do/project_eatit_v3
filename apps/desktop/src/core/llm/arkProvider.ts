@@ -32,7 +32,7 @@ export class ArkProvider implements LLMProvider {
   private readonly defaultModel: string;
 
   constructor(options: ArkProviderOptions = {}) {
-    this.defaultModel = options.defaultModel ?? "doubao-seed-1-6-250615";
+    this.defaultModel = options.defaultModel ?? "doubao-seed-2-0-lite-260215";
   }
 
   /**

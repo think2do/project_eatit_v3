@@ -5,6 +5,7 @@ import {
   type ObserverAgentOutput,
 } from "@/core/schemas/turns";
 import type { LLMProvider, Message } from "@/core/llm/types";
+import { getConfiguredModel } from "@/core/llm/configuredModel";
 import { systemPrompt, userPrompt } from "./prompts";
 
 // L0 red line A9 lock — re-export the canonical 7-word list so observer
@@ -38,6 +39,6 @@ export async function runObserverAgent(
   return deps.llm.generateObject({
     schema: ObserverAgentOutputSchema,
     messages,
-    model: "doubao-seed-1-6-250615",
+    model: await getConfiguredModel(),
   });
 }

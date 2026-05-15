@@ -5,6 +5,7 @@ import {
   type ReferenceAgentOutput,
 } from "@/core/schemas/turns";
 import type { LLMProvider, Message } from "@/core/llm/types";
+import { getConfiguredModel } from "@/core/llm/configuredModel";
 import { systemPrompt, userPrompt } from "./prompts";
 
 // Minimal logger interface — inline for M3.2.2; can migrate to shared utility later.
@@ -37,6 +38,6 @@ export async function runReferenceAgent(
   return deps.llm.generateObject({
     schema: ReferenceAgentOutputSchema,
     messages,
-    model: "doubao-seed-1-6-250615",
+    model: await getConfiguredModel(),
   });
 }

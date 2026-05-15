@@ -19,15 +19,19 @@ interface Props {
   overallScore: number | null;
   passLikelihood: Tier | null;
   scoreDelta?: number;
+  /** Optional content rendered to the right of the two score cards
+   *  (used by ReportPage to inline the dimension summary). */
+  rightSlot?: React.ReactNode;
 }
 
 export function HeroScoreCard({
   overallScore,
   passLikelihood,
   scoreDelta,
+  rightSlot,
 }: Props): JSX.Element {
   return (
-    <div className="row" style={{ gap: 16 }}>
+    <div className="row" style={{ gap: 16, alignItems: "stretch" }}>
       {overallScore !== null && (
         <div className="card card-pad" style={{ minWidth: 180 }}>
           <div className="muted" style={{ fontSize: 11.5 }}>总分</div>
@@ -72,6 +76,7 @@ export function HeroScoreCard({
           </div>
         </div>
       )}
+      {rightSlot}
     </div>
   );
 }

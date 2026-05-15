@@ -167,3 +167,29 @@ export const getParseResult = async (assetBundleId: string): Promise<ParseResult
     updated_at: row.updated_at as string,
   };
 };
+
+export interface CandidateAssetMeta {
+  resumeFilename: string | null;
+  jdFilename: string | null;
+}
+
+/**
+ * Lightweight read of just the human-facing filenames from `candidate_assets`,
+ * used by InterviewPage / ReportPage to render fallback labels when the LLM
+ * parse didn't surface a company/role.  Cheap (single-row PK lookup); never
+ * touches the file_ref columns (those store extracted text + are bigger).
+ */
+export const getCandidateAssetMeta = async (
+  assetBundleId: string,
+): Promise<CandidateAssetMeta | null> => {
+  const rows = await db.query(
+    "SELECT resume_filename, jd_filename FROM candidate_assets WHERE id = ?",
+    [assetBundleId],
+  );
+  if (rows.length === 0) return null;
+  const row = rows[0];
+  return {
+    resumeFilename: (row.resume_filename as string | null) ?? null,
+    jdFilename: (row.jd_filename as string | null) ?? null,
+  };
+};

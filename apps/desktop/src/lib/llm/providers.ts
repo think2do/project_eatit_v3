@@ -31,6 +31,7 @@ export const PROVIDERS: readonly ProviderPreset[] = [
     registerUrl: "https://www.volcengine.com/product/ark",
     baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
     models: [
+      "doubao-seed-2-0-lite-260215",
       "doubao-seed-1-6-250615",
       "doubao-seed-1-6-flash-250615",
       "doubao-seed-1-6-thinking-250715",

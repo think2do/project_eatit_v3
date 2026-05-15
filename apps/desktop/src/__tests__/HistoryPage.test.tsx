@@ -40,9 +40,6 @@ vi.mock("@/api/usersInsights", () => ({
 vi.mock("@/api/sessions", () => ({
   getSessionList: vi.fn(),
 }));
-vi.mock("@/api/metaReports", () => ({
-  triggerMetaReport: vi.fn(),
-}));
 
 import { getUserInsights } from "@/api/usersInsights";
 import { getSessionList } from "@/api/sessions";

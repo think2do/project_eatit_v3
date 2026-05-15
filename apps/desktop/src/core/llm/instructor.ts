@@ -41,11 +41,19 @@ export async function generateObjectWithRetry<T>(
   let messages = [...params.messages];
   let lastError: Error | undefined;
 
+  // 2026-05-14:Doubao Seed 2.0 Pro 不接受 response_format: json_object(老 OpenAI 协议),
+  // 报错 `llm.params-invalid: json_object is not supported by this model`。
+  // Lite / 1.6 系列仍兼容。所以这里按 model 名分流:
+  //   - Pro 系列:不发 response_format,靠 system prompt 里"输出 JSON only"指令 + safeParse 重试
+  //   - 其它(Lite / 1.6 等):保留 response_format: json_object
+  const effectiveModel = model ?? "doubao-seed-2-0-lite-260215";
+  const supportsJsonObject = !/seed-2-0-pro|seed-2-0-code/.test(effectiveModel);
+
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const req: ChatRequest = {
-      model: model ?? "doubao-seed-1-6-250615",
+      model: effectiveModel,
       messages,
-      response_format: { type: "json_object" },
+      ...(supportsJsonObject ? { response_format: { type: "json_object" } } : {}),
     };
 
     const res = await provider.chat(req);

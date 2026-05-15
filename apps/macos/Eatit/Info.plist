@@ -2,6 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>CFBundleName</key>
+    <string>Eatit</string>
+    <key>CFBundleDisplayName</key>
+    <string>Eatit</string>
+    <key>CFBundleExecutable</key>
+    <string>Eatit</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
     <key>CFBundleIdentifier</key>
     <string>com.eatit.desktop</string>
     <key>CFBundleShortVersionString</key>

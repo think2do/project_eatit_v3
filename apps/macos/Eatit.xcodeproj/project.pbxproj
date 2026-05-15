@@ -28,9 +28,11 @@
 		990D042CC8641ACD609EB151 /* BridgeRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5EA76747759170E42A8C8E4 /* BridgeRouter.swift */; };
 		9A30ADC9DCBE4E3B830B240E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7B8AE0D949E13AD6E0C220D /* AppDelegate.swift */; };
 		A124C35BA81F3FB27B49C690 /* WebViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C779B031475689C5A3249527 /* WebViewController.swift */; };
+		A827CCF0CFC4F2644D5CD484 /* TTSGateway.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FBFCD0457E699863E501595 /* TTSGateway.swift */; };
 		B111728351EC4034DC0075C4 /* KeychainServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78EA1BE62430794ECCF5180B /* KeychainServiceTests.swift */; };
 		B468EBEB420BB31CEF569708 /* MigrationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98C4162768A769BBADA44F3B /* MigrationsTests.swift */; };
 		B92FCBC07EA92ED8244601F2 /* ASRGatewayFrameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5674783458C04C808F3AF706 /* ASRGatewayFrameTests.swift */; };
+		BAB5B90540979981D978540B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9DC0CCB522DCA3F271495FC5 /* Assets.xcassets */; };
 		C72BF0F75A83CC59AF604D5A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9C4F92E482943CF0EAFEC515 /* PrivacyInfo.xcprivacy */; };
 		D0931A2EBAC2396B6C57777B /* LLMTypesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC6E03864EC3C7AB2ECD3093 /* LLMTypesTests.swift */; };
 		D7B912071A26D6B1F55BB1CA /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = EB6C3281A76DF9FEC0ECC39C /* GRDB */; };
@@ -56,6 +58,7 @@
 /* Begin PBXFileReference section */
 		0397716BAA6A496E05797317 /* Migrations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Migrations.swift; sourceTree = "<group>"; };
 		0BB8B1A7332F04B1A2EF8AA5 /* LLMGateway.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMGateway.swift; sourceTree = "<group>"; };
+		0FBFCD0457E699863E501595 /* TTSGateway.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTSGateway.swift; sourceTree = "<group>"; };
 		13A077803E15BA59D01784C2 /* ASRGatewayConnectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRGatewayConnectTests.swift; sourceTree = "<group>"; };
 		1D97BCF787590B906ED24F7A /* EatitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EatitApp.swift; sourceTree = "<group>"; };
 		24D007F9DD23D7323372CF2A /* Eatit.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Eatit.entitlements; sourceTree = "<group>"; };
@@ -76,6 +79,7 @@
 		8ABC08D39D205B42554753E9 /* EatitURLSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EatitURLSchemeHandler.swift; sourceTree = "<group>"; };
 		98C4162768A769BBADA44F3B /* MigrationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationsTests.swift; sourceTree = "<group>"; };
 		9C4F92E482943CF0EAFEC515 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		9DC0CCB522DCA3F271495FC5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A2CF8E15614176A28DF57FFF /* Eatit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Eatit.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A5EA76747759170E42A8C8E4 /* BridgeRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeRouter.swift; sourceTree = "<group>"; };
 		B2BDD48C47FA2C8804AC270C /* AudioCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureService.swift; sourceTree = "<group>"; };
@@ -209,6 +213,7 @@
 				E786947D98D2BE0B8D4CA42F /* Services */,
 				3714B46D9C44F2A220B67E38 /* WebView */,
 				C7B8AE0D949E13AD6E0C220D /* AppDelegate.swift */,
+				9DC0CCB522DCA3F271495FC5 /* Assets.xcassets */,
 				24D007F9DD23D7323372CF2A /* Eatit.entitlements */,
 				1D97BCF787590B906ED24F7A /* EatitApp.swift */,
 				376F711F8F6001004EF9471A /* Info.plist */,
@@ -238,6 +243,7 @@
 				0BB8B1A7332F04B1A2EF8AA5 /* LLMGateway.swift */,
 				0397716BAA6A496E05797317 /* Migrations.swift */,
 				D1A7F87BEE0962BBA16ADAB3 /* PDFParserService.swift */,
+				0FBFCD0457E699863E501595 /* TTSGateway.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -335,6 +341,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BAB5B90540979981D978540B /* Assets.xcassets in Resources */,
 				C72BF0F75A83CC59AF604D5A /* PrivacyInfo.xcprivacy in Resources */,
 				7C9CFAA95FE6109226165496 /* web in Resources */,
 			);
@@ -426,6 +433,7 @@
 				F2608B5578A37B276C915E7A /* LLMTypes.swift in Sources */,
 				234C778F7F573D0CE3905495 /* Migrations.swift in Sources */,
 				1763841EC90FE25B31E8589B /* PDFParserService.swift in Sources */,
+				A827CCF0CFC4F2644D5CD484 /* TTSGateway.swift in Sources */,
 				A124C35BA81F3FB27B49C690 /* WebViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -463,7 +471,7 @@
 		175A14EF0B010F6C5FC99D23 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = Eatit/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -640,7 +648,7 @@
 		AC0C86FA896B2066B5A6E3A6 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = Eatit/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

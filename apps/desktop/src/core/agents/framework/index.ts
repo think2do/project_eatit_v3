@@ -5,6 +5,7 @@ import {
   type FrameworkAgentOutput,
 } from "@/core/schemas/frameworks";
 import type { LLMProvider, Message } from "@/core/llm/types";
+import { getConfiguredModel } from "@/core/llm/configuredModel";
 import { systemPrompt, userPrompt } from "./prompts";
 
 // §C3: No process.env / getApiKey / keychain access here. LLM calls go through deps.llm only.
@@ -37,6 +38,6 @@ export async function runFrameworkAgent(
   return deps.llm.generateObject({
     schema: FrameworkAgentOutputSchema,
     messages,
-    model: "doubao-seed-1-6-250615",
+    model: await getConfiguredModel(),
   });
 }

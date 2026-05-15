@@ -1,4 +1,9 @@
 import Foundation
+import os.log
+
+// [DIAG-ASR] Subsystem-prefixed logger so `log show --predicate 'subsystem == "com.eatit.desktop.asr"'`
+// captures everything end-to-end during dev. Remove after diagnostics complete.
+private let asrDiag = OSLog(subsystem: "com.eatit.desktop.asr", category: "diag")
 
 // §A0.4 + §C1: volc-asr-credentials life-cycle — read Keychain → stack-local VolcAsrCreds → 4 headers → ARC release.
 // §A0.3: redundant hostname check in makeWebSocketRequest (code layer, in addition to ATS in Info.plist).
@@ -60,9 +65,19 @@ final class ASRGateway {
     private let endpoint: URL
 
     private static let allowedHost = "openspeech.bytedance.com"
-    private static let resourceId = "volc.bigasr.sauc.duration"
+    // 豆包流式语音识别 2.0(Seed ASR Streaming 2.0)产品线 — resource id 是
+    // `volc.seedasr.sauc.duration`,跟老 SAUC 大模型版的 `volc.bigasr.sauc.duration`
+    // 不同。错用老 id 接 2.0 实例,火山服务端直接拒绝 WS upgrade(NSURLErrorBadServerResponse
+    // -1011 / WebSocketHandshakeFailureReasonKey=0)。
+    //
+    // 参考实现:https://github.com/missuo/koe(同样接 Seed ASR 2.0 的 macOS 客户端)
+    // 其 koe-asr/src/doubao.rs 显式使用 `volc.seedasr.sauc.duration`。
+    //
+    // 用户若开通的是其它套餐(订阅版 / 老 SAUC bigmodel),可在设置页「高级」区块
+    // 通过 keychain JSON 的 `resourceId` 字段覆盖。
+    private static let resourceId = "volc.seedasr.sauc.duration"
     private static let defaultEndpoint = URL(
-        string: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel"
+        string: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"
     )!
 
     // Reconnect backoff delays in milliseconds: 500ms, 1s, 2s (§8.2)
@@ -75,6 +90,8 @@ final class ASRGateway {
     private var retryCount: Int = 0
     // Stashed params for reconnectSilent (§8.2 invariant: re-use same config).
     private var lastParams: ASRStartParams?
+    // [DIAG-ASR] Audio frame counter (transient diagnostic, remove after debugging).
+    private var audioFrameCounter: Int = 0
 
     init(
         keychain: KeychainReading,
@@ -93,9 +110,18 @@ final class ASRGateway {
     /// Connect WS, inject 4 auth headers, send first frame, return immediately.
     /// Does NOT block waiting for server ack per §5.3 design decision.
     func connect(streamId: String, params: ASRStartParams) async throws {
-        guard task == nil else {
-            throw BridgeError(code: "asr.already-connected",
-                              message: "another stream is active: \(self.streamId ?? "?")")
+        // If a previous stream is still around, close it abruptly before
+        // starting a new one.  Real-world triggers we've seen for this drift:
+        //   - testASRConnection (SettingsPage) left a stream live whose
+        //     graceful drain hadn't fully completed before the user moved on.
+        //   - InterviewPage re-mount called start before the previous mount's
+        //     stop fully processed.
+        //   - Server-side close that didn't cancel our local task.
+        // Throwing `asr.already-connected` and forcing the user to retry was
+        // user-hostile; auto-recovery is safe because each stream is isolated
+        // by streamId and we hold only one task slot.
+        if self.task != nil {
+            await disconnect(graceful: false)
         }
 
         let req = try makeWebSocketRequest()   // §3.2 — throws on keychain / host check failures
@@ -105,20 +131,33 @@ final class ASRGateway {
         self.streamId = streamId
         self.lastParams = params              // stash for reconnectSilent (§8.2)
 
-        // Build first-frame config from ASRStartParams (§5.2 field-locked JSON)
+        // Build first-frame config — Seed ASR 2.0 wire format.
+        // gzip=true matches koe (working reference impl); the server's
+        // compression flag handling is more permissive on gzip than raw JSON
+        // for some 2.0 deployments per anecdotal community reports.
         let config = ASRConfigPayload(
-            audio: ASRAudioConfig(format: "pcm", rate: 16000, channels: 1, codec: "raw"),
+            user: ASRUserConfig(uid: "eatit"),
+            audio: ASRAudioConfig(
+                format: "pcm",
+                codec: "raw",
+                rate: 16000,
+                bits: 16,
+                channel: 1
+            ),
             request: ASRRequestConfig(
                 modelName: "bigmodel",
                 enableITN: params.enableITN ?? true,
                 enablePunc: params.enablePunc ?? true,
-                enableSpeakerInfo: nil
+                enableDDC: false,
+                enableNonstream: false,
+                resultType: "full",
+                showUtterances: true
             )
         )
 
         let firstFrame: Data
         do {
-            firstFrame = try packFirstFrame(config: config, gzip: false)
+            firstFrame = try packFirstFrame(config: config)
         } catch {
             // Pack failure is internal; clean up before throwing.
             self.task = nil
@@ -130,11 +169,15 @@ final class ASRGateway {
 
         do {
             try await newTask.send(.data(firstFrame))
+            // [DIAG-ASR] First-frame size + header hex (no payload bytes — payload is JSON config, not PII).
+            let hex = firstFrame.prefix(8).map { String(format: "%02x", $0) }.joined(separator: " ")
+            os_log("%{public}@", log: asrDiag, type: .info, "firstFrame sent: \(firstFrame.count)B header8=[\(hex)] endpoint=\(self.endpoint.absoluteString) resourceId=\(Self.resourceId)")
         } catch {
             // §5.4: send failure — reset state, cancel task to prevent leak.
             self.task = nil
             self.streamId = nil
             newTask.cancel(with: .normalClosure, reason: nil)
+            os_log("%{public}@", log: asrDiag, type: .info, "firstFrame send FAILED: \(error)")
             throw BridgeError(code: "asr.ws-handshake-failed",
                               message: "first frame send failed: \(error)")
         }
@@ -167,7 +210,11 @@ final class ASRGateway {
         router.dispatchEvent(
             type: "asr-end",
             streamId: savedStreamId ?? "",
-            payload: ["reason": graceful ? "client-stop" : "abrupt"]
+            // JS Zod ASR end-reason enum: ["1006","1011","stop","client-stop","eof","error"].
+            // "abrupt" was rejected (verified via WKJavaScriptException log). Both graceful
+            // and non-graceful self-initiated closes map to "client-stop" — the distinction
+            // (stale-task cleanup vs explicit stop) doesn't matter to the UI.
+            payload: ["reason": "client-stop"]
         )
     }
 
@@ -182,10 +229,16 @@ final class ASRGateway {
             return
         }
         let frame = packAudioFrame(pcmChunk: pcmChunk, last: false)
+        // [DIAG-ASR] PCM-frame counter — log every 10th frame (≈ once / 2s) to confirm audio flowing.
+        audioFrameCounter += 1
+        if audioFrameCounter == 1 || audioFrameCounter % 10 == 0 {
+            os_log("%{public}@", log: asrDiag, type: .info, "audio frame #\(audioFrameCounter) sent: \(frame.count)B (pcm=\(pcmChunk.count)B)")
+        }
         Task { [weak self] in
             do {
                 try await task.send(.data(frame))
             } catch {
+                os_log("%{public}@", log: asrDiag, type: .info, "audio frame send FAILED at #\(self?.audioFrameCounter ?? 0): \(error)")
                 self?.dispatchError(code: "asr.frame-send-failed",
                                     message: "audio frame send: \(error)")
                 await self?.attemptReconnect()
@@ -209,24 +262,33 @@ final class ASRGateway {
 
     private func receiveLoop() async {
         guard let task = self.task else { return }
+        os_log("%{public}@", log: asrDiag, type: .info, "receiveLoop started, task.state=\(task.state.rawValue)")
+        var frameRxCount = 0
         while task.state == .running {
             let msg: URLSessionWebSocketTask.Message
             do {
                 msg = try await task.receive()
             } catch {
+                os_log("%{public}@", log: asrDiag, type: .info, "receive() THREW after \(frameRxCount) frames: error=\(error) urlErr=\((error as? URLError)?.code.rawValue ?? -9999) closeCode=\(task.closeCode.rawValue)")
                 await handleReceiveError(error)
                 return
             }
             switch msg {
             case .data(let frameData):
+                frameRxCount += 1
+                let hex = frameData.prefix(16).map { String(format: "%02x", $0) }.joined(separator: " ")
+                os_log("%{public}@", log: asrDiag, type: .info, "RX frame #\(frameRxCount): \(frameData.count)B header16=[\(hex)]")
                 handleFrame(frameData)
-            case .string:
-                // SAUC does not send text frames; ignore defensively.
+            case .string(let text):
+                // SAUC does not send text frames; log defensively.
+                os_log("%{public}@", log: asrDiag, type: .info, "RX text frame (unexpected): \(text.prefix(120))")
                 continue
             @unknown default:
+                os_log("%{public}@", log: asrDiag, type: .info, "RX unknown message kind")
                 continue
             }
         }
+        os_log("%{public}@", log: asrDiag, type: .info, "receiveLoop exiting, task.state=\(task.state.rawValue), closeCode=\(task.closeCode.rawValue)")
     }
 
     // MARK: - handleFrame (§7.1)
@@ -244,25 +306,80 @@ final class ASRGateway {
         }
         switch resp {
         case .result(let r):
-            dispatchUtterances(r.result.utterances)
+            // Seed ASR 2.0 may send a per-utterance breakdown, a summary-only
+            // text, or a heartbeat with neither.  dispatchResult handles all.
+            dispatchResult(r.result)
         case .serverError(let env):
             dispatchError(code: "asr.server-error",
                           message: "[\(env.code)] \(env.message)")
         }
     }
 
+    // MARK: - dispatchResult (§7.1)
+
+    /// Handle the optional `result` block per Seed ASR 2.0 wire format.
+    ///
+    /// IMPORTANT (verified empirically against Volc Seed ASR 2.0 + matched in
+    /// /tmp/asr_test.py output):
+    ///   - `result.text` is ALWAYS the FULL cumulative transcript so far across
+    ///     the whole session, not the delta. The text grows monotonically per
+    ///     frame.
+    ///   - `result.utterances` is the FULL HISTORY of segmented utterances
+    ///     (each subsequent frame includes ALL prior + current utterances).
+    ///     Iterating utterances per-frame (the original M2.8.dev.c approach)
+    ///     causes the same definite utterance to get re-dispatched many times,
+    ///     producing the catastrophic "repeated 10+ times" UI bug observed.
+    ///
+    /// Therefore: emit ONE event per frame using `result.text` as the entire
+    /// transcript. Mark the event "final" iff every utterance in the array is
+    /// definite=true (server has committed the whole transcript so far).
+    /// JS layer just shows whatever `text` arrives — no accumulation needed.
+    private func dispatchResult(_ result: ASRResultInner?) {
+        guard let result = result else {
+            os_log("%{public}@", log: asrDiag, type: .info, "dispatchResult: result==nil (heartbeat)")
+            return
+        }
+        guard let text = result.text, !text.isEmpty else {
+            // No text yet (initial heartbeat or empty interim) — nothing to render.
+            return
+        }
+        // Definite if ALL utterances have definite=true (i.e. server committed
+        // the full transcript so far). If utterances missing or any is partial,
+        // treat as live partial.
+        let allDefinite: Bool
+        if let utts = result.utterances, !utts.isEmpty {
+            allDefinite = utts.allSatisfy { ($0.definite ?? false) }
+        } else {
+            allDefinite = false
+        }
+        let eventType = allDefinite ? "asr-final" : "asr-partial"
+        var payload: [String: Any] = ["definite": allDefinite, "text": text]
+        if allDefinite, let utts = result.utterances, let lastDefinite = utts.last(where: { ($0.definite ?? false) }) {
+            if let st = lastDefinite.startTime { payload["startTime"] = st }
+            if let et = lastDefinite.endTime   { payload["endTime"] = et }
+        }
+        os_log("%{public}@", log: asrDiag, type: .info, "dispatch \(eventType) streamId=\(self.streamId ?? "nil") textLen=\(text.count) allDefinite=\(allDefinite)")
+        router.dispatchEvent(type: eventType, streamId: self.streamId ?? "", payload: payload)
+    }
+
     // MARK: - dispatchUtterances (§7.1)
 
     private func dispatchUtterances(_ utterances: [ASRUtterance]) {
         for u in utterances {
+            // Skip utterances with no text — server occasionally emits
+            // metadata-only entries (e.g. timing markers) the UI can't render.
+            guard let text = u.text, !text.isEmpty else { continue }
+            // `definite` defaults to false (partial) when the server omits it.
+            let isDefinite = u.definite ?? false
             // §C3 / §3.3: utterance.text is candidate PII — never write to log.
-            var payload: [String: Any] = ["definite": u.definite]
-            payload["text"] = u.text
-            if u.definite {
+            var payload: [String: Any] = ["definite": isDefinite, "text": text]
+            if isDefinite {
                 if let st = u.startTime { payload["startTime"] = st }
                 if let et = u.endTime   { payload["endTime"] = et }
             }
-            let eventType = u.definite ? "asr-final" : "asr-partial"
+            let eventType = isDefinite ? "asr-final" : "asr-partial"
+            // [DIAG-ASR] Log dispatch — text length only (PII §C3 keeps text out of log).
+            os_log("%{public}@", log: asrDiag, type: .info, "dispatch \(eventType) streamId=\(self.streamId ?? "nil") textLen=\(text.count) definite=\(isDefinite)")
             router.dispatchEvent(type: eventType, streamId: self.streamId ?? "", payload: payload)
         }
     }
@@ -417,15 +534,25 @@ final class ASRGateway {
                               message: "no lastParams available for reconnect")
         }
         let config = ASRConfigPayload(
-            audio: ASRAudioConfig(format: "pcm", rate: 16000, channels: 1, codec: "raw"),
+            user: ASRUserConfig(uid: "eatit"),
+            audio: ASRAudioConfig(
+                format: "pcm",
+                codec: "raw",
+                rate: 16000,
+                bits: 16,
+                channel: 1
+            ),
             request: ASRRequestConfig(
                 modelName: "bigmodel",
                 enableITN: params.enableITN ?? true,
                 enablePunc: params.enablePunc ?? true,
-                enableSpeakerInfo: nil
+                enableDDC: false,
+                enableNonstream: false,
+                resultType: "full",
+                showUtterances: true
             )
         )
-        let firstFrame = try packFirstFrame(config: config, gzip: false)
+        let firstFrame = try packFirstFrame(config: config)
         try await newTask.send(.data(firstFrame))
 
         // Spawn fresh receive loop.
@@ -438,12 +565,6 @@ final class ASRGateway {
     // MARK: - makeWebSocketRequest() (§3.2 pseudocode + §A0.3 host check + §A0.4 lifecycle)
 
     private func makeWebSocketRequest() throws -> URLRequest {
-        // §A0.3: redundant hostname check (code layer, defense-in-depth alongside ATS)
-        guard endpoint.host?.lowercased() == Self.allowedHost else {
-            throw BridgeError(code: "asr.host-not-allowed",
-                              message: "host '\(endpoint.host ?? "")' not in allow list")
-        }
-
         // §A0.4: read Keychain → JSON-decode → stack-local creds → headers → ARC release on return
         guard let credsData = try keychain.read(account: "volc-asr-credentials") else {
             throw BridgeError(code: "asr.credentials-missing",
@@ -458,20 +579,47 @@ final class ASRGateway {
                               message: "volc-asr-credentials JSON decode failed")
         }
 
-        guard !creds.appId.isEmpty, !creds.accessToken.isEmpty else {
+        guard !creds.apiKey.isEmpty else {
             throw BridgeError(code: "asr.credentials-missing",
-                              message: "appId or accessToken is empty")
+                              message: "apiKey is empty")
         }
+
+        // Resolve endpoint: creds.endpointPath overrides ONLY the path
+        // (host stays pinned by §A0.3 white-list).  Empty / nil → fall back
+        // to the gateway-level endpoint baked at init.
+        let resolvedEndpoint: URL = {
+            let pathOverride = (creds.endpointPath ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !pathOverride.isEmpty,
+                  var comps = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
+                return endpoint
+            }
+            comps.path = pathOverride.hasPrefix("/") ? pathOverride : "/\(pathOverride)"
+            return comps.url ?? endpoint
+        }()
+
+        // §A0.3: redundant hostname check (code layer, defense-in-depth alongside ATS)
+        guard resolvedEndpoint.host?.lowercased() == Self.allowedHost else {
+            throw BridgeError(code: "asr.host-not-allowed",
+                              message: "host '\(resolvedEndpoint.host ?? "")' not in allow list")
+        }
+
+        let resolvedResourceId: String = {
+            let trimmed = (creds.resourceId ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? Self.resourceId : trimmed
+        }()
 
         let newConnectId = UUID().uuidString
         self.connectId = newConnectId
 
-        var req = URLRequest(url: endpoint)
-        req.setValue(creds.appId,        forHTTPHeaderField: "X-Api-App-Key")
-        req.setValue(creds.accessToken,  forHTTPHeaderField: "X-Api-Access-Key")
-        req.setValue(Self.resourceId,    forHTTPHeaderField: "X-Api-Resource-Id")
+        var req = URLRequest(url: resolvedEndpoint)
+        // 新版控制台单 key 鉴权:X-Api-Key 取代旧版 X-Api-App-Key + X-Api-Access-Key。
+        // X-Api-Resource-Id / X-Api-Connect-Id 在新旧两版协议中保持不变。
+        req.setValue(creds.apiKey,       forHTTPHeaderField: "X-Api-Key")
+        req.setValue(resolvedResourceId, forHTTPHeaderField: "X-Api-Resource-Id")
         req.setValue(newConnectId,       forHTTPHeaderField: "X-Api-Connect-Id")
-        // creds (and creds.accessToken) exits scope at function return → ARC release
+        // creds (and creds.apiKey) exits scope at function return → ARC release
         return req
     }
 }

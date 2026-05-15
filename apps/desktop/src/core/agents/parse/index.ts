@@ -8,6 +8,7 @@ import {
   type InterviewFocus,
 } from "@/core/schemas/parse";
 import type { LLMProvider } from "@/core/llm/types";
+import { getConfiguredModel } from "@/core/llm/configuredModel";
 import { systemPrompt, userPrompt } from "./prompts";
 
 // Minimal logger interface — inline for M3.2.1; can migrate to shared utility later.
@@ -100,7 +101,7 @@ export async function runParseAgent(
   const result = await deps.llm.generateObject({
     schema: ParseOutputSchema,
     messages,
-    model: "doubao-seed-1-6-250615",
+    model: await getConfiguredModel(),
   });
 
   // Fallback #1: derive match_score if LLM omitted it

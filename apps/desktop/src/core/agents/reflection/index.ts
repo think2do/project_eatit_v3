@@ -12,6 +12,7 @@ import {
 } from "@/core/schemas/reflection";
 import { scanForbiddenTone, sanitizeTone } from "@/core/schemas/reports";
 import type { LLMProvider, Message } from "@/core/llm/types";
+import { getConfiguredModel } from "@/core/llm/configuredModel";
 import { systemPrompt, userPrompt } from "./prompts";
 
 // ===== Reflection-specific constants (not in core/schemas/reports.ts) =====
@@ -314,7 +315,7 @@ export async function runReflectionAgent(
   const rawLLMOut = await deps.llm.generateObject({
     schema: _LLMReflectionOutputSchema,
     messages,
-    model: "doubao-seed-1-6-250615",
+    model: await getConfiguredModel(),
   });
 
   const sanitized = sanitizeOutput(rawLLMOut, ai_verdict, deps.logger);

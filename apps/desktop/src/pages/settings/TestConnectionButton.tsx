@@ -3,34 +3,28 @@ import { Loader2 } from "lucide-react";
 import { saveLLMConfig, type LLMConfig } from "@/lib/llm/config";
 import { testLLMConnection, type LLMTestResponse } from "@/api/llm";
 
+export type LLMTestStatus =
+  | { kind: "idle" }
+  | { kind: "running" }
+  | { kind: "ok"; data: LLMTestResponse }
+  | { kind: "error"; code: string; message: string };
+
 interface Props {
   config: LLMConfig;
   disabled?: boolean;
   onSuccess?: (response: LLMTestResponse) => void;
 }
 
-type Status =
-  | { kind: "idle" }
-  | { kind: "running" }
-  | { kind: "ok"; data: LLMTestResponse }
-  | { kind: "error"; code: string; message: string };
+/**
+ * Headless test-connection state. SaveLLMConfig is invoked first so the
+ * keychain entry is in place before the LLM call goes out.  Callers can
+ * render `status` however they like — SettingsPage uses it inline below
+ * a shared button row; StepLLM uses TestConnectionButton's default layout.
+ */
+export function useLLMTest(config: LLMConfig, onSuccess?: (response: LLMTestResponse) => void) {
+  const [status, setStatus] = useState<LLMTestStatus>({ kind: "idle" });
 
-function resultBannerStyle(ok: boolean): React.CSSProperties {
-  return {
-    marginTop: 12,
-    padding: "10px 14px",
-    borderRadius: "var(--r-md)",
-    fontSize: 13,
-    background: ok ? "var(--brand-soft)" : "var(--warn-soft)",
-    color: ok ? "var(--brand-ink)" : "var(--warn)",
-    border: `1px solid ${ok ? "var(--brand)" : "var(--warn)"}`,
-  };
-}
-
-export function TestConnectionButton({ config, disabled, onSuccess }: Props): JSX.Element {
-  const [status, setStatus] = useState<Status>({ kind: "idle" });
-
-  const handleClick = async () => {
+  const run = async () => {
     setStatus({ kind: "running" });
     try {
       await saveLLMConfig(config);
@@ -61,6 +55,26 @@ export function TestConnectionButton({ config, disabled, onSuccess }: Props): JS
     }
   };
 
+  const reset = () => setStatus({ kind: "idle" });
+
+  return { status, run, reset };
+}
+
+export function resultBannerStyle(ok: boolean): React.CSSProperties {
+  return {
+    marginTop: 12,
+    padding: "10px 14px",
+    borderRadius: "var(--r-md)",
+    fontSize: 13,
+    background: ok ? "var(--brand-soft)" : "var(--warn-soft)",
+    color: ok ? "var(--brand-ink)" : "var(--warn)",
+    border: `1px solid ${ok ? "var(--brand)" : "var(--warn)"}`,
+  };
+}
+
+export function TestConnectionButton({ config, disabled, onSuccess }: Props): JSX.Element {
+  const { status, run } = useLLMTest(config, onSuccess);
+
   const isRunning = status.kind === "running";
   const canClick = !disabled && !isRunning && config.api_key.trim().length > 0;
 
@@ -68,7 +82,7 @@ export function TestConnectionButton({ config, disabled, onSuccess }: Props): JS
     <div style={{ display: "flex", flexDirection: "column" }}>
       <button
         type="button"
-        onClick={handleClick}
+        onClick={run}
         disabled={!canClick}
         style={{
           alignSelf: "flex-start",

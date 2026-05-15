@@ -1,5 +1,8 @@
 import AppKit
 import WebKit
+import os.log
+
+private let wvDiag = OSLog(subsystem: "com.eatit.desktop.asr", category: "webview")
 
 final class WebViewController: NSViewController {
     private let schemeHandler = EatitURLSchemeHandler()
@@ -18,6 +21,8 @@ final class WebViewController: NSViewController {
     private lazy var llmGateway: LLMGateway = LLMGateway(keychain: keychainService)
     // §A0.4: volc-asr-credentials read per-call inside ASRGateway; not cached here.
     private lazy var asrGateway: ASRGateway = ASRGateway(keychain: keychainService, router: bridgeRouter)
+    // §C3: volc-asr-credentials read per-call inside TTSGateway; not cached here.
+    private lazy var ttsGateway: TTSGateway = TTSGateway(keychain: keychainService)
     // §6.3: active SSE stream tasks keyed by streamId. NSLock for thread-safe mutation.
     private var activeStreams: [String: Task<Void, Never>] = [:]
     private let activeStreamsLock = NSLock()
@@ -34,6 +39,13 @@ final class WebViewController: NSViewController {
         )
         webView = DropAwareWebView(frame: .zero, configuration: config)
         webView.translatesAutoresizingMaskIntoConstraints = false
+        // Enable Web Inspector (right-click → Inspect Element) in Debug builds
+        // so silent React render failures / JS exceptions / CSS issues are
+        // diagnosable without rebuilding. macOS 13.3+ API. Archive/Release
+        // builds inherit this — Apple's review doesn't complain about it.
+        if #available(macOS 13.3, *) {
+            webView.isInspectable = true
+        }
         // 让 <input type="file"> 在 WKWebView 内可触发 NSOpenPanel(WKUIDelegate.runOpenPanel)。
         // M2.4 FilePickerService 的 bridge.call("file.pick") 是 JS 主动调用通道;
         // 这里是 web 标准 input.click() 通道,二者并存。§A0.1 复用 files.user-selected.read-write entitlement。
@@ -61,6 +73,7 @@ final class WebViewController: NSViewController {
         registerAudioCaptureHandlers()
         registerLLMHandlers()
         registerASRHandlers()
+        registerTTSHandlers()
     }
 
     private func registerEchoHandler() {
@@ -69,6 +82,23 @@ final class WebViewController: NSViewController {
         // Test method: bridge.echo({ msg }) → { msg }
         bridgeRouter.register(method: "bridge.echo") { (p: EchoParams) -> EchoResult in
             EchoResult(msg: p.msg)
+        }
+
+        // diag.log({ level, msg }) → 把 JS console 输出写进 macOS unified log。
+        // 让 `log show --process Eatit` 能看到 JS 端日志。subsystem 用 com.eatit.desktop.js。
+        struct LogParams: Codable { let level: String; let msg: String }
+        struct LogResult: Codable {}
+        let jsLog = OSLog(subsystem: "com.eatit.desktop.js", category: "console")
+        bridgeRouter.register(method: "diag.log") { (p: LogParams) -> LogResult in
+            let logType: OSLogType
+            switch p.level {
+            case "error", "rejection", "window-error":
+                logType = .error
+            default:
+                logType = .info
+            }
+            os_log("[%{public}@] %{public}@", log: jsLog, type: logType, p.level, p.msg)
+            return LogResult()
         }
     }
 
@@ -235,6 +265,7 @@ final class WebViewController: NSViewController {
             guard let self = self else {
                 throw BridgeError(code: "bridge.internal-error", message: "service released")
             }
+            os_log("%{public}@", log: wvDiag, type: .info, "audio.start Bridge call streamId=\(p.streamId)")
             do {
                 // M2.8.dev.d: PCM flows Swift→Swift in-process; zero JS hop (§C3 / §6.1).
                 // If ASRGateway is not yet connected, handlePCMChunk silent-drops the chunk.
@@ -361,6 +392,7 @@ final class WebViewController: NSViewController {
             guard let self = self else {
                 throw BridgeError(code: "bridge.internal-error", message: "service released")
             }
+            os_log("%{public}@", log: wvDiag, type: .info, "asr.start Bridge call streamId=\(p.streamId)")
             do {
                 try await self.asrGateway.connect(streamId: p.streamId, params: p)
                 return ASRStartedResult(streamId: p.streamId, started: true)
@@ -384,6 +416,28 @@ final class WebViewController: NSViewController {
                 throw BridgeError(code: "bridge.internal-error", message: "service released")
             }
             return self.asrGateway.statusSnapshot()
+        }
+    }
+
+    /// Registers tts.synthesize Bridge method. One-shot HTTP TTS via Volc Doubao.
+    /// §C3: volc-asr-credentials never crosses Bridge; only synthesized audio
+    /// (no PII, server-generated speech of interviewer questions) flows out.
+    /// §B9: dual-end contract — JS TTSSynthesizeParamsSchema + TTSResultSchema in same commit.
+    private func registerTTSHandlers() {
+        struct TTSSynthesizeParams: Codable {
+            let text: String
+            let voiceType: String
+            let speedRatio: Double?
+        }
+        bridgeRouter.register(method: "tts.synthesize") { [weak self] (p: TTSSynthesizeParams) -> TTSGateway.TTSResult in
+            guard let self = self else {
+                throw BridgeError(code: "bridge.internal-error", message: "service released")
+            }
+            return try await self.ttsGateway.synthesize(
+                text: p.text,
+                voiceType: p.voiceType,
+                speedRatio: p.speedRatio ?? 1.0
+            )
         }
     }
 
@@ -434,6 +488,31 @@ extension WebViewController: WKUIDelegate {
         } else {
             panel.begin(completionHandler: handle)
         }
+    }
+
+    /// 拦下 `<a target="_blank">` 之类需要打开新窗的链接,转交系统浏览器。
+    ///
+    /// 默认 WKWebView 对这种 navigation 的反应是「啥都不做」(因为我们没
+    /// 开 `WKWebView.allowsLinkPreview` 之外的弹窗能力,也没让它创建 child
+    /// WebView),用户体验是「点了没反应」。SettingsPage 上 BYOK · LLM 与
+    /// BYOK · ASR 两段「前往火山引擎控制台」外链全部因此哑火。
+    ///
+    /// 这里只放行 http(s),拒绝 `mailto:` / `tel:` / 自定义 scheme,避免
+    /// 借此弹起其它 app(沙盒侧 `NSWorkspace.open` 自身合规,但白名单仍
+    /// 由我们守住,跟 §A0.3 出站 host 白名单保持同样的「最小授权」精神)。
+    /// 始终返回 nil,主 WKWebView 不会被替换或弹出 child window。
+    func webView(
+        _ webView: WKWebView,
+        createWebViewWith configuration: WKWebViewConfiguration,
+        for navigationAction: WKNavigationAction,
+        windowFeatures: WKWindowFeatures
+    ) -> WKWebView? {
+        if let url = navigationAction.request.url,
+           let scheme = url.scheme?.lowercased(),
+           scheme == "http" || scheme == "https" {
+            NSWorkspace.shared.open(url)
+        }
+        return nil
     }
 }
 

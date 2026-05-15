@@ -325,7 +325,7 @@ describe("ArkProvider", () => {
 
     expect(postMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        params: expect.objectContaining({ model: "doubao-seed-1-6-250615" }),
+        params: expect.objectContaining({ model: "doubao-seed-2-0-lite-260215" }),
       })
     );
   });

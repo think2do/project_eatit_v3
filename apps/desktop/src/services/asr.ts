@@ -268,3 +268,46 @@ export async function* useASRStream(
     await asrStop(streamId).catch(() => undefined);
   }
 }
+
+// MARK: - testASRConnection (M-asr.byok)
+
+/**
+ * Verify the `volc-asr-credentials` Keychain entry can actually open a Volc
+ * SAUC WebSocket.  Mirrors the LLM section's testLLMConnection but uses
+ * `asr.start` as the probe — Swift ASRGateway.connect() blocks until the
+ * WebSocket handshake completes and the first config frame is sent, which
+ * means a sync return from `asr.start` already proves:
+ *   1. Keychain has volc-asr-credentials (else asr.credentials-missing)
+ *   2. Volc accepted the WS upgrade (auth headers were valid)
+ *   3. First-frame send succeeded (TLS / network healthy)
+ *
+ * No PCM is captured (audio.start is NOT called), so the user is not
+ * prompted for mic permission and no microphone resource is touched.
+ *
+ * The probe always asrStop()s in `finally` to avoid leaking the WS task
+ * on failure paths.
+ */
+export interface ASRTestResult {
+  ok: boolean;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
+export async function testASRConnection(): Promise<ASRTestResult> {
+  const streamId = crypto.randomUUID();
+  try {
+    await asrStart({ streamId });
+  } catch (err) {
+    const code = (err as { code?: string })?.code ?? "asr.unknown";
+    const message =
+      err instanceof Error
+        ? err.message
+        : typeof err === "string"
+          ? err
+          : "ASR probe failed";
+    return { ok: false, errorCode: code, errorMessage: message };
+  }
+  // Best-effort cleanup; swallow errors so they don't mask a successful probe.
+  await asrStop(streamId).catch(() => undefined);
+  return { ok: true };
+}

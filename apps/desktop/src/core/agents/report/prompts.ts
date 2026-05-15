@@ -78,12 +78,10 @@ export function systemPrompt(): string {
 - \`tone\`: "good" | "ok" | "warn"
 - \`answer_summary\`: 答案要点压缩(≤ 60 字)
 - \`ai_feedback\`: 针对该轮的教练建议(≤ 80 字)
+- \`raw_answer\`: **固定输出空字符串 ""**,系统会用候选人原始作答覆盖,你不需要复制长文本
+- \`ai_suggested_answer\`: 针对该轮问题的范例答案(150~300 字),用第二人称("你可以这样答...")给出结构化、可借鉴的高质量回答示范。要点:对齐岗位 / 框架,体现 STAR / 决策推演 / 业务直觉等结构,不要直接复述候选人原话。
 
-#### next_actions_v2(可选)
-若有明确的下一场练习建议,填写:
-- \`headline\`: ≤ 20 字的标题
-- \`preset_config\`: 下一场面试配置
-- \`reason\`: 理由(≤ 60 字)
+#### (next_actions_v2 字段已移除,不要输出该字段)
 
 #### overall_score
 0~100 整数,加权综合评分。

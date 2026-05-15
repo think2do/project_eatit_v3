@@ -5,7 +5,6 @@
 
 import { Mic } from "lucide-react";
 import type { InterviewDirectionV32, InterviewDurationV32 } from "@eatit/shared-types";
-import { getRemainingQuotaMock, readQuotaMock } from "@/lib/quotaMock";
 
 export interface SummarySidebarProps {
   /** "Notion · 高级产品经理" — derived from JD parse; falls back to "—". */
@@ -40,9 +39,6 @@ export function SummarySidebar({
   submitting,
   onStart,
 }: SummarySidebarProps): JSX.Element {
-  const quota = readQuotaMock();
-  const remaining = getRemainingQuotaMock();
-
   return (
     <aside
       data-testid="config-summary-sidebar"
@@ -137,21 +133,6 @@ export function SummarySidebar({
         <Mic size={14} />
         {submitting ? "生成面试框架…" : "开始模拟面试"}
       </button>
-
-      <div
-        className="muted"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          fontSize: 12,
-        }}
-        data-testid="summary-quota-row"
-      >
-        <span>开始后会扣除 1 次额度</span>
-        <span style={{ fontFamily: "var(--f-mono)" }}>
-          剩余 {remaining}/{quota.limit}
-        </span>
-      </div>
     </aside>
   );
 }

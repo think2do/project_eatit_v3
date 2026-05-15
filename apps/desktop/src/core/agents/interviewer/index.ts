@@ -5,6 +5,7 @@ import {
   type InterviewerAgentOutput,
 } from "@/core/schemas/turns";
 import type { LLMProvider, Message } from "@/core/llm/types";
+import { getConfiguredModel } from "@/core/llm/configuredModel";
 import type { InterviewStyleV32 } from "./personas";
 import { getPersona } from "./personas";
 import { systemPrompt, userPrompt, extractPredictedQuestions } from "./prompts";
@@ -71,6 +72,6 @@ export async function runInterviewerAgent(
   return deps.llm.generateObject({
     schema: InterviewerAgentOutputSchema,
     messages,
-    model: "doubao-seed-1-6-250615",
+    model: await getConfiguredModel(),
   });
 }

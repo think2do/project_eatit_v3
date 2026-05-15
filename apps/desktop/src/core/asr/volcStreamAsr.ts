@@ -48,37 +48,59 @@ export function createVolcStreamAsr(
   } | null = null;
   let _state: VolcStreamAsrState = "idle";
   let cachedFinal: CaptureResult | null = null;
+  // Latest partial text — used as fallback "final" if user stops mid-sentence
+  // and Volc never marks the trailing utterance as definite. result.text is
+  // always cumulative, so the latest partial IS a valid full transcript.
+  let latestPartialText: string = "";
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  // Volc Seed ASR 2.0 server sends `result.text` as the FULL CUMULATIVE
+  // transcript on every frame (not deltas). The Swift ASRGateway emits one
+  // event per frame using that text. So each chunk.text we receive is already
+  // the complete transcript so far — just track the latest, no accumulation.
+  // (Earlier accumulation attempt produced the "我这边叫丁诗轩 repeated 10x"
+  // catastrophe because we were re-adding the same prefix on every frame.)
 
   async function runLoop(cb: VolcStreamAsrCallbacks): Promise<void> {
     try {
       for await (const chunk of iter!) {
         if (chunk.type === "partial") {
+          latestPartialText = chunk.text;
           cb.onPartial(chunk.text);
         } else if (chunk.type === "final") {
+          latestPartialText = chunk.text;  // a final is also our latest text
           cachedFinal = {
             finalText: chunk.text,
             startTime: chunk.startTime,
             endTime: chunk.endTime,
           };
-          if (pendingFinal) {
-            _state = "done";
-            if (timeoutId) {
-              clearTimeout(timeoutId);
-              timeoutId = null;
-            }
-            pendingFinal.resolve(cachedFinal);
-            pendingFinal = null;
-            return;
-          }
+          // Don't resolve pendingFinal on every final — server may keep
+          // sending incremental updates (interim definites, then more
+          // partials for the next segment). Wait for iterator to end
+          // (last_packet drain / server close).
         }
       }
-      // Iterator ended without a final being consumed by pendingFinal
+      // Iterator ended (last_packet drain complete OR server close).
+      // Three cases:
+      //   1. We have cachedFinal → resolve with it
+      //   2. We have only latestPartialText (server never sent definite) →
+      //      resolve with it as the answer (it's the cumulative transcript)
+      //   3. Truly empty session → reject no-final-received
       if (pendingFinal) {
-        _state = "errored";
-        const r = pendingFinal.reject;
-        pendingFinal = null;
-        r(new Error("asr.no-final-received"));
+        const finalResult = cachedFinal ?? (latestPartialText.length > 0
+          ? { finalText: latestPartialText, startTime: undefined, endTime: undefined }
+          : null);
+        if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
+        if (finalResult !== null) {
+          _state = "done";
+          pendingFinal.resolve(finalResult);
+          pendingFinal = null;
+        } else {
+          _state = "errored";
+          const r = pendingFinal.reject;
+          pendingFinal = null;
+          r(new Error("asr.no-final-received"));
+        }
       } else {
         _state = "done";
       }
@@ -110,6 +132,7 @@ export function createVolcStreamAsr(
       cachedFinal = null;
       pendingFinal = null;
       timeoutId = null;
+      latestPartialText = "";
       iter = useASRStream(options);
       void runLoop(callbacks);
     },
@@ -126,14 +149,31 @@ export function createVolcStreamAsr(
       }
       return new Promise<CaptureResult>((resolve, reject) => {
         pendingFinal = { resolve, reject };
+        // Bumped 1500 → 3500ms to give the server enough drain budget after
+        // we send last_packet (Swift disconnect waits 1s + server may emit
+        // 5~20 finals over the next 500ms~1s for long answers).
         timeoutId = setTimeout(() => {
           if (pendingFinal) {
-            _state = "errored";
-            const r = pendingFinal.reject;
-            pendingFinal = null;
-            r(new Error("asr.no-final-received"));
+            // Resolve with whatever we have: prefer cachedFinal (server-marked
+            // definite); otherwise use the latest partial (still cumulative
+            // and complete per Volc's wire format). Only reject if BOTH are
+            // empty — meaning user spoke literally nothing.
+            const finalResult = cachedFinal ?? (latestPartialText.length > 0
+              ? { finalText: latestPartialText, startTime: undefined, endTime: undefined }
+              : null);
+            if (finalResult !== null) {
+              _state = "done";
+              const r = pendingFinal.resolve;
+              pendingFinal = null;
+              r(finalResult);
+            } else {
+              _state = "errored";
+              const r = pendingFinal.reject;
+              pendingFinal = null;
+              r(new Error("asr.no-final-received"));
+            }
           }
-        }, 1500);
+        }, 3500);
         // Triggers useASRStream finally block → audio.stop → asrStop
         void iter!.return(undefined as unknown as void);
       });

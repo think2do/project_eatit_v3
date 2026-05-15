@@ -62,7 +62,7 @@ export function systemPrompt(persona: InterviewerPersona): string {
 - \`intent\`:该问题的考察意图(内部字段,面向前端 debug panel,不直接对候选人显示)
 - \`expected_depth\`:枚举 \`surface\` / \`tactical\` / \`strategic\`,帮助下游评估这轮应按什么粒度评分
 - \`followup_hint\`:可选,给下一轮的追问方向提示(简短一句)
-- \`should_end\`:bool,若认为面试在本轮应收尾(时间到 / 问题已充分 / 用户多次无效回答),置 true,此时 question 可以是结束语
+- \`should_end\`:bool,**默认必须 false**。何时 / 是否结束面试由客户端 budget guard 统一裁决(基于剩余分钟数和题量预算),你这里**不参与**结束决策。即便候选人回答非常完整 / 时间紧 / 你"觉得"该收尾,也**始终返回 false**。当客户端需要结束时,会在 framework 里给到 should_end:true 兜底逻辑,无需你判断。
 
 ## 行为准则
 
@@ -125,11 +125,22 @@ export function userPrompt(
   input: InterviewerAgentInput,
   predictedQuestions: PredictedQuestion[],
 ): string {
-  // M8.6: open-question hint for Q1/Q2 (no prior turns context)
-  const openingHint =
-    input.recent_turns.length === 0
-      ? "\n\n这是面试的开场题，请提一个开放性问题，不要假设候选人已经回答过任何具体内容。"
-      : "";
+  // M8.6 修复:Q0/Q1/Q2 不能都用同一个 openingHint,否则 LLM 给 3 个一模一样的"自我介绍"。
+  // 按 target_turn_index 分化开场指令,题目类型逐题递进(自我介绍 → 核心项目 → 具体挑战)。
+  const openingHint = (() => {
+    if (input.recent_turns.length > 0) return "";
+    const idx = input.target_turn_index ?? 0;
+    if (idx === 0) {
+      return "\n\n这是面试的**第 1 题(开场)**:请让候选人做一个 60-90 秒的自我介绍 + 简要说明最核心的工作经历。不要问具体项目细节,这一题是建立 baseline。";
+    }
+    if (idx === 1) {
+      return "\n\n这是面试的**第 2 题**:候选人已经做过自我介绍。**禁止再让候选人做自我介绍**,直接挑一个候选人在简历/JD 中提到的最核心项目,让 ta 用 STAR 结构展开介绍该项目的业务背景 + 个人角色 + 落地成果。题目要具体到某一个项目,不要泛问。";
+    }
+    if (idx === 2) {
+      return "\n\n这是面试的**第 3 题**:候选人已经介绍过自我和最核心项目。**禁止重复前两题**。挑该项目中的一个**具体技术决策点或挑战**(架构权衡 / 数据策略 / 跨团队协调 / 关键 trade-off),让候选人深挖讲清当时怎么做的、为什么这么做、结果如何。";
+    }
+    return "\n\n这是面试早期题(无前几轮答案上下文),请提一个候选人最核心赛道方向上的开放性问题,**避免**与典型开场题(自我介绍 / 项目介绍 / 技术挑战)重复。";
+  })();
   const predictedSection =
     predictedQuestions.length > 0
       ? `\n=== 预测题库(F-321,优先采用其中与当前方向匹配的题)===\n本场已有 FrameworkAgent 产出的预测题。**当且仅当**满足以下条件,优先从中挑选:\n\n- 候选人前一轮回答没有打开新的深挖路径\n- 当前剩余时间充裕\n- 题目与当前 direction / focus_competencies 一致\n\n否则按已有的对话节奏自然出题,不要为了用预测题而打断深挖。\n\n${predictedQuestions.map((q) => `- [${q.category}] ${q.question} (why: ${q.why_likely})`).join("\n")}\n`

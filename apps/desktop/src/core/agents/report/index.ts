@@ -7,6 +7,7 @@ import {
   type ReportAgentOutput,
 } from "@/core/schemas/reports";
 import type { LLMProvider, Message } from "@/core/llm/types";
+import { getConfiguredModel } from "@/core/llm/configuredModel";
 import { systemPrompt, userPrompt } from "./prompts";
 import { applyReportSanitization } from "./sanitizers";
 
@@ -49,7 +50,7 @@ export async function runReportAgent(
   const rawOutput = await deps.llm.generateObject({
     schema: ReportAgentOutputSchema,
     messages,
-    model: "doubao-seed-1-6-250615",
+    model: await getConfiguredModel(),
   });
 
   return applyReportSanitization(rawOutput);

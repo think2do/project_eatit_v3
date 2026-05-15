@@ -116,12 +116,6 @@ describe("SummarySidebar", () => {
     expect(onStart).toHaveBeenCalledTimes(1);
   });
 
-  it("renders default quota row (剩余 10/10) on first mount", () => {
-    const { getByTestId } = render(<SummarySidebar {...baseProps} />);
-    expect(getByTestId("summary-quota-row")).toHaveTextContent("剩余 10/10");
-    expect(getByTestId("summary-quota-row")).toHaveTextContent("开始后会扣除 1 次额度");
-  });
-
   it("renders the privacy 小建议 callout", () => {
     const { getByTestId } = render(<SummarySidebar {...baseProps} />);
     const tip = getByTestId("summary-tip");

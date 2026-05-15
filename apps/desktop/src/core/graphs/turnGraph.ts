@@ -12,6 +12,7 @@ import {
 import type { LLMProvider } from "@/core/llm/types";
 import { runCompressionAgent } from "@/core/agents/compression";
 import { runInterviewerAgent } from "@/core/agents/interviewer";
+import { getConfiguredModel } from "@/core/llm/configuredModel";
 
 // §C3: No process.env / getApiKey / keychain access. LLM calls go through deps.llm only.
 
@@ -96,7 +97,7 @@ async function turnAssessmentNode(state: TurnState, deps: TurnGraphDeps): Promis
       { role: "system", content: TURN_ASSESSMENT_SYSTEM },
       { role: "user", content: `问题:${state.question}\n候选人作答:${state.answer}` },
     ],
-    model: "doubao-seed-1-6-250615",
+    model: await getConfiguredModel(),
   });
   return { assessment };
 }

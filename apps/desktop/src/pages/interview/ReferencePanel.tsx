@@ -211,93 +211,16 @@ export function ReferencePanel({ reference, resetKey, streamingText }: Props): J
         </div>
       ) : null}
 
-      {reference.answer_outline.length > 0 ? (
-        <div>
-          <div className="eyebrow" style={{ marginBottom: 6 }}>
-            回答提纲
-          </div>
-          <ol
-            style={{
-              margin: 0,
-              paddingLeft: 18,
-              fontSize: 12.5,
-              lineHeight: 1.7,
-              color: "var(--ink-700)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 2,
-            }}
-          >
-            {reference.answer_outline.map((item, idx) => (
-              <li key={`outline-${idx}`}>{item}</li>
-            ))}
-          </ol>
-        </div>
-      ) : null}
-
       {reference.ideal_answer ? (
-        <div>
-          <div className="eyebrow" style={{ marginBottom: 6 }}>
-            完整示例
-          </div>
-          <div
-            style={{
-              fontSize: 12.5,
-              lineHeight: 1.7,
-              color: "var(--ink-900)",
-              whiteSpace: "pre-wrap",
-            }}
-          >
-            {reference.ideal_answer}
-          </div>
-        </div>
-      ) : null}
-
-      {reference.key_evaluation_points.length > 0 ? (
-        <div>
-          <div className="eyebrow" style={{ marginBottom: 6 }}>
-            评分关键点
-          </div>
-          <ul
-            style={{
-              margin: 0,
-              paddingLeft: 18,
-              fontSize: 12.5,
-              lineHeight: 1.7,
-              color: "var(--ink-700)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 2,
-            }}
-          >
-            {reference.key_evaluation_points.map((item, idx) => (
-              <li key={`kp-${idx}`}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {reference.common_pitfalls.length > 0 ? (
-        <div>
-          <div className="eyebrow" style={{ marginBottom: 6 }}>
-            常见误区
-          </div>
-          <ul
-            style={{
-              margin: 0,
-              paddingLeft: 18,
-              fontSize: 12.5,
-              lineHeight: 1.7,
-              color: "var(--warn)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 2,
-            }}
-          >
-            {reference.common_pitfalls.map((item, idx) => (
-              <li key={`pf-${idx}`}>{item}</li>
-            ))}
-          </ul>
+        <div
+          style={{
+            fontSize: 13,
+            lineHeight: 1.75,
+            color: "var(--ink-900)",
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {reference.ideal_answer}
         </div>
       ) : null}
     </section>

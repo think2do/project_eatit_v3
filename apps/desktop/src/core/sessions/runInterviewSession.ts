@@ -177,6 +177,42 @@ export async function* runInterviewSession(
 ): AsyncGenerator<InterviewSessionEvent, void, unknown> {
   const events = createAsyncQueue<InterviewSessionEvent>();
 
+  // 2026-05-13:把简历真实经历 (profile + summary + advantages + gaps) 序列化传给 ReferenceAgent,
+  // 让生成的 ideal_answer 用候选人**实际**项目/年限,而不是凭空捏"6 年 AI PM / 3 千万级月调用量"。
+  // BYOK 产品下数据走用户自己的 ARK key,未离本机生态。
+  //
+  // L3(2026-05-14):前几题用完整 profile(自我介绍/核心项目题需要细节),Q4+
+  // 改用 short summary 降 token,避免累积上下文 + recent_turns 把 prompt 撑爆 ARK 4xx。
+  const candidateProfileFull = (() => {
+    const ps = input.parseSummary;
+    const hasContent =
+      ps.candidate_profile != null ||
+      (ps.profile_summary && ps.profile_summary.trim() !== "") ||
+      ps.match_advantages.length > 0 ||
+      ps.gaps.length > 0;
+    if (!hasContent) return null;
+    return JSON.stringify({
+      profile: ps.candidate_profile ?? null,
+      profile_summary: ps.profile_summary ?? null,
+      match_advantages: ps.match_advantages,
+      gaps: ps.gaps,
+    });
+  })();
+  const candidateProfileShort = (() => {
+    const ps = input.parseSummary;
+    const summaryText = ps.profile_summary && ps.profile_summary.trim() !== ""
+      ? ps.profile_summary
+      : null;
+    if (summaryText === null && ps.match_advantages.length === 0) return null;
+    return JSON.stringify({
+      profile_summary: summaryText,
+      match_advantages: ps.match_advantages,
+    });
+  })();
+  /** 给 ReferenceAgent 选 profile 体积:前 4 题(Q0-Q3)用 full,Q4+ 用 short。 */
+  const profileForTurn = (turnIdx: number): string | null =>
+    turnIdx < 4 ? candidateProfileFull : candidateProfileShort;
+
   // Fire reference for `question` in the background.  When the LLM call
   // settles, push reference.ready with the captured turnIndex so the state
   // machine can drop it if the user has already moved on (stale-arrival guard).
@@ -189,6 +225,7 @@ export async function* runInterviewSession(
         // depend on candidate_answer; the comparison-to-user field in the
         // prompt template is optional.
         candidate_answer: null,
+        candidate_profile_json: profileForTurn(capturedTurnIndex),
       },
       { llm },
     )
@@ -231,7 +268,7 @@ export async function* runInterviewSession(
     void (async () => {
       try {
         for await (const chunk of streamDraftReadableAnswer(
-          { question, persona: input.personaName },
+          { question, persona: input.personaName, candidateProfileJson: profileForTurn(capturedTurnIndex) },
           { llm },
         )) {
           if (controller.signal.aborted) break;
@@ -383,10 +420,17 @@ export async function* runInterviewSession(
           });
         }
 
+        // L3(2026-05-14):recent_turns 在 InterviewerAgent / Coach 等 agent 里都会
+        // 拼进 prompt。用户答得长(500-2000 字常见)+ 累积 2 轮 → 单题 prompt 容易超 8K
+        // 触发 ARK rate-limit / token-limit 4xx。截断到 800 字保留语义骨架,降 token。
+        const cappedAnswer =
+          userInput.text.length > 800
+            ? userInput.text.slice(0, 800) + "...(truncated for context budget)"
+            : userInput.text;
         // Accumulate turn record (question / answer / assessment only — no turn_index)
         turns.push({
           question: lastQuestion,
-          answer: userInput.text,
+          answer: cappedAnswer,
           assessment: result.assessment
             ? { summary: result.assessment.summary }
             : null,

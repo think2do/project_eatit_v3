@@ -9,6 +9,7 @@ import {
   type ResearchAgentOutput,
 } from "@/core/schemas/research";
 import type { LLMProvider, Message } from "@/core/llm/types";
+import { getConfiguredModel } from "@/core/llm/configuredModel";
 import { z } from "zod";
 import { systemPrompt, userPrompt } from "./prompts";
 
@@ -78,7 +79,7 @@ export async function runResearchAgent(
   const llmResult = await deps.llm.generateObject({
     schema: ResearchSubObjectSchema,
     messages,
-    model: "doubao-seed-1-6-250615",
+    model: await getConfiguredModel(),
   });
 
   return ResearchAgentOutputSchema.parse({

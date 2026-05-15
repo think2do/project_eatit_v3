@@ -89,9 +89,17 @@ final class MockWebSocketTaskFactoryQueued: WebSocketTaskFactory {
 
 // MARK: - Frame builders for test
 
+private func beU32Bytes(_ value: UInt32) -> Data {
+    var out = Data(count: 4)
+    out[0] = UInt8((value >> 24) & 0xFF)
+    out[1] = UInt8((value >> 16) & 0xFF)
+    out[2] = UInt8((value >> 8) & 0xFF)
+    out[3] = UInt8(value & 0xFF)
+    return out
+}
+
 private func makeServerFullResponseFrame(utterances: [[String: Any]]) -> Data {
-    // Build JSON matching ASRResultPayload shape:
-    // { "result": { "utterances": [...] } }
+    // Seed ASR 2.0 wire: header(4) + u32 BE size(4) + JSON payload.
     var utteranceJSON: [[String: Any]] = []
     for u in utterances {
         utteranceJSON.append(u)
@@ -99,24 +107,29 @@ private func makeServerFullResponseFrame(utterances: [[String: Any]]) -> Data {
     let body: [String: Any] = ["result": ["utterances": utteranceJSON]]
     let payload = try! JSONSerialization.data(withJSONObject: body)
 
-    var header = Data(count: 4)
-    header[0] = 0x11
-    header[1] = (0x9 << 4) | 0x0   // serverFullResponse, flags=0
-    header[2] = (0x1 << 4) | 0x0   // JSON, no compression
-    header[3] = 0x00
-    return header + payload
+    var frame = Data(count: 4)
+    frame[0] = 0x11
+    frame[1] = (0x9 << 4) | 0x0   // serverFullResponse, flags=0
+    frame[2] = (0x1 << 4) | 0x0   // JSON, no compression
+    frame[3] = 0x00
+    frame.append(beU32Bytes(UInt32(payload.count)))
+    frame.append(payload)
+    return frame
 }
 
 private func makeServerErrorFrame(code: Int, message: String) -> Data {
-    let body: [String: Any] = ["code": code, "message": message]
-    let payload = try! JSONSerialization.data(withJSONObject: body)
+    // Seed ASR 2.0 error body is BINARY: u32 BE code + u32 BE msg_size + UTF-8.
+    let msgBytes = message.data(using: .utf8) ?? Data()
 
-    var header = Data(count: 4)
-    header[0] = 0x11
-    header[1] = (0xB << 4) | 0x0   // serverErrorResponse, flags=0
-    header[2] = (0x1 << 4) | 0x0   // JSON, no compression
-    header[3] = 0x00
-    return header + payload
+    var frame = Data(count: 4)
+    frame[0] = 0x11
+    frame[1] = (0xF << 4) | 0x0   // serverErrorResponse, flags=0
+    frame[2] = 0x00               // ser=none, comp=none (binary error body)
+    frame[3] = 0x00
+    frame.append(beU32Bytes(UInt32(code)))
+    frame.append(beU32Bytes(UInt32(msgBytes.count)))
+    frame.append(msgBytes)
+    return frame
 }
 
 // MARK: - Helper to build gateway for receive tests
@@ -135,7 +148,7 @@ final class ASRGatewayReceiveTests: XCTestCase {
     private var mockTask: MockWebSocketSendableQueued!
     private var mockFactory: MockWebSocketTaskFactoryQueued!
 
-    private let validEndpoint = URL(string: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel")!
+    private let validEndpoint = URL(string: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async")!
 
     override func setUp() {
         super.setUp()

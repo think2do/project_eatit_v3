@@ -70,9 +70,26 @@ final class LLMGateway {
         self.endpoint = endpoint
     }
 
+    /// Production URLSession with timeouts tuned for Doubao "thinking" models.
+    ///
+    /// URLSession.shared defaults `timeoutIntervalForRequest = 60s`, which is too tight
+    /// for ARK reasoning models on long prompts (parse: resume + JD ~5KB → 60-120s) — the
+    /// chat() retry loop then re-fires three more 60s requests before giving up at ~240s
+    /// with `llm.network-error` (NSURLErrorTimedOut, code -1001). 180s on request and
+    /// 600s on resource keeps headroom for thinking variants without masking real hangs.
+    private static func makeProductionSession() -> URLSession {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 180
+        config.timeoutIntervalForResource = 600
+        return URLSession(configuration: config)
+    }
+
     // Convenience init for production use with KeychainService directly.
     convenience init(keychain: KeychainService) {
-        self.init(keychain: keychain as KeychainReading)
+        self.init(
+            keychain: keychain as KeychainReading,
+            session: LLMGateway.makeProductionSession()
+        )
     }
 
     // MARK: - Synchronous chat

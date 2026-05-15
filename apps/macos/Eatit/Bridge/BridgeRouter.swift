@@ -1,4 +1,7 @@
 import WebKit
+import os.log
+
+private let bridgeDiag = OSLog(subsystem: "com.eatit.desktop.asr", category: "bridge")
 
 // §B9: Any method add/remove/signature change must update Swift Codable + JS Zod in same commit.
 // §C3: handlers MUST NOT return secret material in response.data.
@@ -120,13 +123,24 @@ final class BridgeRouter: NSObject, WKScriptMessageHandlerWithReply {
 
     /// Push a BridgeEvent to the JS dispatcher (`window.eatitBridge.dispatch`).
     func dispatchEvent(type: String, streamId: String, payload: Any) {
-        guard let webView = webView else { return }
+        guard let webView = webView else {
+            os_log("%{public}@", log: bridgeDiag, type: .info, "dispatchEvent SKIPPED (webView==nil) type=\(type) streamId=\(streamId)")
+            return
+        }
         let body: [String: Any] = ["type": type, "streamId": streamId, "payload": payload]
         guard let data = try? JSONSerialization.data(withJSONObject: body),
-              let json = String(data: data, encoding: .utf8) else { return }
+              let json = String(data: data, encoding: .utf8) else {
+            os_log("%{public}@", log: bridgeDiag, type: .info, "dispatchEvent SKIPPED (JSON encode failed) type=\(type)")
+            return
+        }
         let js = "if (window.eatitBridge && window.eatitBridge.dispatch) { window.eatitBridge.dispatch(\(json)); }"
+        os_log("%{public}@", log: bridgeDiag, type: .info, "dispatchEvent type=\(type) streamId=\(streamId) jsLen=\(js.count)")
         DispatchQueue.main.async {
-            webView.evaluateJavaScript(js, completionHandler: nil)
+            webView.evaluateJavaScript(js) { _, err in
+                if let err = err {
+                    os_log("%{public}@", log: bridgeDiag, type: .error, "evaluateJavaScript FAILED type=\(type): \(err)")
+                }
+            }
         }
     }
 }

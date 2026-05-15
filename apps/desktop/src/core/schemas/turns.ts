@@ -92,11 +92,15 @@ export type ReferenceAnswer = z.infer<typeof ReferenceAnswerSchema>;
 
 // M3.2.2: Reference Agent contract input
 // §A11 PII guard: .strict() rejects extra fields (resume_text / candidate_email / candidate_phone etc.)
+//
+// candidate_profile_json(2026-05-13 加入):BYOK 产品下,用户自己的简历摘要走自己的 ARK key 发给 LLM,
+// 数据未出本机生态。让 ReferenceAgent 基于候选人真实经历生成可朗读的第一人称答案,而不是凭空捏"6 年经验"。
 export const ReferenceAgentInputSchema = z
   .object({
     question: z.string().min(1),
     job_context: z.string().nullable().optional(),
     candidate_answer: z.string().nullable().optional(),
+    candidate_profile_json: z.string().nullable().optional(),
   })
   .strict();
 export type ReferenceAgentInput = z.infer<typeof ReferenceAgentInputSchema>;
@@ -196,6 +200,9 @@ export const InterviewerAgentInputSchema = z
     recent_turns: z.array(TurnRecordSchema),
     long_term_summary: z.string().nullable().optional(),
     remaining_minutes: z.number().int().nullable().optional(),
+    /** M8.6 修复:Q0/Q1/Q2 用空 recent_turns,LLM 看不到差异会重复出"自我介绍"。
+     * 传入目标 turn_index,prompt 按 idx 给不同开场 hint 强制题目分化。 */
+    target_turn_index: z.number().int().nonnegative().optional(),
   })
   .strict();
 export type InterviewerAgentInput = z.infer<typeof InterviewerAgentInputSchema>;

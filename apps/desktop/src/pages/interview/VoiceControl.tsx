@@ -1,18 +1,17 @@
 import { Mic, MicOff } from "lucide-react";
 
 /**
- * Hold-to-talk button for voice-mode interviews.
+ * Click-to-toggle recording button for voice-mode interviews.
  *
- * Press-and-hold semantics: mousedown / touchstart fires `onStart`;
- * mouseup / touchend / mouseleave / blur fires `onStop`. The lifecycle
- * events are driven from the outside so the InterviewPage can link them
- * to MediaRecorder + WS frames without this component knowing about the
- * socket.
+ * Single click fires `onStart` when idle, `onStop` when recording.
+ * The lifecycle events are driven from the outside so InterviewPage can
+ * link them to MediaRecorder + WS frames without this component knowing
+ * about the socket.
  *
  * Visual states:
- *   - idle:      dark button with mic icon, "按住说话"
+ *   - idle:      brand button with mic icon, "开始录音"
  *   - disabled:  gray button (e.g. voice not permitted yet)
- *   - recording: red button, pulsing dot, "正在聆听..." + live partial
+ *   - recording: red button, pulsing dot, "停止录音" + live partial
  */
 export function VoiceControl({
   isRecording,
@@ -27,15 +26,13 @@ export function VoiceControl({
   onStart: () => void;
   onStop: () => void;
 }): JSX.Element {
-  const handleStart = (event: { preventDefault: () => void }) => {
+  const handleClick = () => {
     if (disabled) return;
-    event.preventDefault();
-    onStart();
-  };
-
-  const handleStop = (event: { preventDefault: () => void }) => {
-    event.preventDefault();
-    if (isRecording) onStop();
+    if (isRecording) {
+      onStop();
+    } else {
+      onStart();
+    }
   };
 
   const background = disabled
@@ -59,14 +56,9 @@ export function VoiceControl({
       <button
         type="button"
         disabled={disabled}
-        onMouseDown={handleStart}
-        onMouseUp={handleStop}
-        onMouseLeave={handleStop}
-        onTouchStart={handleStart}
-        onTouchEnd={handleStop}
-        onBlur={handleStop}
+        onClick={handleClick}
         aria-pressed={isRecording}
-        aria-label={isRecording ? "松开结束录音" : "按住说话"}
+        aria-label={isRecording ? "停止录音" : "开始录音"}
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -96,7 +88,7 @@ export function VoiceControl({
                 display: "inline-block",
               }}
             />
-            正在聆听...
+            停止录音
           </>
         ) : disabled ? (
           <>
@@ -106,7 +98,7 @@ export function VoiceControl({
         ) : (
           <>
             <Mic size={15} />
-            按住说话
+            开始录音
           </>
         )}
       </button>

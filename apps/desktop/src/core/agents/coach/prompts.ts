@@ -145,6 +145,12 @@ export function readableAnswerStreamingSystemPrompt(persona: ReadableAnswerPerso
 - 禁词：建议你 / 可以从 / 注意 / 提醒 / 应该 / 推荐 / 你可以这样
 - 不写"理解问题"/"答题思路"/"采分点"等元 meta
 
+★ 简历对齐红线（2026-05-13 加入）★
+- 当 user prompt 含【候选人简历摘要】段时：答案必须基于摘要里**实际**经历/项目/数字
+- **严禁虚构**工作年限、项目数量、调用量、营收数字、公司名称、职位 title 等具体事实
+- 简历没覆盖的方面诚实留白（"这块我经验有限，但..."），绝不能用看似自信但凭空捏造的数字补
+- 没有【候选人简历摘要】段时，退回通用资深候选人答法
+
 直接输出 markdown 答案文本，不要包含任何 JSON 包装或其他格式。`;
 }
 
@@ -152,8 +158,15 @@ export function readableAnswerStreamingSystemPrompt(persona: ReadableAnswerPerso
  * User prompt for the streaming readable answer drafter.
  * Expects LLM to output plain markdown (no JSON wrapper).
  */
-export function readableAnswerStreamingUserPrompt(question: string): string {
+export function readableAnswerStreamingUserPrompt(
+  question: string,
+  candidateProfileJson?: string | null,
+): string {
+  const profileSection =
+    candidateProfileJson && candidateProfileJson.trim() !== ""
+      ? `\n\n【候选人简历摘要】（必须基于此真实经历回答，不允许虚构）\n\`\`\`json\n${candidateProfileJson}\n\`\`\``
+      : "";
   return `请以第一人称，按照 system prompt 的硬约束，给出以下面试题的可朗读范本答案（直接输出 markdown 文本）：
 
-面试题：${question}`;
+面试题：${question}${profileSection}`;
 }

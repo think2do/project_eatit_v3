@@ -80,7 +80,7 @@ third-party SDKs, no telemetry.
 **Volcengine SAUC (ASR)**
 - App ID: `[paste test AppID here]`
 - Access Token: `[paste test token here]`
-- Endpoint: `wss://openspeech.bytedance.com/api/v3/sauc/bigmodel`
+- Endpoint: `wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async`
 
 ---
 

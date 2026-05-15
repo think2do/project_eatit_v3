@@ -24,7 +24,7 @@ export function systemPrompt(): string {
 - \`focus_competencies\`:3~6 条本场要考察的能力维度,每条带 title + why + probe_hint
 - \`opening_questions\`:2~3 条暖场问题(不评分,用来引出简历)
 - \`deep_dive_anchors\`:针对 project_hooks 映射出的深挖锚点,每条带 anchor + probe_chain(3~5 步追问思路)
-- \`pace_plan\`:整场节奏建议,total_minutes + segments 列表
+- \`pace_plan\`:整场节奏建议,\`total_minutes\`(整数,分钟数)+ \`segments\` 列表(**每条必须带 \`name\` 字符串 + \`rough_minutes\` ≥1 整数 + \`goal\` 字符串**,三字段缺一不可)
 
 ## 可选字段(F-321 PredictedQuestionBank)
 
@@ -54,7 +54,18 @@ export function systemPrompt(): string {
 - direction = "project_deep_dive"
 - focus_competencies 里会有"需求抽象"、"指标设计"、"跨团队推动"、"失败复盘"
 - deep_dive_anchors 会挑 1~2 个项目,每个给 4 步追问,从 what → why → how → what-if
-- pace_plan.segments ≈ [暖场 3min, 项目深挖 18min, 能力追问 7min, 反问 2min]
+- pace_plan 形如(**字段名固定为 name / rough_minutes / goal,不许换写法**):
+\`\`\`json
+{
+  "total_minutes": 30,
+  "segments": [
+    { "name": "暖场",     "rough_minutes": 3,  "goal": "通过简历高亮引导候选人开口" },
+    { "name": "项目深挖", "rough_minutes": 18, "goal": "围绕主项目走 what→why→how→what-if 追问链" },
+    { "name": "能力追问", "rough_minutes": 7,  "goal": "针对 focus_competencies 的薄弱项各追一题" },
+    { "name": "反问",     "rough_minutes": 2,  "goal": "候选人向面试官提问,观察其关注点" }
+  ]
+}
+\`\`\`
 - predicted_questions(若 Research 存在):约 12 条,4 个 category 各 3 条
 
 ## 输出约束

@@ -239,6 +239,20 @@ export const interviewMachine = createMachine({
             partialTranscript: "",
           }),
         },
+        // ASR / WebSocket failures during recording (e.g. asr.credentials-missing
+        // when volc-asr-credentials hasn't been saved to Keychain) used to be
+        // dropped here — the machine had no WS_ERROR handler in user_answering,
+        // so the StatusBar stayed silent while isRecording stuck on true and
+        // "正在聆听..." dangled forever. Surface the message and roll back
+        // the recording-state assignments AUDIO_START set, so the user sees
+        // both the error and a clean idle UI.
+        WS_ERROR: {
+          actions: assign({
+            error: ({ event }) => event.message,
+            isRecording: false,
+            partialTranscript: "",
+          }),
+        },
         END_SESSION: "ended",
       },
     },
@@ -290,7 +304,12 @@ export const interviewMachine = createMachine({
           },
         ],
         END_SESSION: "ended",
+        // L1(2026-05-14):runInterviewSession 在生成下一题阶段任何 throw 都会
+        // 通过 WS_ERROR 抵达。之前这里只 assign error 不 target,导致状态机永
+        // 久卡在 next_question,UI 显示「等待问题加载」死锁。
+        // 现在 target 回 user_answering,用户能看到红条错误且能再次提交触发重试。
         WS_ERROR: {
+          target: "user_answering",
           actions: assign({ error: ({ event }) => event.message }),
         },
       },

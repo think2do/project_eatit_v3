@@ -219,12 +219,17 @@ export interface StreamDraftReadableAnswerDeps {
  * §A0.3: uses existing ARK channel (chatStream → Bridge → Swift LLMGateway).
  */
 export async function* streamDraftReadableAnswer(
-  args: { question: string; persona: ReadableAnswerPersona },
+  args: {
+    question: string;
+    persona: ReadableAnswerPersona;
+    /** 2026-05-13 加入:候选人简历摘要 JSON,让流式参考答案基于真实简历经历生成 */
+    candidateProfileJson?: string | null;
+  },
   deps: StreamDraftReadableAnswerDeps,
 ): AsyncGenerator<string> {
   const messages: Message[] = [
     { role: "system", content: readableAnswerStreamingSystemPrompt(args.persona) },
-    { role: "user", content: readableAnswerStreamingUserPrompt(args.question) },
+    { role: "user", content: readableAnswerStreamingUserPrompt(args.question, args.candidateProfileJson ?? null) },
   ];
 
   const iter = deps.llm.chatStream({
