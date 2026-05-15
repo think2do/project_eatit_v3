@@ -155,11 +155,17 @@ export const interviewMachine = createMachine({
     },
     SERVER_REFERENCE: {
       actions: assign({
-        referenceAnswer: ({ context, event }) => {
+        referenceAnswer: ({ context, event, self }) => {
           if (event.type !== "SERVER_REFERENCE") return context.referenceAnswer;
           // Drop late arrivals that don't match the active turn so a stale
           // reference doesn't shadow the new question's hint.
           if (event.payload.turn_index !== context.currentTurnIndex) {
+            return context.referenceAnswer;
+          }
+          // M9.1: freeze the reference snapshot while the user is answering.
+          // A more-complete streamed version arriving mid-answer would
+          // interrupt the user's focus (boss feedback 00:13:15).
+          if (self.getSnapshot().matches("user_answering")) {
             return context.referenceAnswer;
           }
           return event.payload;

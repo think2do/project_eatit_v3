@@ -390,6 +390,14 @@ export function InterviewPage(): JSX.Element {
               const map = referenceStreamingByTurnRef.current;
               const prev = map.get(event.turnIndex) ?? "";
               map.set(event.turnIndex, prev + event.delta);
+              // M9.1: if this turn's reference is frozen (user is answering),
+              // accumulate into the ref but don't push to React state so the
+              // panel snapshot stays still while the user reads/recites.
+              // Use frozenTurnIndexRef (not the state) to avoid closure staleness
+              // in this long-lived async generator loop.
+              if (frozenTurnIndexRef.current !== null && event.turnIndex === frozenTurnIndexRef.current) {
+                break;
+              }
               // Only trigger re-render for the currently active turn
               if (event.turnIndex === localTurnIndex - 1) {
                 setCurrentTurnStreamingText(map.get(event.turnIndex) ?? null);
@@ -699,6 +707,23 @@ export function InterviewPage(): JSX.Element {
   // text changes (batched by the chunk handler below).
   const referenceStreamingByTurnRef = useRef<Map<number, string>>(new Map());
   const [currentTurnStreamingText, setCurrentTurnStreamingText] = useState<string | null>(null);
+
+  // M9.1: freeze reference panel while the user is answering so mid-stream
+  // updates don't overwrite the snapshot the user is reading/reciting.
+  // frozenTurnIndexRef mirrors the state so the async generator closure
+  // (which captures frozenTurnIndex at mount) can always read the latest value.
+  const [frozenTurnIndex, setFrozenTurnIndex] = useState<number | null>(null);
+  const frozenTurnIndexRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (state.matches("user_answering")) {
+      const idx = state.context.currentTurnIndex;
+      setFrozenTurnIndex(idx);
+      frozenTurnIndexRef.current = idx;
+    } else if (state.matches("next_question") || state.matches("scoring")) {
+      setFrozenTurnIndex(null);
+      frozenTurnIndexRef.current = null;
+    }
+  }, [state.value, state.context.currentTurnIndex]);
 
   // F-310: per-turn wall-clock start. Resets the moment the user enters
   // the answering state for a new turn (covers both voice and text
