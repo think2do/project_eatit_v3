@@ -176,7 +176,7 @@ Match the section prefix(`V34.M*.*`)to 当前 spec 文件即可。
 > **优先级**:M10.1~M10.5 全部 [x] 之前**不要碰 M6.5**(体验不稳就不上架,与 M9 同纪律)
 > Ralph 按 top-down 第一个未勾消费;M10.1~M10.3 互不依赖可并行,M10.4 deps M10.1,M10.5 deps 前 4 节点
 
-- [ ] M10.1 WarmupOverlay 纯展示组件(developer,**Parallel-safe**,Deps: —)— 零 state/effect/async 的三段式阶段进度组件,ConfigPage + InterviewPage 复用保证跨页连续。新增 `apps/desktop/src/components/WarmupOverlay.tsx` + test(≥5 case)。复用 TipsCarousel/selectTips/Spinner,tips.ts 不改。详 spec `## M10.1`
+- [x] M10.1 WarmupOverlay 纯展示组件 (7b3ff6ea, 2026-05-16)(developer,**Parallel-safe**,Deps: —)— 零 state/effect/async 的三段式阶段进度组件,ConfigPage + InterviewPage 复用保证跨页连续。新增 `apps/desktop/src/components/WarmupOverlay.tsx` + test(≥5 case)。复用 TipsCarousel/selectTips/Spinner,tips.ts 不改。详 spec `## M10.1`
 - [ ] M10.2 runInterviewSession 一次性 reference.started 事件(developer,**Parallel-safe**,Deps: —)— InterviewSessionEvent 加 `reference.started`;IIFE 内 `referenceStartedTurns` Set + `markReferenceStarted` 守卫;startStreamingDraft 首 chunk 前 + startReference.then 前各调一次。现有 reference.chunk/ready/streamComplete 不动(流式加粗零回归)。详 spec `## M10.2`
 - [ ] M10.3 interview-machine warming 态 + REFERENCE_STARTED(developer,**Parallel-safe**,Deps: —)— InterviewEvent 加 `REFERENCE_STARTED`;ready 的 SERVER_QUESTION target 由 user_answering 改 warming;新增唯一 1 个 warming 态(REFERENCE_STARTED guard turn 匹配→user_answering;END_SESSION→ended;WS_ERROR→user_answering 带 error)。新增 interview-machine.warming.test.ts(≥4 case),既有直达用例同步改。详 spec `## M10.3`
 - [ ] M10.4 ConfigPage 接入 stage-1 预热屏(developer,Deps: M10.1)— warmStage/warmError state;提交 setWarmStage(1)→await createSession→成功 setWarmStage(2)+navigate(state:{warming:true}),失败 setWarmError;渲染早返回 WarmupOverlay 替换原 opacity:0.45 变灰。详 spec `## M10.4`
