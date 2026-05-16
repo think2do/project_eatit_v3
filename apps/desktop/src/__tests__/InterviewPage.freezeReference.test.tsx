@@ -76,13 +76,17 @@ describe("M9.1 — reference freeze during user_answering", () => {
     actor.stop();
   });
 
-  it("SERVER_REFERENCE is dropped while in user_answering (freeze behavior)", () => {
+  it("SERVER_REFERENCE is dropped once the user is actively answering (freeze behavior)", () => {
     const actor = advanceToUserAnswering();
     // Verify we are in user_answering
     expect(actor.getSnapshot().matches("user_answering")).toBe(true);
 
-    // First reference arrives — may or may not land depending on timing;
-    // send it to establish the frozen snapshot
+    // M9.1 (e49c5b99 refinement): the freeze only engages once the user has
+    // *started* answering (draftAnswer non-empty / recording). Simulate the
+    // user typing so the snapshot is frozen.
+    actor.send({ type: "UPDATE_ANSWER", value: "I am typing my own answer" });
+
+    // First reference arrives while the user is actively answering — dropped.
     actor.send({ type: "SERVER_REFERENCE", payload: MOCK_REFERENCE_V1 });
     const snapshotAfterV1 = actor.getSnapshot().context.referenceAnswer;
     // The machine is now in user_answering; V1 should have been dropped
@@ -98,7 +102,9 @@ describe("M9.1 — reference freeze during user_answering", () => {
 
   it("SERVER_REFERENCE is accepted again after moving to scoring then next_question", () => {
     const actor = advanceToUserAnswering();
-    // Drop reference while answering
+    // User starts answering → freeze engages (M9.1 e49c5b99 refinement)
+    actor.send({ type: "UPDATE_ANSWER", value: "drafting my answer" });
+    // Reference dropped while user is actively answering
     actor.send({ type: "SERVER_REFERENCE", payload: MOCK_REFERENCE_V1 });
     expect(actor.getSnapshot().context.referenceAnswer).toBeNull();
 
@@ -121,7 +127,10 @@ describe("M9.1 — reference freeze during user_answering", () => {
     // referenceAnswer was reset to null by the SERVER_QUESTION action
     expect(actor.getSnapshot().context.referenceAnswer).toBeNull();
 
-    // Now a reference for turn 1 arrives while in user_answering → still frozen
+    // SERVER_QUESTION reset draftAnswer to "" — the user must start answering
+    // turn 1 before the freeze re-engages for the new turn.
+    actor.send({ type: "UPDATE_ANSWER", value: "answering turn one" });
+    // Reference for turn 1 arrives while user is actively answering → frozen
     actor.send({ type: "SERVER_REFERENCE", payload: MOCK_REFERENCE_TURN1 });
     expect(actor.getSnapshot().context.referenceAnswer).toBeNull();
 
