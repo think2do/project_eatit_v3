@@ -182,7 +182,7 @@ Match the section prefix(`V34.M*.*`)to 当前 spec 文件即可。
 - [ ] M10.4 ConfigPage 接入 stage-1 预热屏(developer,Deps: M10.1)— warmStage/warmError state;提交 setWarmStage(1)→await createSession→成功 setWarmStage(2)+navigate(state:{warming:true}),失败 setWarmError;渲染早返回 WarmupOverlay 替换原 opacity:0.45 变灰。详 spec `## M10.4`
 - [ ] M10.5 InterviewPage 整合(developer,Deps: M10.1+M10.2+M10.3+M10.4)— WARMUP_REFERENCE_TIMEOUT_MS=8000;useLocation 取 isWarmupEntry;generator 加 reference.started→REFERENCE_STARTED;非预热入口单 tick 穿 warming;8s 超时 effect 兜底;warming 期渲染 WarmupOverlay(stage 2/3)。退场需 pnpm test 全绿 + xcodebuild 成功 + 用户跑 7 场景手测。详 spec `## M10.5`
 
-- [ ] M6.5 第一次 Archive + 上传 App Store Connect(developer,**Deps: M8.1~M8.6 + M9.1~M9.4 + M10.1~M10.5 全部 [x]**)— `archive-and-upload.sh`
+- [⏸] M6.5 第一次 Archive + 上传 App Store Connect(developer,**Deps: M8.1~M8.6 + M9.1~M9.4 + M10.1~M10.5 全部 [x]**)— `archive-and-upload.sh`。**BLOCKED-ON-HUMAN**:需用户人工 Apple Developer 上传 + 5 张 App Store 截图,ralph 无法自动完成。2026-05-16 标 [⏸] 防止熔断空转(旧会话曾连续 62 次 identical BLOCKED)。M10 全 [x] 且用户备好材料后由人工解挂。
 
 ### M7 — Review 处理 + 上架(反应式,1+ 节点)
 
