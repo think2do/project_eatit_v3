@@ -84,12 +84,15 @@ const DIRECTION_LABEL_ZH: Record<string, string> = {
   strategy: "产品战略",
 };
 
-// Rough turns/duration heuristic — backend's FrameworkAgent doesn't
-// surface the planned turn count separately, so we approximate from the
-// duration. 3 minutes/turn matches the PRD §6.3.4 pacing guidance.
+// 2026-05-16:与 ConfigPage UI 标签 + QuestionQueue.totalTurnsByDuration 完全对齐。
+// 之前三套算法各算各的(UI 读 framework.stages / 后端 ceil(min×0.4)+2 / framework
+// pace_plan budget),导致 UI 显示 7/7 但 queue 还允许出 Q8 的错位。统一 lookup。
 function estimateTotalTurns(durationMinutes: number): number {
-  if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return 5;
-  return Math.max(3, Math.round(durationMinutes / 3));
+  if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return 4;
+  if (durationMinutes <= 15) return 4;
+  if (durationMinutes <= 30) return 8;
+  if (durationMinutes <= 45) return 12;
+  return 16;
 }
 
 type InputMode = "voice" | "text";
@@ -618,26 +621,11 @@ export function InterviewPage(): JSX.Element {
             ? [config.direction as string]
             : [];
         const primaryDirection = directionsList[0] ?? null;
-        // V32.M1.1.X-followup — totalTurns must match the backend's
-        // actual budget (sum of `direction_framework.stages[*]`
-        // .question_budget). Otherwise the progress strip lies (10/10
-        // while the FrameworkAgent planned 12). The backend's
-        // `_total_question_budget` guard ends the interview at this
-        // sum, so frontend + backend stay in sync.
-        // Fall back to the duration estimate when the framework hasn't
-        // landed yet (first GET race) or stages are missing.
-        const stages =
-          detail.direction_framework &&
-          Array.isArray(detail.direction_framework.stages)
-            ? detail.direction_framework.stages
-            : [];
-        const frameworkBudget = stages.reduce<number>((sum, stage) => {
-          const budget = (stage as { question_budget?: unknown })
-            .question_budget;
-          return sum + (typeof budget === "number" && budget > 0 ? budget : 0);
-        }, 0);
-        const totalTurns =
-          frameworkBudget > 0 ? frameworkBudget : estimateTotalTurns(duration);
+        // 2026-05-16:不再读 framework.stages.question_budget(LLM 出的题量不可控,
+        // 容易跟 UI 标签错位)。统一用 duration → lookup,与 QuestionQueue +
+        // ConfigPage UI 三处对齐。framework budget 仍由 turnGraph 内部做兜底
+        // ceiling,但 UI 显示以 lookup 为准。
+        const totalTurns = estimateTotalTurns(duration);
         // Provisional title from the asset id slice; replaced below
         // once the parse payload returns the real JD company + role.
         const titleFallback = detail.candidate_asset_id
@@ -708,22 +696,36 @@ export function InterviewPage(): JSX.Element {
   const referenceStreamingByTurnRef = useRef<Map<number, string>>(new Map());
   const [currentTurnStreamingText, setCurrentTurnStreamingText] = useState<string | null>(null);
 
-  // M9.1: freeze reference panel while the user is answering so mid-stream
-  // updates don't overwrite the snapshot the user is reading/reciting.
-  // frozenTurnIndexRef mirrors the state so the async generator closure
-  // (which captures frozenTurnIndex at mount) can always read the latest value.
+  // M9.1: freeze reference panel while the user is **actively answering**.
+  // 2026-05-15 修正:之前进 user_answering 立即 freeze 太早,reference 流根本
+  // 没机会到 UI(问题一出现 SERVER_QUESTION 就把状态机推进 user_answering)。
+  // 真正应该 freeze 的时机是用户**开始动作**:打字(draftAnswer 非空)/ 录音
+  // (isRecording 或有 partialTranscript)。进 user_answering 但还没动作时
+  // 让 reference 继续 stream,等用户开始念/打字才 freeze。
   const [frozenTurnIndex, setFrozenTurnIndex] = useState<number | null>(null);
   const frozenTurnIndexRef = useRef<number | null>(null);
   useEffect(() => {
-    if (state.matches("user_answering")) {
+    if (!state.matches("user_answering")) {
+      setFrozenTurnIndex(null);
+      frozenTurnIndexRef.current = null;
+      return;
+    }
+    const hasStartedAnswering =
+      state.context.draftAnswer.length > 0 ||
+      state.context.isRecording ||
+      state.context.partialTranscript.length > 0;
+    if (hasStartedAnswering && frozenTurnIndexRef.current === null) {
       const idx = state.context.currentTurnIndex;
       setFrozenTurnIndex(idx);
       frozenTurnIndexRef.current = idx;
-    } else if (state.matches("next_question") || state.matches("scoring")) {
-      setFrozenTurnIndex(null);
-      frozenTurnIndexRef.current = null;
     }
-  }, [state.value, state.context.currentTurnIndex]);
+  }, [
+    state.value,
+    state.context.currentTurnIndex,
+    state.context.draftAnswer,
+    state.context.isRecording,
+    state.context.partialTranscript,
+  ]);
 
   // F-310: per-turn wall-clock start. Resets the moment the user enters
   // the answering state for a new turn (covers both voice and text
@@ -787,6 +789,32 @@ export function InterviewPage(): JSX.Element {
     send({ type: "END_SESSION" });
     navigate("/");
   }, [sessionId, markAnalyzing, markReady, endSession, send, navigate]);
+
+  // 2026-05-16:监听状态机进入 ended(由 runInterviewSession 的 session.ended
+  // 自动触发,典型场景:答完 totalTurns 上限的最后一题)→ 自动 navigate 回主页
+  // + 触发分析生成 toast,跟用户手动点"结束面试"行为一致。
+  const autoEndedRef = useRef(false);
+  useEffect(() => {
+    if (!state.matches("ended")) return;
+    if (autoEndedRef.current) return;
+    if (!sessionId) return;
+    autoEndedRef.current = true;
+    // 跟 handleEndSession 同样的副作用:markAnalyzing → finalize → toast → navigate
+    markAnalyzing(sessionId);
+    void finalizeSession(sessionId).then((result) => {
+      if (result.status === "ready") {
+        markReady(sessionId);
+        showToast("上一轮面试分析完成", {
+          actionLabel: "查看",
+          onAction: () => navigate(`/report/${sessionId}`),
+        });
+      } else {
+        showToast("分析生成失败,请稍后在面试记录中重试", { tone: "error" });
+      }
+    });
+    showToast("面试已到达题数上限,正在生成分析…");
+    navigate("/");
+  }, [state, sessionId, markAnalyzing, markReady, navigate]);
 
   // Suspend the keymap once the session has wrapped — pressing Esc on a
   // navigated-away page would otherwise reopen the dialog.
@@ -1032,11 +1060,11 @@ export function InterviewPage(): JSX.Element {
           shared a single `<section>` separated by a 1px divider; now
           the my-response card is its own card-pad section so the
           page reads as a structured turn-pair rather than one mega-card. */}
+      {/* 2026-05-16:去掉 ds-card 边框,跟问题卡之间用 gap 间距区分而非两层卡片包裹 */}
       <section
-        className="ds-card"
         data-testid="my-response-card"
         style={{
-          padding: 22,
+          padding: "22px 4px",
           display: "flex",
           flexDirection: "column",
           gap: 14,

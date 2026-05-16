@@ -1,4 +1,4 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 interface Props {
   open: boolean;
@@ -26,7 +26,7 @@ export function EndConfirmDialog({
       }}
     >
       <DialogContent className="card-pad-lg">
-        <h2 className="h2">结束面试?</h2>
+        <DialogTitle className="h2">结束面试?</DialogTitle>
         <p className="body muted" style={{ marginTop: 8 }}>
           当前进度会保留,稍后可继续或重新开始。
         </p>

@@ -29,12 +29,38 @@ type Props = {
  *   - reference !== null & not revealed: button to expand.
  *   - reference !== null & revealed: full content.
  */
-export function ReferencePanel({ reference, resetKey, streamingText }: Props): JSX.Element {
-  const [revealed, setRevealed] = useState(false);
+export function ReferencePanel({ reference, resetKey, streamingText }: Props): JSX.Element | null {
+  // 2026-05-15 改:默认展示(revealed=true),用户可点"隐藏"折起;切到下一题
+  // (resetKey 变)自动重新展开。"隐藏"只在本题内有效,不持久化。
+  const [revealed, setRevealed] = useState(true);
+  const [userHidden, setUserHidden] = useState(false);
 
   useEffect(() => {
-    setRevealed(false);
+    setRevealed(true);
+    setUserHidden(false);
   }, [resetKey]);
+
+  // 用户主动隐藏 → 完全不渲染面板(回答区视野更宽)
+  if (userHidden) {
+    return (
+      <button
+        type="button"
+        onClick={() => setUserHidden(false)}
+        style={{
+          width: "100%",
+          padding: "8px 12px",
+          borderRadius: "var(--r-md)",
+          border: "1px dashed var(--line)",
+          background: "transparent",
+          color: "var(--ink-500)",
+          fontSize: 11.5,
+          cursor: "pointer",
+        }}
+      >
+        点击展开 AI 参考答案
+      </button>
+    );
+  }
 
   if (!reference) {
     // M8.3: show streaming text if available, otherwise show loading indicator
@@ -94,51 +120,8 @@ export function ReferencePanel({ reference, resetKey, streamingText }: Props): J
     );
   }
 
-  if (!revealed) {
-    // design-reference/page-live.jsx — collapsed state is a neutral
-    // bg-warm strip (NOT a green CTA button) so it sits quietly inside
-    // the question card and doesn't compete with the question text.
-    // Lock icon + tertiary text emphasise "answer first, then peek".
-    return (
-      <button
-        type="button"
-        onClick={() => setRevealed(true)}
-        data-testid="reference-panel-collapsed"
-        style={{
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
-          padding: "10px 14px",
-          borderRadius: "var(--r-md)",
-          border: "1px solid var(--line)",
-          background: "var(--bg-warm)",
-          color: "var(--ink-700)",
-          fontSize: 12.5,
-          cursor: "pointer",
-          textAlign: "left",
-        }}
-      >
-        <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <Lock size={13} />
-          <span style={{ fontWeight: 500, color: "var(--ink-900)" }}>
-            AI 参考回答
-          </span>
-          <span className="muted" style={{ fontSize: 11.5 }}>
-            默认折叠 · 回答后再查看效果更好
-          </span>
-        </span>
-        <ChevronDown size={14} style={{ transform: "rotate(-90deg)" }} />
-      </button>
-    );
-  }
+  // 2026-05-15:老板要求"不需要隐藏,直接展示"—— reference 一旦 ready 立即全展开,
+  // 不再走 click-to-peek 折叠态。setRevealed 调用保留兼容,但不再 gate UI。
 
   return (
     <section
@@ -175,7 +158,7 @@ export function ReferencePanel({ reference, resetKey, streamingText }: Props): J
         </div>
         <button
           type="button"
-          onClick={() => setRevealed(false)}
+          onClick={() => setUserHidden(true)}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -188,8 +171,9 @@ export function ReferencePanel({ reference, resetKey, streamingText }: Props): J
             fontSize: 11,
             cursor: "pointer",
           }}
+          title="隐藏 AI 参考(本题内有效,下题自动展开)"
         >
-          收起 <ChevronDown size={12} />
+          隐藏
         </button>
       </header>
 

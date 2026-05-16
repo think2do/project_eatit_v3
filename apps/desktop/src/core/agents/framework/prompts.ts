@@ -72,7 +72,23 @@ export function systemPrompt(): string {
 
 - \`focus_competencies\` 必须能和 ParseAgent 的 job_requirements/candidate_risks 产生映射,不要凭空新造维度
 - \`deep_dive_anchors.anchor\` 必须引用 parse 结果里出现过的项目名或关键词
-- pace_plan 时长加总应 ≈ 配置里的 total_minutes(±10%),不要严格相等`;
+- pace_plan 时长加总应 ≈ 配置里的 total_minutes(±10%),不要严格相等
+
+## ★ 题量上限对齐(2026-05-16 加入,优先级最高)★
+
+UI 已经在面试时长卡片里明确承诺了题量:
+- 15 分钟 → **3~4 题**(精简)
+- 30 分钟 → **6~8 题**(标准)
+- 45 分钟 → **10~12 题**(完整)
+- 60 分钟+ → **14~16 题**(深度·含 case)
+
+**pace_plan.segments 的 rough_minutes 总和 ÷ 3 ≈ totalTurns 上限**,所以你出 pace_plan 时**必须**保证:
+- duration_minutes ≤ 15:segments 加总 rough_minutes ≤ 12(对应 ≤ 4 题)
+- duration_minutes ≤ 30:segments 加总 ≤ 24(对应 ≤ 8 题)
+- duration_minutes ≤ 45:segments 加总 ≤ 36(对应 ≤ 12 题)
+- duration_minutes ≥ 60:segments 加总 ≤ 48(对应 ≤ 16 题)
+
+不能超过这个上限,否则后端 QuestionQueue.totalTurns 会强制截断,产生"承诺 12 题实际只跑 8 题"的错位。规则不许例外。`;
 }
 
 /**

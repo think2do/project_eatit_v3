@@ -296,11 +296,20 @@ export async function* runInterviewSession(
     // 1) Bootstrap: first question from prefetch pipeline.
     //    getSessionQueue returns the queue registered in createSession (ConfigPage path).
     //    Falls back to a new queue with prefetch for test path / late arrivals.
+    //
+    // 2026-05-16:对齐 ConfigPage UI 标签。之前 ceil(min × 0.4) + 2 算出来比 UI
+    // 承诺的 2× 多(15min UI 说 3~4 题代码跑 8 题)。改为 lookup table。
+    const totalTurnsByDuration = (m: number): number => {
+      if (m <= 15) return 4;   // 15 分钟 · 精简 · 3~4 题(上限 4)
+      if (m <= 30) return 8;   // 30 分钟 · 标准 · 6~8 题(上限 8)
+      if (m <= 45) return 12;  // 45 分钟 · 完整 · 10~12 题(上限 12)
+      return 16;               // 60 分钟+ · 深度 · 含 case
+    };
     const queue =
       getSessionQueue(input.sessionId) ??
       registerSessionPrefetch({
         sessionId: input.sessionId,
-        totalTurns: Math.ceil(input.durationMinutes * 0.4) + 2,
+        totalTurns: totalTurnsByDuration(input.durationMinutes),
         llm,
         frameworkJson: input.frameworkJson,
         durationMinutes: input.durationMinutes,
@@ -464,6 +473,31 @@ export async function* runInterviewSession(
         // now come from the prefetch pipeline (QuestionQueue) to eliminate per-turn LLM wait.
         // This matches the "concurrency implemented OUTSIDE LangGraph" pattern from M8.3.
         turnIndex += 1;
+
+        // 2026-05-16:题数到了上限直接结束面试,不要再尝试 queue.next(N) 然后报错。
+        // totalTurns lookup 与 ConfigPage UI 三处对齐:15min=4 / 30min=8 / 45min=12 / 60min=16
+        const sessionTotalTurns = totalTurnsByDuration(input.durationMinutes);
+        if (turnIndex >= sessionTotalTurns) {
+          // 跟用户主动结束走同一条路径:fire-and-forget postReport + emit session.ended
+          for (const ctrl of draftAbortControllers.values()) ctrl.abort();
+          draftAbortControllers.clear();
+          releaseSession(input.sessionId);
+          void buildPostReportGraph({ llm })
+            .invoke({
+              user_id: "local",
+              last_session_id: input.sessionId,
+              coach_input: null,
+              reflection_input: null,
+              coach_skipped: false,
+              coach_error: null,
+              reflection_error: null,
+            } as Parameters<ReturnType<typeof buildPostReportGraph>["invoke"]>[0])
+            .catch(() => {});
+          events.push({ type: "session.ended", payload: { reason: "budget-exhausted" } });
+          events.close();
+          return;
+        }
+
         try {
           const nextOut = await queue.next(turnIndex);
           lastQuestion = nextOut.question;

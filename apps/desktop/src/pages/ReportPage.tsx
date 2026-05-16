@@ -285,6 +285,16 @@ export function ReportPage(): JSX.Element {
         <HeroScoreCard
           overallScore={payload.overall_score ?? null}
           passLikelihood={payload.pass_likelihood ?? null}
+          rightSlot={
+            hasDimensions ? (
+              <div style={{ flex: 1, minWidth: 280 }}>
+                <DimensionSidebar
+                  dimensions={payload.dimensions}
+                  overallScore={payload.overall_score ?? null}
+                />
+              </div>
+            ) : undefined
+          }
         />
         <div
           style={{
@@ -297,26 +307,9 @@ export function ReportPage(): JSX.Element {
         </div>
       </section>
 
-      {/* report-layout: main rounds + dimension sidebar */}
-      <div
-        className="report-layout"
-        style={
-          wideLayout
-            ? {
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) 280px",
-                gap: 20,
-                alignItems: "start",
-              }
-            : {
-                display: "flex",
-                flexDirection: "column",
-                gap: 20,
-              }
-        }
-      >
-        {/* main: per-round question reviews */}
-        <main className="rounds">
+      {/* 2026-05-15:维度评分挪到 HeroScoreCard 右侧 rightSlot,逐题复盘满宽 */}
+      <div className="report-layout">
+        <main className="rounds" style={{ display: "block" }}>
           {payload.round_reviews_v2 && payload.round_reviews_v2.length > 0 ? (
             <section className="card">
               <div
@@ -345,19 +338,6 @@ export function ReportPage(): JSX.Element {
             </section>
           ) : null}
         </main>
-
-        {/* aside: dimension sidebar — hidden when no dimensions or when printing */}
-        {hasDimensions ? (
-          <aside
-            className="dimension-sidebar report-page__print-hide"
-            style={{ minWidth: 0 }}
-          >
-            <DimensionSidebar
-              dimensions={payload.dimensions}
-              overallScore={payload.overall_score ?? null}
-            />
-          </aside>
-        ) : null}
       </div>
     </div>
   );

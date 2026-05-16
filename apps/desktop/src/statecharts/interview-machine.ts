@@ -162,10 +162,17 @@ export const interviewMachine = createMachine({
           if (event.payload.turn_index !== context.currentTurnIndex) {
             return context.referenceAnswer;
           }
-          // M9.1: freeze the reference snapshot while the user is answering.
-          // A more-complete streamed version arriving mid-answer would
-          // interrupt the user's focus (boss feedback 00:13:15).
-          if (self.getSnapshot().matches("user_answering")) {
+          // M9.1: freeze the reference snapshot only while the user is **actively**
+          // answering (typing OR recording). 2026-05-15 修正:之前一进 user_answering
+          // 就 freeze 太早,问题刚出来用户还在读题时也被 freeze,导致初始流式根本
+          // 进不来 UI。改为:进 user_answering 但 draftAnswer 空且未录音时仍然允许
+          // stream 更新;用户开始动作(打字或录音)后才 freeze。
+          const snapshot = self.getSnapshot();
+          const hasStartedAnswering =
+            snapshot.context.draftAnswer.length > 0 ||
+            snapshot.context.isRecording ||
+            snapshot.context.partialTranscript.length > 0;
+          if (snapshot.matches("user_answering") && hasStartedAnswering) {
             return context.referenceAnswer;
           }
           return event.payload;

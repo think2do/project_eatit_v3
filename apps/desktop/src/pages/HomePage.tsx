@@ -4,7 +4,6 @@ import { AnalyzingHeroCard } from "@/pages/home/AnalyzingHeroCard";
 export function HomePage(): JSX.Element {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      <AnalyzingHeroCard />
       <div>
         <div className="eyebrow">01 · 首页</div>
         <h1
@@ -96,6 +95,9 @@ export function HomePage(): JSX.Element {
           </Link>
         </div>
       </div>
+
+      {/* 2026-05-15 演示反馈:面试结束态卡片放在主 hero 下方,框变大更显眼 */}
+      <AnalyzingHeroCard />
     </div>
   );
 }

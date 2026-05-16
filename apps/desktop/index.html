@@ -36,39 +36,42 @@
       @keyframes eatit-spin { to { transform: rotate(360deg); } }
     </style>
     <script>
-      // JS console → macOS unified log via diag.log Bridge method。
-      // 用 `log show --process Eatit --subsystem com.eatit.desktop.js --last 5m` 看 JS 日志。
-      // Bridge call 失败时静默(dev shell / vitest 无 Bridge 时不破坏 console)。
+      // JS console → macOS unified log only(无任何屏幕 DOM 面板)。
+      // 2026-05-16 用户要求:日志只在后台保存,屏幕上完全不显示。
+      // 查日志:log show --process Eatit --subsystem com.eatit.desktop.js --last 30m
+      // (Swift TTSGateway/diag.log handler 用 os_log 写,macOS 统一日志库持久化)
       (function(){
-        function send(level, args){
+        function sendBridge(level, msg){
           try {
             var handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.eatit;
             if (!handler) return;
-            var msg = Array.prototype.map.call(args, function(a){
-              if (typeof a === 'string') return a;
-              try { return JSON.stringify(a); } catch { return String(a); }
-            }).join(' ');
             handler.postMessage({ id: 'diag-' + Math.random().toString(36).slice(2,8), method: 'diag.log', params: { level: level, msg: msg.slice(0, 4000) } });
           } catch (_) { /* never propagate */ }
+        }
+        function send(level, args){
+          var msg = Array.prototype.map.call(args, function(a){
+            if (typeof a === 'string') return a;
+            try { return JSON.stringify(a); } catch { return String(a); }
+          }).join(' ');
+          sendBridge(level, msg);
         }
         var ow = console.warn.bind(console);
         var oe = console.error.bind(console);
         var ol = console.log.bind(console);
         console.warn = function(){ send('warn', arguments); ow.apply(null, arguments); };
         console.error = function(){ send('error', arguments); oe.apply(null, arguments); };
-        // 只把 pipeline-相关的 log 转发,避免噪声
         console.log = function(){
-          if (typeof arguments[0] === 'string' && /\[QQ\]|question|prefetch|interview/i.test(arguments[0])) {
+          if (typeof arguments[0] === 'string' && /\[QQ\]|\[ST\]|\[IP\]|question|prefetch|interview/i.test(arguments[0])) {
             send('log', arguments);
           }
           ol.apply(null, arguments);
         };
         window.addEventListener('error', function(e){
-          send('window-error', [(e.message || String(e)), (e.error && e.error.stack) || '']);
+          send('window-error', [(e.message || String(e)) + ' ' + ((e.error && e.error.stack) || '')]);
         });
         window.addEventListener('unhandledrejection', function(e){
           var r = e.reason;
-          send('rejection', [(r && r.message) || String(r), (r && r.stack) || '']);
+          send('rejection', [((r && r.message) || String(r)) + ' ' + ((r && r.stack) || '')]);
         });
       })();
     </script>

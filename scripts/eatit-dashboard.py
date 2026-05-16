@@ -169,6 +169,40 @@ h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; }
 """
 
 
+def tail_live_log(lines: int = 30) -> str:
+    """实时尾部 ralph live.log,过滤掉 ANSI 控制字符。"""
+    live = REPO_ROOT / ".ralph" / "live.log"
+    if not live.exists():
+        return "(.ralph/live.log 不存在 — ralph 尚未启动?)"
+    try:
+        with live.open("rb") as f:
+            f.seek(0, 2)  # SEEK_END
+            size = f.tell()
+            # 读最后 16KB,足够 50 行
+            f.seek(max(0, size - 16384))
+            chunk = f.read().decode("utf-8", errors="replace")
+        # ANSI escape 清除
+        ansi = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+        chunk = ansi.sub("", chunk)
+        return "\n".join(chunk.splitlines()[-lines:])
+    except Exception as e:
+        return f"(读取 live.log 失败:{e})"
+
+
+def tail_js_console(seconds: int = 120) -> str:
+    """读最近 N 秒的 JS console 日志(diag.log Bridge → com.eatit.desktop.js)。"""
+    try:
+        out = subprocess.check_output(
+            ["log", "show",
+             "--predicate", 'subsystem == "com.eatit.desktop.js"',
+             "--info", "--last", f"{seconds}s", "--style", "compact"],
+            text=True, stderr=subprocess.DEVNULL, timeout=5,
+        )
+        return out.strip() or "(过去 {} 秒无 JS 日志)".format(seconds)
+    except Exception as e:
+        return f"(读取 JS 日志失败:{e})"
+
+
 def render_html() -> str:
     milestones, done_total, todo_total = parse_fix_plan()
     total = done_total + todo_total
@@ -179,6 +213,8 @@ def render_html() -> str:
     loop = current_loop_info()
     commits = recent_commits(12)
     wd = watchdog_recent()
+    live_tail = tail_live_log(40)
+    js_tail = tail_js_console(120)
 
     # Identify current node (first unchecked in fix_plan order)
     current_node = None
@@ -251,13 +287,13 @@ def render_html() -> str:
 <html lang="zh">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="refresh" content="30">
+<meta http-equiv="refresh" content="5">
 <title>Eatit v3.4 — {pct}% · {done_total}/{total}</title>
 <style>{PAGE_CSS}</style>
 </head>
 <body>
 <h1>Eatit v3.4 — macOS App Store 重构</h1>
-<div class="sub">实时进度面板 · 30 秒自动刷新 · {now_china()}</div>
+<div class="sub">实时进度面板 · <b>5 秒</b>自动刷新 · {now_china()}</div>
 
 <div class="card big-bar">
   <h2>总进度</h2>
@@ -277,6 +313,16 @@ def render_html() -> str:
 </div>
 
 {"".join(ms_cards)}
+
+<div class="card" id="live-tail-card">
+  <h2>🔴 Ralph 实时输出 <span style="font-size:11px;color:#888;font-weight:400;margin-left:8px;">(.ralph/live.log 最近 40 行,5s 刷新)</span></h2>
+  <pre style="background:#1a1a1a;color:#d4d4d4;padding:14px;border-radius:6px;max-height:360px;overflow-y:auto;font:11px/1.5 ui-monospace,monospace;white-space:pre-wrap;margin:0;">{html.escape(live_tail)}</pre>
+</div>
+
+<div class="card">
+  <h2>🟢 Eatit JS Console <span style="font-size:11px;color:#888;font-weight:400;margin-left:8px;">(com.eatit.desktop.js 最近 2 分钟 — QQ/IP/ST 标记 + reject + error)</span></h2>
+  <pre style="background:#0e1a0e;color:#a8d4a8;padding:14px;border-radius:6px;max-height:260px;overflow-y:auto;font:11px/1.5 ui-monospace,monospace;white-space:pre-wrap;margin:0;">{html.escape(js_tail)}</pre>
+</div>
 
 <div class="card">
   <h2>最近 commits</h2>
