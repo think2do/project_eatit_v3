@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type {
   InterviewDirectionV32,
@@ -7,11 +7,10 @@ import type {
 } from "@eatit/shared-types";
 import { createSession } from "@/api/sessions";
 import { PageStepIndicator } from "@/components/PageStepIndicator";
-import { TipsCarousel } from "@/components/TipsCarousel";
+import { WarmupOverlay } from "@/components/WarmupOverlay";
 import { SummarySidebar } from "@/pages/config/SummarySidebar";
 import { deriveJobTitle } from "@/lib/jobTitle";
 import { requestMicPermission } from "@/lib/mic";
-import { selectTips } from "@/lib/tips";
 import { useAppStore } from "@/stores/app-store";
 
 type StyleOption = {
@@ -90,8 +89,8 @@ export function ConfigPage(): JSX.Element {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const submitTips = useMemo(() => selectTips("parsing", 0), []);
+  const [warmStage, setWarmStage] = useState<1 | 2 | 3 | null>(null);
+  const [warmError, setWarmError] = useState<string | null>(null);
 
   // F-317: consume one-shot preset handoff from ReportPage's dark CTA
   // and clear the slot. Runs once on mount; subsequent navigations
@@ -151,6 +150,7 @@ export function ConfigPage(): JSX.Element {
     }
 
     setSubmitting(true);
+    setWarmStage(1); setWarmError(null);
     try {
       const response = await createSession({
         asset_bundle_id: upload.assetBundleId,
@@ -160,9 +160,10 @@ export function ConfigPage(): JSX.Element {
           duration_minutes: config.durationMinutes,
         },
       });
-      navigate(`/interview/${response.session_id}`);
+      setWarmStage(2);
+      navigate(`/interview/${response.session_id}`, { state: { warming: true } });
     } catch (err) {
-      setError(extractError(err));
+      setWarmError(extractError(err));
     } finally {
       setSubmitting(false);
     }
@@ -198,18 +199,23 @@ export function ConfigPage(): JSX.Element {
     label: DIRECTION_OPTIONS.find((opt) => opt.value === value)?.label ?? value,
   }));
 
+  if (warmStage !== null) {
+    return (
+      <WarmupOverlay
+        stage={warmStage}
+        error={warmError}
+        onBack={() => { setWarmStage(null); setWarmError(null); }}
+      />
+    );
+  }
+
   return (
-    <>
     <div
       style={{
         display: "flex",
         gap: 24,
         alignItems: "flex-start",
-        opacity: submitting ? 0.45 : 1,
-        pointerEvents: submitting ? "none" : "auto",
-        transition: "opacity 180ms ease",
       }}
-      aria-hidden={submitting ? true : undefined}
     >
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 24, minWidth: 0 }}>
       <div>
@@ -375,59 +381,6 @@ export function ConfigPage(): JSX.Element {
         onStart={handleStart}
       />
     </div>
-
-    {submitting ? (
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="AI 正在生成面试框架"
-        data-testid="config-framework-overlay"
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 50,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 24,
-          background: "rgba(15, 23, 42, 0.42)",
-          backdropFilter: "blur(2px)",
-          WebkitBackdropFilter: "blur(2px)",
-        }}
-      >
-        <div
-          style={{
-            width: "100%",
-            maxWidth: 520,
-            background: "var(--bg-elev)",
-            borderRadius: "var(--r-lg)",
-            border: "1px solid var(--line)",
-            boxShadow: "var(--shadow-lg)",
-            padding: 28,
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontSize: 16,
-                fontWeight: 600,
-                color: "var(--ink-900)",
-              }}
-            >
-              AI 正在为你定制面试框架...
-            </div>
-            <div style={{ fontSize: 12.5, color: "var(--ink-500)", marginTop: 4 }}>
-              通常约 30-60 秒。在此期间可以看看面试技巧。
-            </div>
-          </div>
-          <TipsCarousel tips={submitTips} />
-        </div>
-      </div>
-    ) : null}
-    </>
   );
 }
 
