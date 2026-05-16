@@ -27,6 +27,9 @@ vi.mock("@/core/agents/observer", () => ({
 vi.mock("@/core/agents/reference", () => ({
   runReferenceAgent: vi.fn(),
 }));
+vi.mock("@/core/agents/coach", () => ({
+  streamDraftReadableAnswer: vi.fn(),
+}));
 vi.mock("@/core/graphs/turnGraph", () => ({
   buildTurnGraph: vi.fn(() => ({ invoke: vi.fn() })),
 }));
@@ -89,6 +92,7 @@ vi.mock("@/core/sessions/QuestionQueue", () => {
 import { runInterviewerAgent } from "@/core/agents/interviewer";
 import { runObserverAgent } from "@/core/agents/observer";
 import { runReferenceAgent } from "@/core/agents/reference";
+import { streamDraftReadableAnswer } from "@/core/agents/coach";
 import { buildTurnGraph } from "@/core/graphs/turnGraph";
 import { buildPostReportGraph } from "@/core/graphs/postReportGraph";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -97,6 +101,7 @@ import * as QuestionQueueModule from "@/core/sessions/QuestionQueue";
 const mockRunInterviewerAgent = vi.mocked(runInterviewerAgent);
 const mockRunObserverAgent = vi.mocked(runObserverAgent);
 const mockRunReferenceAgent = vi.mocked(runReferenceAgent);
+const mockStreamDraftReadableAnswer = vi.mocked(streamDraftReadableAnswer);
 const mockBuildTurnGraph = vi.mocked(buildTurnGraph);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const stubQueue = (QuestionQueueModule as any)._stubQueue as {
@@ -236,6 +241,10 @@ beforeEach(() => {
   // Default: observer and reference succeed
   mockRunObserverAgent.mockResolvedValue(makeObserverOutput());
   mockRunReferenceAgent.mockResolvedValue(makeReferenceOutput());
+
+  // Default: streaming draft yields no chunks (soft-fail path — consistent with
+  // pre-M10.2 behavior where no stream mock existed and the real call would fail).
+  mockStreamDraftReadableAnswer.mockImplementation(async function* () { /* empty */ });
 
   // Default: turnGraph returns assessment + next question
   const mockInvoke = vi.fn().mockResolvedValue(makeTurnGraphResult());
@@ -459,6 +468,97 @@ describe("runInterviewSession", () => {
     // Second call should receive previous_summary from first turn's compressed.summary
     const secondCallArgs = mockInvoke.mock.calls[1][0] as { previous_summary: string | null };
     expect(secondCallArgs.previous_summary).toBe("第一轮摘要");
+  });
+
+  // Test 11 (M10.2 — case a)
+  // Stream arrives first: reference.started must fire exactly once per turn,
+  // before the first reference.chunk, even when multiple chunks arrive and
+  // reference.ready also resolves afterward.
+  it("M10.2 case-a: stream chunk first → exactly one reference.started per turn, before first chunk", async () => {
+    mockStreamDraftReadableAnswer.mockImplementation(async function* () {
+      yield "chunk1";
+      yield "chunk2";
+    });
+    mockRunReferenceAgent.mockResolvedValue(makeReferenceOutput());
+
+    const events = await collectEvents(BASE_INPUT, [
+      { type: "answer.submitted", text: "第一轮回答", turnIndex: 0 },
+      { type: "session.end" },
+    ]);
+
+    const types = events.map((e) => e.type);
+
+    // There must be reference.started events (one per turn: Q0 + Q1 = 2 turns)
+    const startedEvents = events.filter(
+      (e): e is Extract<InterviewSessionEvent, { type: "reference.started" }> =>
+        e.type === "reference.started",
+    );
+    expect(startedEvents.length).toBeGreaterThanOrEqual(1);
+
+    // Each turnIndex appears exactly once in reference.started
+    const seenTurnIndexes = new Set(startedEvents.map((e) => e.turnIndex));
+    expect(seenTurnIndexes.size).toBe(startedEvents.length);
+
+    // reference.started comes before the first reference.chunk for the same turn
+    const firstChunkIdx = types.indexOf("reference.chunk");
+    const firstStartedIdx = types.indexOf("reference.started");
+    if (firstChunkIdx !== -1) {
+      expect(firstStartedIdx).toBeLessThan(firstChunkIdx);
+    }
+
+    // reference.ready events (if any) do not cause a second reference.started
+    // for the same turn — the Set guard prevents double-emit
+    for (const readyEvent of events.filter(
+      (e): e is Extract<InterviewSessionEvent, { type: "reference.ready" }> =>
+        e.type === "reference.ready",
+    )) {
+      const startedForSameTurn = startedEvents.filter(
+        (s) => s.turnIndex === readyEvent.turnIndex,
+      );
+      expect(startedForSameTurn).toHaveLength(1);
+    }
+  });
+
+  // Test 12 (M10.2 — case b)
+  // Stream fails / produces no chunks, but reference.ready resolves → still
+  // emits one reference.started (via the .then path), ordered before reference.ready.
+  it("M10.2 case-b: stream fails but reference.ready resolves → reference.started emitted via .then path", async () => {
+    mockStreamDraftReadableAnswer.mockImplementation(async function* () {
+      throw new Error("stream down");
+    });
+    mockRunReferenceAgent.mockResolvedValue(makeReferenceOutput());
+
+    const events = await collectEvents(BASE_INPUT, [
+      { type: "answer.submitted", text: "第一轮回答", turnIndex: 0 },
+      { type: "session.end" },
+    ]);
+
+    const types = events.map((e) => e.type);
+
+    // No stream chunks should be present (stream threw before yielding anything)
+    expect(types).not.toContain("reference.chunk");
+
+    // reference.started must still appear (from .then path)
+    const startedEvents = events.filter(
+      (e): e is Extract<InterviewSessionEvent, { type: "reference.started" }> =>
+        e.type === "reference.started",
+    );
+    expect(startedEvents.length).toBeGreaterThanOrEqual(1);
+
+    // For each reference.ready, reference.started for the same turn appeared first
+    for (const readyEvent of events.filter(
+      (e): e is Extract<InterviewSessionEvent, { type: "reference.ready" }> =>
+        e.type === "reference.ready",
+    )) {
+      // Exactly one reference.started per turn
+      const startedForTurn = startedEvents.filter((s) => s.turnIndex === readyEvent.turnIndex);
+      expect(startedForTurn).toHaveLength(1);
+
+      // That specific reference.started must appear before reference.ready for the same turn
+      const startedIdx = events.indexOf(startedForTurn[0]);
+      const readyIdx = events.indexOf(readyEvent);
+      expect(startedIdx).toBeLessThan(readyIdx);
+    }
   });
 });
 

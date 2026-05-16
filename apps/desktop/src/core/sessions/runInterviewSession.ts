@@ -59,6 +59,10 @@ export type InterviewSessionEvent =
   | { type: "question.generated"; payload: InterviewerAgentOutput }
   | { type: "turn.assessed"; payload: TurnAssessment }
   | { type: "coach.observation"; payload: ObserverAgentOutput }
+  // M10.2: emitted once per turn on first sign-of-life from reference
+  // (first stream chunk OR reference agent resolve, whichever arrives first).
+  // Consumed by M10.3 interview-machine to transition out of "warming" state.
+  | { type: "reference.started"; turnIndex: number }
   // turnIndex on reference.ready: reference agent fires asynchronously when
   // the question is generated (peek-while-typing UX), so the event may
   // arrive before / during / after the corresponding submit. The state
@@ -230,6 +234,7 @@ export async function* runInterviewSession(
       { llm },
     )
       .then((value) => {
+        markReferenceStarted(capturedTurnIndex);                   // M10.2: covers stream soft-fail path
         events.push({
           type: "reference.ready",
           turnIndex: capturedTurnIndex,
@@ -245,6 +250,17 @@ export async function* runInterviewSession(
   // Keyed by turnIndex. abort() is called when the next turn starts or session ends,
   // so we don't waste tokens on stale streaming for a question the user moved past.
   const draftAbortControllers = new Map<number, AbortController>();
+
+  // M10.2: one-shot guard — emit reference.started exactly once per turn,
+  // whichever of (first stream chunk, reference.ready) arrives first.
+  // Defined here in the outer generator scope so both startReference and
+  // startStreamingDraft closures can reach it (they live above the IIFE).
+  const referenceStartedTurns = new Set<number>();
+  const markReferenceStarted = (idx: number): void => {
+    if (referenceStartedTurns.has(idx)) return;
+    referenceStartedTurns.add(idx);
+    events.push({ type: "reference.started", turnIndex: idx });
+  };
 
   // M8.3: Start streaming reference draft concurrently with startReference().
   // Fires chatStream (Bridge → Swift LLMGateway → ARK) and pushes reference.chunk
@@ -272,6 +288,7 @@ export async function* runInterviewSession(
           { llm },
         )) {
           if (controller.signal.aborted) break;
+          markReferenceStarted(capturedTurnIndex);                 // M10.2: first chunk → sign-of-life
           events.push({ type: "reference.chunk", turnIndex: capturedTurnIndex, delta: chunk });
         }
         if (!controller.signal.aborted) {
