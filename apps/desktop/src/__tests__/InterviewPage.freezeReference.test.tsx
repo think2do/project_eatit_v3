@@ -59,6 +59,7 @@ function advanceToUserAnswering() {
   actor.send({ type: "CONNECT", sessionId: "test-session" });
   actor.send({ type: "WS_OPEN" });
   actor.send({ type: "SERVER_QUESTION", payload: MOCK_QUESTION });
+  actor.send({ type: "REFERENCE_STARTED", turn_index: 0 });
   return actor;
 }
 

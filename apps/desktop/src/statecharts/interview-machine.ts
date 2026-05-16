@@ -85,7 +85,8 @@ export type InterviewEvent =
   | { type: "TRANSCRIPT_PARTIAL"; text: string }
   | { type: "TRANSCRIPT_FINAL"; text: string }
   | { type: "END_SESSION" }
-  | { type: "WS_ERROR"; message: string };
+  | { type: "WS_ERROR"; message: string }
+  | { type: "REFERENCE_STARTED"; turn_index: number };
 
 function appendObservationToContext(
   context: InterviewContext,
@@ -119,6 +120,7 @@ const appendObservation = assign<InterviewContext, InterviewEvent>({
  * Lifecycle:
  *   idle -> connecting (WS opens, session.init goes out)
  *        -> ready      (waiting for first question from server)
+ *        -> warming    (Q0: question set, waiting for REFERENCE_STARTED)
  *        -> user_answering (question delivered, user typing)
  *        -> scoring    (turn.end sent, waiting for assessment)
  *        -> next_question (waiting for the next server.question.generated)
@@ -204,7 +206,7 @@ export const interviewMachine = createMachine({
     ready: {
       on: {
         SERVER_QUESTION: {
-          target: "user_answering",
+          target: "warming",
           actions: assign({
             currentQuestion: ({ event }) => event.payload,
             currentTurnIndex: ({ event }) => event.payload.turn_index,
@@ -218,6 +220,24 @@ export const interviewMachine = createMachine({
         END_SESSION: "ended",
         WS_ERROR: {
           actions: assign({ error: ({ event }) => event.message }),
+        },
+      },
+    },
+    warming: {
+      on: {
+        REFERENCE_STARTED: {
+          guard: ({ context, event }) =>
+            event.type === "REFERENCE_STARTED" &&
+            event.turn_index === context.currentTurnIndex,
+          target: "user_answering",
+        },
+        END_SESSION: { target: "ended" },
+        WS_ERROR: {
+          target: "user_answering",
+          actions: assign({
+            error: ({ event }) =>
+              event.type === "WS_ERROR" ? event.message : null,
+          }),
         },
       },
     },
