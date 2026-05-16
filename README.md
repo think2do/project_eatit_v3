@@ -1,185 +1,193 @@
 <div align="center">
-  <img src="apps/desktop/src-tauri/icons/128x128.png" alt="Eatit" width="96" height="96" />
+  <img src="apps/macos/Eatit/Assets.xcassets/AppIcon.appiconset/icon_128x128.png" alt="Eatit" width="96" height="96" />
 
   <h1>Eatit</h1>
 
-  <p><strong>BYOK 的本地 AI 模拟面试官 · macOS 桌面应用</strong></p>
+  <p><strong>本地优先的 AI 模拟面试系统 · macOS App Store 交付版本</strong></p>
 
   <p>
-    <a href="#%E5%AE%89%E8%A3%85"><img alt="platform" src="https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey" /></a>
-    <a href="#%E6%8A%80%E6%9C%AF%E6%A0%88"><img alt="frontend" src="https://img.shields.io/badge/frontend-Swift%20%2B%20WKWebView%20%2B%20React%2018-blue" /></a>
-    <a href="#%E6%8A%80%E6%9C%AF%E6%A0%88"><img alt="backend" src="https://img.shields.io/badge/backend-Local%20TS%20Agents-success" /></a>
-    <a href="#%E6%8A%80%E6%9C%AF%E6%A0%88"><img alt="asr" src="https://img.shields.io/badge/ASR-Volcengine%20SAUC-orange" /></a>
+    <img alt="platform" src="https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey" />
+    <img alt="shell" src="https://img.shields.io/badge/native-Swift%20%2B%20WKWebView-blue" />
+    <img alt="frontend" src="https://img.shields.io/badge/frontend-React%2018%20%2B%20TypeScript-3178c6" />
+    <img alt="agents" src="https://img.shields.io/badge/agents-LangGraph.js-success" />
+    <img alt="distribution" src="https://img.shields.io/badge/distribution-Mac%20App%20Store-black" />
   </p>
 
   <p>
-    上传简历与 JD,自定义面试风格,Eatit 用你自己的 LLM Key 给你做一场结构化模拟面试,本地 SQLite,无登录,无云同步。
+    上传简历和岗位 JD,配置面试风格与方向,Eatit 会组织多轮 AI 模拟面试,给出实时观察、参考回答、评估报告和跨场次成长建议。
   </p>
 </div>
 
 ---
 
-## 为什么选 Eatit
+## 项目概览
 
-- **完全本地**:简历、面试录音、回答记录、报告全部存在 macOS Sandbox 容器目录,不上传任何云
-- **BYOK(Bring Your Own Key)**:你用自己的火山引擎 Ark Key 调 LLM,Eatit 不中转、不计费、不接触余额
-- **macOS 原生**:Swift app + 嵌入 WKWebView + 本地 SQLite,所有数据停留在本机,符合 App Store sandbox 规范
-- **真实临场感**:面试官语音播报问题、按住说话录音、实时转写,跟真实电话面试节奏一致
-- **AI 全程辅助**:答题时可一键查看参考提纲;每轮答完右侧会有 AI 观察提醒;最终生成带证据绑定的评估报告
+Eatit 是一个面向求职者的 AI 模拟面试 macOS 应用。产品主线是「简历 + JD → 多轮面试 → 评估报告 → 跨场次成长追踪」,不是简历生成器、岗位推荐平台或招聘 SaaS。
 
-## 截图
+当前 v3.4 版本以 Mac App Store 上架为最终交付定义,架构已收敛为 Swift 原生壳 + WKWebView + React 前端 + 本地 TypeScript Agent 编排。应用不开本地服务端,不依赖 Python sidecar,不提供 DMG 或网站下载等备用分发路径。
 
-> *截图位待补,可拖一张 Eatit 实机截图到 `docs/` 后引用*
+## 核心功能
 
-## 主要功能
+| 模块           | 能力                                                                                                             |
+| -------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 简历与 JD 解析 | 提炼岗位匹配点、简历亮点、潜在风险和可追问项目                                                                   |
+| 联网情报       | 用户 opt-in 后,只用公司名、岗位名、行业关键词检索公司与行业信息                                                  |
+| 面试配置       | 支持 4 种面试风格、6 个方向多选 1-3 项、15/30/45 分钟时长                                                        |
+| 多 Agent 面试  | Parse、Research、Framework、Interviewer、Reference Answer、Compression、Report、Coach、Reflection、Observer 协作 |
+| 实时面试       | AI 面试官出题、追问线索、语音/文字回答、实时统计和观察侧栏                                                       |
+| 参考回答       | 每轮异步生成参考话术,默认折叠,避免用户照念                                                                       |
+| 评估报告       | 五维度评分、单题评分、通过可能性三档、证据绑定反馈                                                               |
+| 复盘与成长     | 单场 Reflection 教学复盘 + 跨场次 Coach 个性化建议                                                               |
+| 本地存储       | SQLite + macOS Sandbox 容器,数据留在用户设备内                                                                   |
 
-| 模块 | 描述 |
-| --- | --- |
-| 简历 + JD 解析 | ParseAgent 从简历 + JD 提炼匹配点、亮点、风险、可深挖的项目 |
-| 自定义面试框架 | 选风格(友好引导 / 标准专业 / 高强度追问)、方向(岗位匹配 / 项目深挖 / 行为综合)、时长(15/20/30 min) |
-| 实时面试 | 语音 / 文字双模,火山引擎 SAUC 流式 ASR(Bring Your Own Volc credentials),中文语音播报问题 |
-| AI 参考答案 | 每轮问题刚出来时后台异步生成提纲 + 完整示例 + 评分关键点 + 常见误区,默认隐藏,一键展开 |
-| AI 实时观察 | 每轮答完 AI 给一句 ≤ 60 字的 support / alert / pivot 提醒 |
-| 评估报告 | 通过可能性环 + 证据绑定的维度评价 + 下一场行动建议,可一键打印为 PDF |
-| 综合分析 | 跨多场面试的 MetaReport,识别长期模式 |
+## 产品约束
 
-## 安装
-
-### Mac App Store
-
-TBD: Mac App Store 上架后,从 App Store 直接安装。
-
-> Eatit v3.4 是 Mac App Store 上架定位的 sandboxed 应用,首次打开遵循标准 App Store 流程,无需绕过任何系统安全校验。
-
-## 快速上手
-
-1. **配置 LLM Key** —— 设置 → 填入火山引擎 Ark API Key → 测试连接
-2. **上传简历 + JD** —— 拖拽 PDF/文本文件 → 点「开始 AI 解析」
-3. **配置面试** —— 选风格 / 方向 / 时长 → 点「开始面试」(等 30–60 秒生成框架)
-4. **答题** —— 听 AI 面试官提问(语音/文字),按住说话或键入回答
-5. **拿报告** —— 答完点「提前结束」或自然结束,AI 生成带证据绑定的评估报告
+- App Store 是唯一正式分发渠道。
+- macOS 版本要求为 macOS 14.0+。
+- Sandbox 必须开启。
+- 不使用 `network.server` entitlement。
+- 不使用 `disable-library-validation` entitlement。
+- 不在运行时下载可执行代码、动态库或 native 模块。
+- API Key 只进入 Keychain 和运行时内存,不得写入日志、Sentry 或 SQLite。
+- WebView 网络白名单限制为火山引擎 Ark 与 OpenSpeech 相关域名。
+- JS 与 Swift bridge 使用双端 schema 化契约,Codable 与 Zod 同步维护。
 
 ## 技术栈
 
-| 层 | 选型 |
-| --- | --- |
-| 桌面壳 | Xcode + Swift + WKWebView(macOS 14 Sonoma+) |
-| 前端 | React 18 + TypeScript 5 + Vite + XState + TanStack Query + Zustand |
-| 后端 | 完全本地 — 无 Python / 无 server |
-| 数据 | SQLite + WAL(via Swift GRDB,Bridge 到 JS)+ macOS Sandbox container |
-| LLM 接入 | Bridge → Swift LLMGateway → 火山 Ark(BYOK) |
-| Agent 编排 | LangGraph.js(turn_graph / intake_graph / post_report_graph) |
-| 语音识别 | Bridge → Swift ASRGateway → 火山引擎 SAUC 流式 WebSocket |
-| 语音合成 | Web Speech API(macOS 系统中文语音) |
-| 打包 | xcodebuild + Apple Developer ID(M5.3 路径)+ App Store Connect |
+| 层级       | 选型                                                        |
+| ---------- | ----------------------------------------------------------- |
+| macOS 壳   | Swift、AppKit/SwiftUI、WKWebView、Xcode project             |
+| 前端       | React 18、TypeScript、Vite、XState、TanStack Query、Zustand |
+| Agent 编排 | LangGraph.js、Zod、Vercel AI SDK                            |
+| 数据契约   | TypeScript interfaces、Zod schema、Swift Codable            |
+| 本地数据库 | SQLite + WAL,Swift 侧服务经 bridge 暴露给前端               |
+| LLM        | 火山引擎 Ark,BYOK 模式                                      |
+| ASR        | 火山引擎流式 SAUC,Swift native 代理                         |
+| TTS        | macOS 系统语音能力                                          |
+| 测试       | Vitest、Playwright、XCTest、xcodebuild                      |
 
 ## 架构
 
-```
-┌─────────────────────────────────────────────────────────┐
-│   Eatit.app (Mac App Store, Sandboxed)                 │
-│  ┌────────────────────────┐   ┌──────────────────────┐  │
-│  │  React UI (WKWebView)  │ ──── bridge.call ────►   │  │
-│  │  - InterviewPage XState│   │  Swift services     │  │
-│  │  - core/agents/*       │   │  - KeychainService  │  │
-│  │  - core/graphs/*       │   │  - LLMGateway       │  │
-│  │  - core/sessions/      │   │  - ASRGateway       │  │
-│  │    runInterviewSession │   │  - DatabaseService  │  │
-│  └────────────────────────┘   │  - PDFParserService │  │
-│                                └──────────┬───────────┘  │
-│                                            │             │
-│                                            ▼             │
-│       ~/Library/Containers/com.eatit.desktop/           │
-│       └─ Application Support/Eatit/                      │
-│          ├─ eatit.db (SQLite + WAL via GRDB)             │
-│          └─ cache/                                       │
-│                                                          │
-│  Outbound:                                               │
-│   • https://ark.cn-beijing.volces.com (LLM, BYOK)       │
-│   • wss://openspeech.bytedance.com (SAUC ASR, BYOK)     │
-└─────────────────────────────────────────────────────────┘
+```text
+Eatit.app
+├─ Swift macOS shell
+│  ├─ WKWebView
+│  ├─ BridgeRouter
+│  ├─ KeychainService
+│  ├─ LLMGateway
+│  ├─ ASRGateway
+│  ├─ DatabaseService
+│  └─ PDFParserService
+│
+└─ React application
+   ├─ pages/
+   ├─ components/
+   ├─ services/nativeBridge.ts
+   ├─ core agents
+   └─ LangGraph.js graphs
 
-API Key 存 macOS Keychain,Swift 端 inject 到 URLRequest header,
-JS 永远不见 ARK_API_KEY。Bridge 双端 Codable + Zod 同 commit 改。
+Data:
+~/Library/Containers/<bundle-id>/Data/Library/Application Support/Eatit/eatit.db
+
+Network allowlist:
+https://ark.cn-beijing.volces.com
+wss://openspeech.bytedance.com
 ```
 
-## 从源码构建
+## 仓库结构
 
-<details>
-<summary>展开开发环境配置</summary>
+```text
+.
+├── apps/
+│   ├── desktop/          # React + TypeScript 前端
+│   └── macos/            # Swift macOS App、Bridge、服务与 XCTest
+├── docs/
+│   ├── PRD/              # 产品需求与版本约束
+│   ├── design-reference/ # 设计系统与页面原型
+│   └── FEATURES.md       # 已实现功能镜像
+├── packages/
+│   └── shared-types/     # 跨端共享类型
+├── scripts/              # 校验、构建、隐私与签名辅助脚本
+├── package.json
+├── pnpm-workspace.yaml
+└── README.md
+```
 
-### 前置依赖
+## 本地开发
 
-- Node.js 20+ 与 `pnpm`(可用 `corepack enable`)
+### 环境要求
+
+- macOS 14+
 - Xcode 15+
-- macOS 14+(Sonoma)
+- Node.js 20+
+- pnpm 9+
 
-### 启动开发模式
+### 安装依赖
 
 ```bash
-# 安装依赖
+corepack enable
 pnpm install
-
-# 纯 web 调试(Vite dev server)
-cd apps/desktop && pnpm dev
-
-# — OR — 构建并运行原生 app
-cd apps/macos && xcodebuild build -scheme Eatit -destination "platform=macOS"
-open apps/macos/build/Build/Products/Debug/Eatit.app
 ```
 
-### 跑测试
+### 启动前端开发服务器
 
 ```bash
-# 前端单元测试
-pnpm --dir apps/desktop test
-
-# 类型检查
-pnpm --dir apps/desktop exec tsc --noEmit
-
-# Swift 测试
-cd apps/macos && xcodebuild test -scheme Eatit -destination "platform=macOS"
+pnpm --dir apps/desktop dev
 ```
 
-### 打 Archive(App Store 发布)
+### 构建前端资源
 
 ```bash
-# Archive
-xcodebuild archive \
+pnpm --dir apps/desktop build
+```
+
+### 构建 macOS App
+
+```bash
+xcodebuild build \
+  -project apps/macos/Eatit.xcodeproj \
   -scheme Eatit \
-  -archivePath apps/macos/build/Eatit.xcarchive
-
-# 通过 Xcode Organizer 或 xcrun altool 上传至 App Store Connect
+  -destination "platform=macOS"
 ```
 
-</details>
+### 运行测试
 
-## 隐私与数据流
+```bash
+pnpm --dir apps/desktop test
+pnpm --dir apps/desktop exec tsc --noEmit
+xcodebuild test \
+  -project apps/macos/Eatit.xcodeproj \
+  -scheme Eatit \
+  -destination "platform=macOS"
+```
 
-- LLM Key 存 macOS Keychain(Swift KeychainService 管理)
-- 简历 / JD / 面试转写 / 报告全部本地 SQLite,**永不上传**
-- LLM 调用直连火山引擎 Ark,API Key 仅在 Swift 层 inject 到请求 header
-- 语音识别走火山引擎 SAUC 流式 WebSocket,仅传输音频帧,无 PII
-- 无埋点、无 telemetry、无自动更新
+## App Store 发布检查
 
-## Roadmap
+发布前至少需要完成以下闸门:
 
-- [x] Phase 1–4 基础闭环(BYOK / 6 Agent / LangGraph / 语音面试)
-- [x] Phase 5.1–5.3 打包 + 错误边界 + PDF 导出 + Apple Developer ID
-- [x] Tauri → Xcode/WKWebView 迁移(v3.4)
-- [ ] Mac App Store 上架
-- [ ] 一键获取 API Key 跳转(参考 Cherry Studio)
-- [ ] 报告深化:拉分/扣分项展开、下一场 drill 建议
-- [ ] 面试记录搜索 / 筛选 / 「再来一场同岗位」CTA
+- `xcodebuild archive` 通过。
+- entitlements 校验通过,确认 Sandbox 开启。
+- `spctl --assess` 通过。
+- 网络监控只命中白名单 host。
+- `PrivacyInfo.xcprivacy` 完整。
+- TestFlight 上传通过。
+- App Store Review 拒绝项在 48 小时内修复并重新提交。
+
+## 隐私原则
+
+- 简历、JD、面试记录、报告和成长建议默认存储在本机。
+- API Key 存储在 macOS Keychain。
+- Research Agent 必须由用户显式授权后才运行。
+- Research Agent payload 只允许包含公司名、岗位名和行业关键词。
+- 禁止把简历正文、姓名、邮箱、电话或其他 PII 发送给联网检索。
+- 日志不得记录明文 API Key 或明文公司 cache key。
+
+## 当前状态
+
+- v3.2/v3.3 的多 Agent 面试能力已完成主体实现。
+- v3.4 已迁移到 App Store 友好的 Swift + WKWebView 架构。
+- 后续工作聚焦 App Store 提交流程、审核修复、体验打磨和发布材料完善。
 
 ## License
 
-License TBD —— 当前仓库尚未添加 LICENSE 文件。在添加前请勿用于商业用途。
-
-## 致谢
-
-- [LangGraph.js](https://github.com/langchain-ai/langgraphjs) —— 多 Agent 编排
-- [@xstate/react](https://stately.ai/docs/xstate) —— 面试状态机
-- [Volcengine Ark](https://www.volcengine.com/product/ark) —— LLM 推理
-- [Volcengine SAUC](https://www.volcengine.com/product/asr) —— 流式语音识别
-- [GRDB](https://github.com/groue/GRDB.swift) —— Swift SQLite
+当前仓库尚未添加开源许可证。未经授权,请勿复制、分发或用于商业用途。
