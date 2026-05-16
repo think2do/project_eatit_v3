@@ -154,7 +154,7 @@ export function WarmupOverlay({ stage, error, onBack }: Props): JSX.Element {
           })}
         </div>
 
-        <TipsCarousel tips={tips} size="large" />
+        <TipsCarousel tips={tips} size="full" />
       </div>
     </div>
   );

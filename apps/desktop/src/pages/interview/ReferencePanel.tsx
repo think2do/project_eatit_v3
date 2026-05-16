@@ -195,7 +195,9 @@ export function ReferencePanel({ reference, resetKey, streamingText }: Props): J
         </div>
       ) : null}
 
-      {reference.ideal_answer ? (
+      {/* 只展示流式答案。ideal_answer 仅作为流式完全缺失(stream 软失败)时的
+          兜底,避免面板空白;正常情况下不再重复渲染结构化版本。 */}
+      {(!streamingText || streamingText.length === 0) && reference.ideal_answer ? (
         <div
           style={{
             fontSize: 13,

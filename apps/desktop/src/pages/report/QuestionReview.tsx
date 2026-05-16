@@ -49,10 +49,17 @@ export function QuestionReview(props: QuestionReviewProps): JSX.Element {
         : "var(--warn)";
 
   // Prefer the markdown field (M8.2+); fall back to the legacy plain-text field.
-  const aiAnswer =
+  // Strip any leading guiding phrase ("你可以这样答：" etc.) — the answer must
+  // read as the persona speaking directly, not an instruction to the user.
+  // Covers existing reports + occasional LLM non-compliance with the prompt.
+  const aiAnswer = (
     (props.aiSuggestedAnswerMarkdown ?? "").trim() ||
     (props.aiSuggestedAnswer ?? "") ||
-    "";
+    ""
+  ).replace(
+    /^\s*(?:你可以这样(?:回答|答)|建议(?:你)?(?:这样)?回答|可以这样(?:说|答|回答)|参考(?:回答|答案)|范例(?:回答|答案))\s*[:：]\s*/,
+    "",
+  );
 
   const rawAnswer = (props.rawAnswer ?? "").trim();
 
