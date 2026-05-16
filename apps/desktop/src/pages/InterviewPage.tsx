@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMachine } from "@xstate/react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Loader2, Pause, Volume2, ChevronRight as ChevronRightIcon } from "lucide-react";
 import { getAppSetting } from "@/api/appSettings";
 import { loadLLMConfig, type LLMConfig } from "@/lib/llm/config";
@@ -43,6 +43,7 @@ import { useTurnStats } from "@/pages/interview/useTurnStats";
 import { VoiceControl } from "@/pages/interview/VoiceControl";
 import { WaveBars } from "@/pages/interview/WaveBars";
 import { interviewMachine } from "@/statecharts/interview-machine";
+import { WarmupOverlay } from "@/components/WarmupOverlay";
 import {
   createVolcStreamAsr,
   type VolcStreamAsrController,
@@ -95,6 +96,8 @@ function estimateTotalTurns(durationMinutes: number): number {
   return 16;
 }
 
+const WARMUP_REFERENCE_TIMEOUT_MS = 8000;
+
 type InputMode = "voice" | "text";
 
 function getViewportWidth(): number {
@@ -105,6 +108,8 @@ function getViewportWidth(): number {
 export function InterviewPage(): JSX.Element {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isWarmupEntry = Boolean((location.state as { warming?: boolean } | null)?.warming);
   const [state, send] = useMachine(interviewMachine);
   const micStreamRef = useRef<MediaStream | null>(null);
   const controllerRef = useRef<VolcStreamAsrController | null>(null);
@@ -352,6 +357,10 @@ export function InterviewPage(): JSX.Element {
                   live_observation: event.payload.live_observation ?? null,
                 },
               });
+              // Non-warmup entries (history/refresh) skip the warming state in one tick.
+              if (!isWarmupEntry) {
+                send({ type: "REFERENCE_STARTED", turn_index: localTurnIndex });
+              }
               // Increment after bootstrap; subsequent questions come one per turn.
               localTurnIndex += 1;
               break;
@@ -376,6 +385,9 @@ export function InterviewPage(): JSX.Element {
                   actionable: event.payload.actionable,
                 },
               });
+              break;
+            case "reference.started":
+              send({ type: "REFERENCE_STARTED", turn_index: event.turnIndex });
               break;
             case "reference.ready":
               send({
@@ -727,6 +739,15 @@ export function InterviewPage(): JSX.Element {
     state.context.partialTranscript,
   ]);
 
+  // F-515: 8s fallback to unblock warming if reference.started never fires.
+  useEffect(() => {
+    if (!state.matches("warming")) return;
+    const t = window.setTimeout(() => {
+      send({ type: "REFERENCE_STARTED", turn_index: state.context.currentTurnIndex });
+    }, WARMUP_REFERENCE_TIMEOUT_MS);
+    return () => window.clearTimeout(t);
+  }, [state.value, state.context.currentTurnIndex, send]);
+
   // F-310: per-turn wall-clock start. Resets the moment the user enters
   // the answering state for a new turn (covers both voice and text
   // modes). The hook freezes its timer when this is null, so we drop
@@ -844,6 +865,17 @@ export function InterviewPage(): JSX.Element {
 
   if (!sessionId) {
     return <NoSessionPlaceholder />;
+  }
+
+  const warmStage: 1 | 2 | 3 | null = !isWarmupEntry
+    ? null
+    : (state.matches("idle") || state.matches("connecting") || state.matches("ready"))
+      ? 2
+      : state.matches("warming")
+        ? 3
+        : null;
+  if (warmStage !== null) {
+    return <WarmupOverlay stage={warmStage} error={state.context.error} />;
   }
 
   const isUserAnswering = state.matches("user_answering");
