@@ -169,7 +169,20 @@ Match the section prefix(`V34.M*.*`)to 当前 spec 文件即可。
 - [x] M9.3 结束态卡片正中央放大 (ce6649fd, 2026-05-15)(developer,**Parallel-safe**)— 老板原话"在面试结束后的那个状态,把它给放在正中间,稍微大一点"。新增 `AnalyzingHeroCard`(560px 宽居中,标题 20px,带 spinner)挂在 HomePage 顶部;隐藏重复的右下角 toast。详 spec `## M9.3`
 - [x] M9.4 History list 加生成中状态 (defac924, 2026-05-15)(developer,**Parallel-safe**)— 老板原话"在 list 里面去加一个生成缓存中的一个状态"。HistoryPage list item 渲染时检查 sessionStatus-store.analyzing,是则显示 `生成中` chip + spinner;`unreadReports` 则显示 `新` chip。详 spec `## M9.4`
 
-- [ ] M6.5 第一次 Archive + 上传 App Store Connect(developer,**Deps: M8.1~M8.6 + M9.1~M9.4 全部 [x]**)— `archive-and-upload.sh`
+### M10 — 面试预热统一加载(1 天,5 节点) — ★ 排在 M6.5 之前 ★
+
+> spec: [`.ralph/specs/v34-warmup-sections.md`](specs/v34-warmup-sections.md)
+> **来源**:2026-05-16 用户反馈("在生成面试题目框架之后,然后面试题目和提示生成之后才开始显示,提前预热出两道题目")
+> **优先级**:M10.1~M10.5 全部 [x] 之前**不要碰 M6.5**(体验不稳就不上架,与 M9 同纪律)
+> Ralph 按 top-down 第一个未勾消费;M10.1~M10.3 互不依赖可并行,M10.4 deps M10.1,M10.5 deps 前 4 节点
+
+- [ ] M10.1 WarmupOverlay 纯展示组件(developer,**Parallel-safe**,Deps: —)— 零 state/effect/async 的三段式阶段进度组件,ConfigPage + InterviewPage 复用保证跨页连续。新增 `apps/desktop/src/components/WarmupOverlay.tsx` + test(≥5 case)。复用 TipsCarousel/selectTips/Spinner,tips.ts 不改。详 spec `## M10.1`
+- [ ] M10.2 runInterviewSession 一次性 reference.started 事件(developer,**Parallel-safe**,Deps: —)— InterviewSessionEvent 加 `reference.started`;IIFE 内 `referenceStartedTurns` Set + `markReferenceStarted` 守卫;startStreamingDraft 首 chunk 前 + startReference.then 前各调一次。现有 reference.chunk/ready/streamComplete 不动(流式加粗零回归)。详 spec `## M10.2`
+- [ ] M10.3 interview-machine warming 态 + REFERENCE_STARTED(developer,**Parallel-safe**,Deps: —)— InterviewEvent 加 `REFERENCE_STARTED`;ready 的 SERVER_QUESTION target 由 user_answering 改 warming;新增唯一 1 个 warming 态(REFERENCE_STARTED guard turn 匹配→user_answering;END_SESSION→ended;WS_ERROR→user_answering 带 error)。新增 interview-machine.warming.test.ts(≥4 case),既有直达用例同步改。详 spec `## M10.3`
+- [ ] M10.4 ConfigPage 接入 stage-1 预热屏(developer,Deps: M10.1)— warmStage/warmError state;提交 setWarmStage(1)→await createSession→成功 setWarmStage(2)+navigate(state:{warming:true}),失败 setWarmError;渲染早返回 WarmupOverlay 替换原 opacity:0.45 变灰。详 spec `## M10.4`
+- [ ] M10.5 InterviewPage 整合(developer,Deps: M10.1+M10.2+M10.3+M10.4)— WARMUP_REFERENCE_TIMEOUT_MS=8000;useLocation 取 isWarmupEntry;generator 加 reference.started→REFERENCE_STARTED;非预热入口单 tick 穿 warming;8s 超时 effect 兜底;warming 期渲染 WarmupOverlay(stage 2/3)。退场需 pnpm test 全绿 + xcodebuild 成功 + 用户跑 7 场景手测。详 spec `## M10.5`
+
+- [ ] M6.5 第一次 Archive + 上传 App Store Connect(developer,**Deps: M8.1~M8.6 + M9.1~M9.4 + M10.1~M10.5 全部 [x]**)— `archive-and-upload.sh`
 
 ### M7 — Review 处理 + 上架(反应式,1+ 节点)
 
