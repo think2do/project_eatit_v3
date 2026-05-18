@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>Eatit</string>
+    <string>EatIt</string>
     <key>CFBundleDisplayName</key>
-    <string>Eatit</string>
+    <string>EatIt</string>
     <key>CFBundleExecutable</key>
     <string>Eatit</string>
     <key>CFBundlePackageType</key>
@@ -21,7 +21,7 @@
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.education</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Eatit 需要使用麦克风以录制您的面试回答,音频会通过您配置的火山引擎 ASR 服务转写为文字。</string>
+    <string>EatIt 需要使用麦克风以录制您的面试回答,音频会通过您配置的火山引擎 ASR 服务转写为文字。</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>
