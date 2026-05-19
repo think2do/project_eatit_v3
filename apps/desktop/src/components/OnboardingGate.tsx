@@ -1,54 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { getAppSetting } from "@/api/appSettings";
+import { Outlet } from "react-router-dom";
 
-const ONBOARDING_KEY = "onboarding_completed_at";
-
-function Shimmer(): JSX.Element {
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "var(--bg)",
-      }}
-    >
-      <div
-        style={{
-          width: 220,
-          height: 12,
-          borderRadius: "var(--r-pill)",
-          background:
-            "linear-gradient(90deg, var(--bg-sunken) 0%, var(--line) 50%, var(--bg-sunken) 100%)",
-          backgroundSize: "200% 100%",
-          animation: "eatit-shimmer 1.4s ease-in-out infinite",
-        }}
-      />
-    </div>
-  );
-}
-
+/**
+ * OnboardingGate — first-run wizard gate.
+ *
+ * 2026-05-19:应用户要求**临时隐藏 onboarding**。原逻辑会在
+ * `onboarding_completed_at` 未设置时强制重定向到 `/onboarding`。
+ * 现在直接放行进主应用;`/onboarding` 路由仍保留,设置入口可手动进入。
+ * 需要恢复强制引导时,`git revert` 本次改动即可(原实现见 git 历史)。
+ */
 export function OnboardingGate(): JSX.Element {
-  const location = useLocation();
-  const query = useQuery({
-    queryKey: ["app-settings", ONBOARDING_KEY],
-    queryFn: () => getAppSetting<string>(ONBOARDING_KEY),
-    staleTime: Infinity,
-    retry: false,
-  });
-
-  if (query.isLoading) return <Shimmer />;
-
-  // If the backend is unreachable, don't trap the user on a shimmer — let them in.
-  // The wizard will be available from the sidebar later; first-run redirect only
-  // happens when we definitively know the setting is absent.
-  if (query.isError) return <Outlet />;
-
-  if (query.data == null) {
-    return <Navigate to="/onboarding" replace state={{ from: location.pathname }} />;
-  }
-
   return <Outlet />;
 }
