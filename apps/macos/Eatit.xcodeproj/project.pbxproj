@@ -78,7 +78,7 @@
 		84A1C10BF214F3B9C20D9C99 /* DatabaseServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseServiceTests.swift; sourceTree = "<group>"; };
 		8ABC08D39D205B42554753E9 /* EatitURLSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EatitURLSchemeHandler.swift; sourceTree = "<group>"; };
 		98C4162768A769BBADA44F3B /* MigrationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationsTests.swift; sourceTree = "<group>"; };
-		9C4F92E482943CF0EAFEC515 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		9C4F92E482943CF0EAFEC515 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		9DC0CCB522DCA3F271495FC5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A2CF8E15614176A28DF57FFF /* Eatit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Eatit.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A5EA76747759170E42A8C8E4 /* BridgeRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeRouter.swift; sourceTree = "<group>"; };
@@ -323,7 +323,7 @@
 			mainGroup = 3207EDFB2C14763B647D0A54;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				DBB87B44E04B5E83B70A12E3 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+				DBB87B44E04B5E83B70A12E3 /* XCRemoteSwiftPackageReference "GRDB" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BC2E2CC04CE62E05C1FA7FFB /* Products */;
@@ -473,6 +473,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 2;
 				INFOPLIST_FILE = Eatit/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -650,6 +651,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 2;
 				INFOPLIST_FILE = Eatit/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -708,7 +710,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		DBB87B44E04B5E83B70A12E3 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+		DBB87B44E04B5E83B70A12E3 /* XCRemoteSwiftPackageReference "GRDB" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/groue/GRDB.swift";
 			requirement = {
@@ -721,12 +723,12 @@
 /* Begin XCSwiftPackageProductDependency section */
 		50AC1480FF709D1CDD73F0EB /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = DBB87B44E04B5E83B70A12E3 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			package = DBB87B44E04B5E83B70A12E3 /* XCRemoteSwiftPackageReference "GRDB" */;
 			productName = GRDB;
 		};
 		EB6C3281A76DF9FEC0ECC39C /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = DBB87B44E04B5E83B70A12E3 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			package = DBB87B44E04B5E83B70A12E3 /* XCRemoteSwiftPackageReference "GRDB" */;
 			productName = GRDB;
 		};
 /* End XCSwiftPackageProductDependency section */
