@@ -206,6 +206,37 @@ xcodebuild test \
 - v3.4 已迁移到 App Store 友好的 Swift + WKWebView 架构。
 - 后续工作聚焦 App Store 提交流程、审核修复、体验打磨和发布材料完善。
 
+## 协作者
+
+<table>
+  <tr>
+    <td align="center" width="130">
+      <a href="https://github.com/CrazyGoudanli">
+        <img src="https://github.com/CrazyGoudanli.png" width="72" alt="呆胶布" /><br/>
+        <sub><b>呆胶布</b></sub>
+      </a>
+    </td>
+    <td align="center" width="130">
+      <a href="https://github.com/dqh3388ok-cloud">
+        <img src="https://github.com/dqh3388ok-cloud.png" width="72" alt="dqh3388ok-cloud" /><br/>
+        <sub><b>dqh3388ok-cloud</b></sub>
+      </a>
+    </td>
+    <td align="center" width="130">
+      <a href="https://github.com/KakooChung">
+        <img src="https://github.com/KakooChung.png" width="72" alt="KakooChung" /><br/>
+        <sub><b>KakooChung</b></sub>
+      </a>
+    </td>
+    <td align="center" width="130">
+      <a href="https://github.com/z13141557217-web">
+        <img src="https://github.com/z13141557217-web.png" width="72" alt="Hong Tao Zhou" /><br/>
+        <sub><b>Hong Tao Zhou</b></sub>
+      </a>
+    </td>
+  </tr>
+</table>
+
 ## License
 
 当前仓库尚未添加开源许可证。未经授权,请勿复制、分发或用于商业用途。
