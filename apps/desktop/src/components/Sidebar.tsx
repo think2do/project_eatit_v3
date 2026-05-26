@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import {
   FileText,
@@ -131,22 +132,33 @@ function NavItem({
   Icon: React.ComponentType<{ size?: number }>;
   badge?: number;
 }): JSX.Element {
+  // Hover must be driven by state, not CSS :hover — the inline
+  // `background: transparent` on inactive items would otherwise win over a
+  // stylesheet :hover rule. Minimalist hover: neutral sunken tint, no shadow,
+  // text nudged darker. Active (white card + shadow) takes precedence.
+  const [hovered, setHovered] = useState(false);
   return (
     <NavLink
       to={to}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={({ isActive }) => ({
         display: "flex",
         alignItems: "center",
         gap: 10,
         padding: "8px 10px",
         borderRadius: "var(--r-sm)",
-        color: isActive ? "var(--ink-900)" : "var(--ink-700)",
+        color: isActive || hovered ? "var(--ink-900)" : "var(--ink-700)",
         fontSize: 13.5,
         fontWeight: isActive ? 500 : 450,
-        background: isActive ? "var(--bg-elev)" : "transparent",
+        background: isActive
+          ? "var(--bg-elev)"
+          : hovered
+            ? "var(--line-strong)"
+            : "transparent",
         boxShadow: isActive ? "var(--shadow-sm)" : undefined,
         textDecoration: "none",
-        transition: "background 120ms ease",
+        transition: "background 120ms ease, color 120ms ease",
       })}
     >
       {({ isActive: _isActive }) => (
@@ -187,58 +199,17 @@ function SidebarFooter(): JSX.Element {
         borderTop: "1px solid var(--line)",
       }}
     >
-      <NavLink
-        to="/settings"
-        style={({ isActive }) => ({
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "8px 10px",
-          borderRadius: "var(--r-sm)",
-          color: isActive ? "var(--ink-900)" : "var(--ink-700)",
-          fontSize: 13.5,
-          fontWeight: isActive ? 500 : 450,
-          background: isActive ? "var(--bg-elev)" : "transparent",
-          boxShadow: isActive ? "var(--shadow-sm)" : undefined,
-          textDecoration: "none",
-        })}
-      >
-        <Settings size={16} />
-        <span>设置</span>
-      </NavLink>
+      <NavItem to="/settings" label="设置" Icon={Settings} />
       <div
+        data-testid="sidebar-privacy-note"
         style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 5,
-          margin: "10px 6px 2px",
-          padding: "3px 9px",
-          fontSize: 11,
-          fontWeight: 500,
-          borderRadius: "var(--r-pill)",
-          background: "var(--brand-soft)",
-          color: "var(--brand-ink)",
+          margin: "12px 10px 4px",
+          fontSize: 11.5,
+          color: "var(--ink-400)",
+          lineHeight: 1.5,
         }}
       >
-        BYOK · 本地
-      </div>
-      <SidebarUserCard />
-    </div>
-  );
-}
-
-// Mirrors `.nav-user` block in design-reference/shell.jsx. The desktop
-// app is single-user BYOK with no auth backend, so name + plan are
-// placeholders until a real userProfile store slice lands.
-function SidebarUserCard(): JSX.Element {
-  return (
-    <div className="nav-user" data-testid="sidebar-user-card">
-      <div className="avatar" aria-hidden="true">
-        Y
-      </div>
-      <div>
-        <div className="nav-user-name">你</div>
-        <div className="nav-user-plan">本地 · 免费</div>
+        你的数据仅保留在本地
       </div>
     </div>
   );
