@@ -234,8 +234,16 @@ xcodebuild test \
         <sub><b>Hong Tao Zhou</b></sub>
       </a>
     </td>
+    <td align="center" width="130">
+      <a href="https://github.com/Yee-hub-dev">
+        <img src="https://github.com/Yee-hub-dev.png" width="72" alt="Yee-hub-dev" /><br/>
+        <sub><b>Yee-hub-dev</b></sub>
+      </a>
+    </td>
   </tr>
 </table>
+
+<sub>排名不分先后。</sub>
 
 ## License
 
