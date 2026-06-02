@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ONBOARDING_GATE_QUERY_KEY } from "@/components/OnboardingGate";
 import { getAppSetting, putAppSetting } from "@/api/appSettings";
 // §A0 v3.4: ASR availability surfaced via ASRGateway errors at runtime; no health probe.
 import {
@@ -62,6 +64,7 @@ type SaveStatus =
   | { kind: "error"; message: string };
 
 export function SettingsPage(): JSX.Element {
+  const queryClient = useQueryClient();
   const [config, setConfig] = useState<LLMConfig>(() => initialConfig());
   const [hydrated, setHydrated] = useState(false);
   const [keyConfigured, setKeyConfigured] = useState(false);
@@ -120,6 +123,11 @@ export function SettingsPage(): JSX.Element {
         // 也让「已配置 API Key」提示更明确。
         setConfig((c) => ({ ...c, api_key: "" }));
       }
+      // Tell OnboardingGate's cached `hasLLMApiKey()` result is stale: next
+      // time the gate evaluates it'll re-read keychain. Without this, a user
+      // who configures a key in this session would still be subject to the
+      // initial-load redirect if they happen to navigate via `/` later.
+      await queryClient.invalidateQueries({ queryKey: ONBOARDING_GATE_QUERY_KEY });
       setSaveStatus({ kind: "saved" });
     } catch (err) {
       setSaveStatus({

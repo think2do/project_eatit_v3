@@ -37,10 +37,20 @@ function Shimmer(): JSX.Element {
   );
 }
 
+export const ONBOARDING_GATE_QUERY_KEY = ["llm-api-key-present"] as const;
+
+/**
+ * 2026-06-01 修复 Apple 二次拒审(Guideline 2.1a):之前实现 "无 key 且
+ * pathname !== /settings → redirect /settings" 把侧边栏每个点击都弹回
+ * 设置页,审核员表现为"侧边栏点啥都没反应"。
+ *
+ * 现在只在**初次从根路径 `/` 进入**且无 key 时 redirect 一次(原"全新
+ * 用户引导"意图保留);用户从侧边栏主动点的任何路径,gate 全部放行。
+ */
 export function OnboardingGate(): JSX.Element {
   const location = useLocation();
   const query = useQuery({
-    queryKey: ["llm-api-key-present"],
+    queryKey: ONBOARDING_GATE_QUERY_KEY,
     queryFn: () => hasLLMApiKey(),
     staleTime: Infinity,
     retry: false,
@@ -51,8 +61,9 @@ export function OnboardingGate(): JSX.Element {
   // keychain unreachable → don't trap the user; let them in.
   if (query.isError) return <Outlet />;
 
-  // No API key yet → send to the API config screen (unless already there).
-  if (query.data === false && location.pathname !== "/settings") {
+  // First-run only: from the root path, if no key, nudge to /settings once.
+  // Any other path (sidebar navigation) is never blocked, even without a key.
+  if (query.data === false && location.pathname === "/") {
     return <Navigate to="/settings" replace state={{ from: location.pathname }} />;
   }
 
