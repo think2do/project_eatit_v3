@@ -1,15 +1,23 @@
+import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { hasLLMApiKey } from "@/lib/llm/config";
 
+export const ONBOARDING_GATE_QUERY_KEY = ["llm-api-key-present"] as const;
+
 /**
- * OnboardingGate — first-run API-key gate.
+ * OnboardingGate — first-run API-key nudge (defense-in-depth rewrite).
  *
- * 2026-05-19:onboarding 向导已隐藏(见 git 历史)。改为按「是否配过
- * API Key」把关:没配过 key 的用户(全新用户)进任意页都先重定向到
- * `/settings`(配置 API 的界面),配过 key 后正常进主应用。
- * 已在 /settings 时不再重定向,避免自跳循环。
- * keychain 不可达(开发壳 / 出错)时放行,不把用户卡在占位屏。
+ * 2026-06-04 三次拒审后的加固版本(Submission a6e822bd):
+ * 渲染期**永远** `<Outlet />`,绝不返回 `<Navigate>`;首次进入根路径
+ * 且未配 key 时的"引导到 /settings"通过 useEffect + useRef 实现,**每个
+ * app session 最多触发一次**。如此一来:
+ * - 侧边栏导航的任何渲染路径都不会被 redirect 拦截(根除 6/1、6/4 那个
+ *   bug 的所有可能复发路径,包括 query 缓存/时序抖动)
+ * - 全新用户首次启动仍被引导到设置页(原 UX 意图保留)
+ * - 用户配过 key、之后再回到 "/" 时,不再触发任何跳转
+ *
+ * keychain 不可达 / 出错 → 放行,不引导,也不卡屏。
  */
 function Shimmer(): JSX.Element {
   return (
@@ -37,18 +45,10 @@ function Shimmer(): JSX.Element {
   );
 }
 
-export const ONBOARDING_GATE_QUERY_KEY = ["llm-api-key-present"] as const;
-
-/**
- * 2026-06-01 修复 Apple 二次拒审(Guideline 2.1a):之前实现 "无 key 且
- * pathname !== /settings → redirect /settings" 把侧边栏每个点击都弹回
- * 设置页,审核员表现为"侧边栏点啥都没反应"。
- *
- * 现在只在**初次从根路径 `/` 进入**且无 key 时 redirect 一次(原"全新
- * 用户引导"意图保留);用户从侧边栏主动点的任何路径,gate 全部放行。
- */
 export function OnboardingGate(): JSX.Element {
   const location = useLocation();
+  const navigate = useNavigate();
+  const nudgedRef = useRef(false);
   const query = useQuery({
     queryKey: ONBOARDING_GATE_QUERY_KEY,
     queryFn: () => hasLLMApiKey(),
@@ -56,16 +56,27 @@ export function OnboardingGate(): JSX.Element {
     retry: false,
   });
 
+  useEffect(() => {
+    // Fire AT MOST once per session, and only on initial "/" landing
+    // with confirmed no-key. Subsequent navigations are never redirected,
+    // no matter the query state or path.
+    if (nudgedRef.current) return;
+    if (query.isLoading) return;
+    if (query.isError) return;
+    if (query.data !== false) return;
+    if (location.pathname !== "/") return;
+    nudgedRef.current = true;
+    navigate("/settings", { replace: true });
+  }, [
+    query.isLoading,
+    query.isError,
+    query.data,
+    location.pathname,
+    navigate,
+  ]);
+
+  // Initial mount before query settles → brief placeholder.
+  // After that, ALWAYS render the matched route. Never <Navigate /> here.
   if (query.isLoading) return <Shimmer />;
-
-  // keychain unreachable → don't trap the user; let them in.
-  if (query.isError) return <Outlet />;
-
-  // First-run only: from the root path, if no key, nudge to /settings once.
-  // Any other path (sidebar navigation) is never blocked, even without a key.
-  if (query.data === false && location.pathname === "/") {
-    return <Navigate to="/settings" replace state={{ from: location.pathname }} />;
-  }
-
   return <Outlet />;
 }
